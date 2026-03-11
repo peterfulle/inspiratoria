@@ -13,7 +13,7 @@ interface Company {
   company_size: string;
   website: string;
   plan: 'enterprise' | 'growth' | 'starter' | 'trial';
-  status: 'active' | 'trial' | 'suspended' | 'cancelled';
+  status: 'active' | 'trial' | 'suspended' | 'cancelled' | 'inactive';
   account_type: string;
   users: number;
   programs: number;

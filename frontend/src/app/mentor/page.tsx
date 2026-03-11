@@ -205,11 +205,13 @@ function formatDateShort(date: Date): string {
   return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 }
 
-function formatTime(date: Date): string {
+function formatTime(date: Date | undefined): string {
+  if (!date) return '';
   return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 }
 
-function getRelativeDay(date: Date): string {
+function getRelativeDay(date: Date | undefined): string {
+  if (!date) return '';
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);

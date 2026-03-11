@@ -15,12 +15,25 @@ interface InfluenceUser {
   role?: string;
 }
 
+export interface InfluenceNode {
+  id: string;
+  name: string;
+  role: string;
+  avatar: string;
+  influence: number;
+  metrics?: Record<string, number>;
+}
+
 interface InfluenceBubblesProps {
-  users: InfluenceUser[];
+  users?: InfluenceUser[];
+  nodes?: InfluenceNode[];
   centerLabel?: string;
+  centralLabel?: string;
   centerValue?: number;
   showLegend?: boolean;
   size?: "sm" | "md" | "lg";
+  variant?: string;
+  onNodeClick?: (node: any) => void;
 }
 
 // Animation keyframes
@@ -450,16 +463,21 @@ export function InfluenceRing({
 // ═══════════════════════════════════════════════════════════════════
 
 interface InfluenceIndicatorProps {
-  value: number;
+  value?: number;
+  influence?: number;
   size?: "sm" | "md" | "lg";
   showPulse?: boolean;
+  trend?: string;
 }
 
 export function InfluenceIndicator({ 
   value, 
+  influence,
   size = "md",
-  showPulse = true
+  showPulse = true,
+  trend,
 }: InfluenceIndicatorProps) {
+  const displayValue = value ?? influence ?? 0;
   const sizes = {
     sm: { container: "w-8 h-8", text: "text-xs", pulse: "w-10 h-10" },
     md: { container: "w-10 h-10", text: "text-sm", pulse: "w-12 h-12" },
@@ -476,7 +494,7 @@ export function InfluenceIndicator({
     return { bg: "#FEF2F2", border: "#F87171", text: "#DC2626" };
   };
   
-  const colors = getColor(value);
+  const colors = getColor(displayValue);
 
   return (
     <div className="relative inline-flex items-center justify-center">
@@ -497,7 +515,7 @@ export function InfluenceIndicator({
           className={`${config.text} font-bold`}
           style={{ color: colors.text }}
         >
-          {value}
+          {displayValue}
         </span>
       </div>
     </div>
