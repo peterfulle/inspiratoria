@@ -1,0 +1,327 @@
+1️⃣ SOP OPERATIVO — Admin Journey
+
+(manual ejecutable del sistema)
+
+ETAPA 1 — SETUP INICIAL (Cliente)
+Objetivo
+
+Habilitar un cliente para operar programas.
+
+Paso a paso
+
+Admin ingresa a Clientes
+
+Admin selecciona:
+
+Cliente existente
+
+o Crear nuevo cliente
+
+Sistema muestra Ficha de Cliente
+
+Admin completa:
+
+Nombre empresa
+
+Contacto principal
+
+Email
+
+Teléfono
+
+Admin guarda ficha
+
+Reglas del sistema
+
+Si faltan campos obligatorios → no permite avanzar
+
+Si ficha completa → cliente pasa a estado HABILITADO
+
+Estado resultante
+
+Cliente = HABILITADO
+
+ETAPA 2 — DISEÑO DEL PROGRAMA
+Objetivo
+
+Definir la estructura lógica del programa.
+
+Paso a paso
+
+Admin entra a Programas
+
+Click en Crear programa
+
+Sistema solicita:
+
+Nombre
+
+Cliente
+
+Descripción
+
+Admin guarda → programa en estado DISEÑADO
+
+Loop de actividades
+
+Admin crea actividad
+
+Sistema pregunta:
+
+Tipo: Entrenamiento / Evento
+
+Si Entrenamiento
+
+Definir:
+
+Público objetivo
+
+Contenido por módulos (sí/no)
+
+Encuesta por módulo (sí/no)
+
+Certificación final (sí/no)
+
+Si Evento
+
+Definir:
+
+Online / Presencial
+
+Encuesta satisfacción (sí/no)
+
+Certificado participación (sí/no)
+
+Sistema guarda actividad
+
+¿Agregar otra actividad?
+
+Sí → vuelve a paso 5
+
+No → continúa
+
+Reglas del sistema
+
+Un programa debe tener ≥ 1 actividad
+
+Todas las reglas quedan “hardcodeadas” al programa
+
+Estado resultante
+
+Programa = DISEÑADO
+
+ETAPA 3 — CONFIGURACIÓN DE USUARIOS
+Objetivo
+
+Asignar personas y roles.
+
+Paso a paso
+
+Admin entra a Usuarios del programa
+
+Sistema pregunta método de carga:
+
+Individual
+
+Masiva (Excel)
+
+Masiva
+
+Admin sube Excel
+
+Sistema valida:
+
+Campos obligatorios
+
+Duplicados
+
+Si hay error → devuelve archivo con observaciones
+
+Si OK → crea/asocia usuarios
+
+Individual
+
+Admin busca usuario
+
+Si existe → asocia
+
+Si no existe → crea usuario
+
+Admin asigna rol:
+
+Mentor
+
+Mentee / Participante
+
+Facilitador
+
+Cliente
+
+Sistema pregunta:
+
+¿Requiere match con otro rol? (sí/no)
+
+¿Agregar otro usuario?
+
+Sí → repetir
+
+No → continuar
+
+Reglas del sistema
+
+Un usuario puede tener múltiples roles
+
+El match NO se crea aún, solo se marca
+
+Estado resultante
+
+Programa = LISTO PARA EJECUCIÓN
+
+ETAPA 4 — EJECUCIÓN
+Objetivo
+
+Operar el programa en tiempo real.
+
+Paso a paso
+
+Admin define fechas de actividades
+
+Sistema actualiza calendario
+
+Según tipo de actividad:
+
+Evento → habilita gestión de agenda
+
+Entrenamiento → publica contenidos
+
+Admin asigna:
+
+Facilitadores
+
+Participantes
+
+Sistema envía invitaciones automáticas
+
+Sistema registra:
+
+Confirmaciones
+
+Asistencia
+
+Sistema envía encuestas si aplica
+
+Subproceso MATCH
+
+Sistema detecta usuarios “requiere match”
+
+Admin ejecuta match
+
+Cliente valida (sí/no)
+
+Sistema guarda vínculo final
+
+Estados de actividades
+
+Programada
+
+Reprogramada
+
+Realizada
+
+Estado resultante
+
+Programa = EN EJECUCIÓN
+
+ETAPA 5 — SEGUIMIENTO
+Objetivo
+
+Detectar desvíos y accionar.
+
+Paso a paso
+
+Admin visualiza dashboard
+
+Sistema muestra alertas:
+
+Actividad atrasada
+
+Baja asistencia
+
+Encuestas pendientes
+
+Admin decide:
+
+Reprogramar
+
+Contactar usuarios
+
+No acción
+
+Sistema registra acción tomada
+
+Estado resultante
+
+Programa sigue EN EJECUCIÓN
+
+Se guarda “último seguimiento”
+
+ETAPA 6 — CIERRE Y REPORTE
+Objetivo
+
+Cerrar el ciclo y medir impacto.
+
+Paso a paso
+
+Admin verifica:
+
+Todas las actividades realizadas
+
+Sistema valida datos completos
+
+Si faltan datos → vuelve a Seguimiento
+
+Sistema consolida métricas
+
+Admin genera reporte:
+
+Interno
+
+Cliente
+
+Admin decide cierre formal
+
+Estado resultante
+
+Programa = CERRADO o REVISIÓN
+
+2️⃣ TABLA BPM — SWIMLANES
+Etapa	Admin	Cliente	Plataforma
+Setup	Crea cliente	Entrega datos	Valida y habilita
+Diseño	Define programa	—	Guarda reglas
+Usuarios	Carga usuarios	—	Valida / crea
+Ejecución	Agenda y match	Valida match	Envía invitaciones
+Seguimiento	Acciona alertas	Responde	Detecta alertas
+Cierre	Genera reportes	Recibe	Consolida datos
+3️⃣ MATRIZ RACI + KPIs
+RACI
+Etapa	Admin	Cliente	Plataforma
+Setup	R	A	S
+Diseño	R/A	C	S
+Usuarios	R	C	S
+Ejecución	R	A	A (automatización)
+Seguimiento	R	C	A
+Cierre	R/A	A	S
+
+R Responsible
+A Accountable
+C Consulted
+S Support
+
+KPIs por etapa
+Etapa	KPI clave
+Setup	% clientes habilitados
+Diseño	Tiempo diseño programa
+Usuarios	% carga sin errores
+Ejecución	% actividades realizadas
+Seguimiento	% alertas resueltas
+Cierre	% programas cerrados

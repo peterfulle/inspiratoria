@@ -1,0 +1,417 @@
+1) Admin Journey
+
+Descripción: Operación de programas, gestión operativa y trazabilidad end-to-end del programa (desde setup del cliente hasta cierre y reporte). 
+
+2) Objetos del sistema
+
+Entidades principales
+
+Cliente (empresa / cuenta)
+
+Programa
+
+Actividad (tipo: Entrenamiento o Evento) 
+
+Contenido (módulos, materiales)
+
+Usuario (con rol)
+
+Vinculación / Match (Mentor↔Mentee / Facilitador↔Participante)
+
+Encuesta (módulo / satisfacción)
+
+Dashboard / Reporte
+
+Roles de usuario
+
+Mentor
+
+Mentee / Participante
+
+Facilitador
+
+Cliente (admin del cliente / stakeholder)
+
+3) Estados del sistema (trazabilidad)
+
+Cliente
+
+Pendiente info → Validado → Habilitado (para crear programas) 
+
+Programa
+
+Diseñado → Listo para ejecución → En ejecución → Revisión (si hay datos incompletos) → Cerrado 
+
+Actividad
+
+Creada → Programada / Reprogramada → Realizada → Cerrada
+
+(Opcional) Encuesta enviada → Encuesta respondida
+
+4) Flujo macro por etapas (orden final)
+
+A continuación te lo dejo como “manual de operación” con Objetivo → Inputs → Acciones → Decisiones → Outputs/Estado.
+
+A) Setup inicial (Cliente)
+
+Objetivo: establecer el entorno base del cliente para habilitar gestión de programas. 
+
+Inputs
+
+Selección o creación de cliente
+
+Datos de contacto del cliente
+
+Acciones clave
+
+Seleccionar o crear cliente 
+
+Crear ficha del cliente 
+
+Completar datos del cliente 
+
+Validar información del cliente 
+
+Decisiones
+
+¿Cliente existe? (Sí/No) 
+
+¿Información del cliente completa? (Sí/No) 
+
+Output / Estado
+
+Cliente en estado “habilitado” para crear programas 
+
+B) Diseño del programa
+
+Objetivo: definir estructura, actividades, contenidos y reglas. 
+
+Inputs
+
+Cliente habilitado
+
+Lineamientos del programa (qué, para quién, duración, etc.)
+
+Acciones clave (core)
+
+Crear programa 
+
+Definir estructura de actividades 
+
+Definir reglas de avance / certificación 
+
+Por cada actividad: elegir tipo y configurar:
+
+Si Evento → configurar evento 
+
+Si Entrenamiento → configurar módulos de contenido 
+
+¿Agregar otra actividad? (loop) 
+
+Decisiones estructurales (siempre)
+
+Tipo de actividad: Entrenamiento / Evento
+
+Categoría de actividad:
+
+Entrenamiento: mentores / mentees / facilitadores / otro
+
+Evento: charla / workshop / encuentro / otro
+
+Rol objetivo: Mentores / Mentees / Facilitadores / Participantes / Otros
+
+Decisiones condicionales
+
+Entrenamiento
+
+¿Contenido se libera por módulos?
+
+¿Incluye encuesta al final de cada módulo?
+
+¿Entrega certificación al finalizar?
+
+Evento
+
+¿Online / presencial?
+
+¿Incluye encuesta de satisfacción?
+
+¿Entrega certificado de participación?
+
+Output / Estado
+
+Programa + actividades creadas y configuradas
+
+Programa en estado “diseñado” 
+
+C) Configuración de usuarios
+
+Objetivo: crear/asignar usuarios, roles, y sus vínculos al programa. 
+
+Inputs
+
+Programa diseñado
+
+Nómina de usuarios (o fuente)
+
+Acciones clave
+
+Elegir método de carga: Individual o Masiva (Excel) 
+
+Carga masiva (Excel)
+
+Subir archivo Excel 
+
+Validar usuarios cargados 
+
+Si hay errores: corregir archivo/ajustar datos y revalidar 
+
+Carga individual
+
+Crear o seleccionar usuario 
+
+Si existe: asociar usuario existente 
+
+Si no existe: crear usuario 
+
+Definir rol en el programa 
+
+Si requiere vinculación: registrar “requiere match” 
+
+¿Agregar más usuarios? (loop) 
+
+Decisiones
+
+¿Método de carga? (Masiva/Individual) 
+
+¿Existen errores en la carga? (Sí/No) 
+
+¿Usuario existe? (Sí/No) 
+
+¿Requiere vinculación? (Sí/No) 
+
+Output / Estado
+
+Usuarios creados/seleccionados, roles asignados, marcación de “requiere match”
+
+Programa en estado “listo para ejecución” 
+
+D) Ejecución del programa
+
+Objetivo: operar el programa garantizando agenda, contenidos, invitaciones y match. 
+
+Inputs
+
+Programa listo para ejecución
+
+Actividades diseñadas
+
+Usuarios cargados
+
+Acciones clave (operación)
+
+Definir fechas de inicio y cierre de actividades 
+
+Gestionar agenda de actividades 
+
+Por tipo de actividad:
+
+Evento: preparar evento (logística y materiales) 
+
+Entrenamiento: publicar contenidos de los módulos 
+
+Asociar facilitadores y participantes (si aplica) 
+
+Enviar invitaciones 
+
+Monitorear actividad y registrar estado 
+
+Enviar encuesta de satisfacción (si corresponde) 
+
+Subproceso: Match
+
+Identificar elegibles para el match 
+
+¿Hay elegibles? → ejecutar match 
+
+¿Validado por cliente? (si no, ajustar/iterar) 
+
+Crear “terna”/asignación final 
+
+Decisiones
+
+Tipo de actividad: Evento / Entrenamiento 
+
+¿Hay elegibles para match? 
+
+¿Validado por cliente? 
+
+¿Encuesta enviada? (Sí/No) 
+
+Output / Estado
+
+Actividades programadas, contenidos publicados, invitaciones enviadas, estados actualizados
+
+Programa en estado “En ejecución” 
+
+E) Seguimiento
+
+Objetivo: monitorear avance, asistencia, encuestas y alertas; ejecutar correcciones. 
+
+Inputs
+
+Estado de actividades
+
+Métricas de asistencia/participación
+
+Estado de encuestas/formularios
+
+Acciones clave
+
+Visualizar calendario de actividades
+
+Revisar estados (pendientes / reprogramadas / realizadas)
+
+Monitorear confirmados vs asistencia real
+
+Revisar pendientes de encuestas/formularios
+
+Identificar alertas operativas y tomar acciones correctivas básicas
+
+Reglas de alerta (operativas)
+
+Actividades atrasadas o no realizadas
+
+Baja tasa de confirmados
+
+Baja asistencia / inasistencia
+
+Encuestas o formularios pendientes
+
+Decisiones
+
+¿Requiere acción correctiva?
+
+Sí → contacto + reprogramar/comunicar
+
+No → continuar seguimiento
+
+Output / Estado
+
+Alertas registradas + acciones correctivas registradas
+
+Programa sigue “en ejecución” con “último seguimiento” registrado
+
+F) Cierre y Reporte
+
+Objetivo: consolidar resultados, dashboards, análisis y reportes de impacto. 
+
+Inputs
+
+Actividades finalizadas (o casi)
+
+Datos de encuestas y estados finales
+
+Acciones clave
+
+Consolidar datos del programa 
+
+Ver dashboards 
+
+Analizar encuestas 
+
+Revisar estados finales 
+
+Descargar y compartir reportes 
+
+Decisiones
+
+¿Programa completo? (Sí/No) 
+
+¿Datos incompletos?
+
+Sí → volver a Seguimiento (loop) 
+
+¿Cierre formal?
+
+Sí → estado “Cerrado”
+
+No → estado “Revisión” 
+
+Output / Estado
+
+Dashboards finales + reportes listos
+
+Programa en estado “Cerrado” (o “Revisión” si aplica) 
+
+5) Checklist mínimo por etapa (para que sea “100%” ejecutable)
+
+Setup
+
+Cliente existe o fue creado
+
+Ficha completa
+
+Cliente validado
+
+Cliente habilitado
+
+Diseño
+
+Programa creado
+
+Actividades definidas (tipo/categoría/rol objetivo)
+
+Reglas avance/certificación listas
+
+Configuración específica por tipo lista
+
+Estado: “diseñado”
+
+Usuarios
+
+Método de carga definido
+
+Usuarios validados (sin errores)
+
+Roles asignados
+
+“Requiere match” registrado si aplica
+
+Estado: “listo para ejecución”
+
+Ejecución
+
+Fechas inicio/cierre por actividad
+
+Agenda operativa lista
+
+Contenidos publicados / evento preparado
+
+Invitaciones enviadas
+
+Estados registrados
+
+Encuestas enviadas cuando corresponda
+
+Estado: “en ejecución”
+
+Seguimiento
+
+Alertas revisadas
+
+Acciones correctivas registradas
+
+Último seguimiento actualizado
+
+Cierre
+
+Programa completo
+
+Datos completos (si no, volver a seguimiento)
+
+Dashboards finales revisados
+
+Reporte generado/compartido
+
+Estado: “cerrado” o “revisión”

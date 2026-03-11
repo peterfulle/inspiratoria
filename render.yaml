@@ -1,0 +1,55 @@
+services:
+  # Backend Service (Django + FastAPI) - Python 3.10.16 required for Django 5.x
+  - type: web
+    name: inspiratoria-backend
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r backend/requirements.txt
+      python backend/manage.py collectstatic --noinput
+      python backend/manage.py migrate
+    startCommand: cd backend && uvicorn mentorloop_clone.asgi:application --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.16
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: False
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: inspiratoria-db
+          property: connectionString
+
+  # Frontend Service (Next.js)
+  - type: web
+    name: inspiratoria-frontend
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: |
+      cd frontend
+      npm install
+      npm run build
+    startCommand: cd frontend && npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://inspiratoria-backend.onrender.com/api
+
+databases:
+  # PostgreSQL Database
+  - name: inspiratoria-db
+    databaseName: inspiratoria
+    user: inspiratoria
+    region: oregon
+    plan: free

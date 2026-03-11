@@ -1,0 +1,33 @@
+cd "/Users/peterfulle/Downloads/INSPIRATORIA 2" && ./start_all.sh
+
+Email: admin@test.com
+Password: admin123
+
+http://localhost:3000
+
+ref.
+
+para enviar a  a <i class="fa fa-github
+
+paso 1:
+se enviara todo al git para que se carguen los archivos en el repositorio local inspiratoria 
+
+Paso 2: se hace push para reescribir archivos en todo el repositorio
+
+Paso 3: se confirmar el git push
+_________________
+
+git add .
+git status
+cd /Users/peterfulle/Desktop/Inspiratoria && git commit -m "actualizar"
+git push
+_________________
+
+para confirmar algun cambio puedes escribir.
+git status
+
+ INSPIRATORIA % chmod +x start_all.sh && ./start_all.sh
+
+
+
+ togglest

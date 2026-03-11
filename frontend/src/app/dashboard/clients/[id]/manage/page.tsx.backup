@@ -1,0 +1,1430 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+
+interface Company {
+  id: string;
+  name: string;
+  slug: string;
+  industry: string;
+  company_size: string;
+  website: string;
+  
+  // Personalidad jurídica
+  legal_name?: string;
+  rut?: string;
+  tax_id?: string;
+  legal_address?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  postal_code?: string;
+  
+  // Contacto principal
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  contact_position?: string;
+  
+  // Información comercial
+  business_type?: string;
+  foundation_year?: number;
+  description?: string;
+  
+  plan: string;
+  status: string;
+  is_data_complete: boolean;
+  is_enabled: boolean;
+  primary_color: string;
+  secondary_color: string;
+  max_users: number;
+  max_programs: number;
+  max_participants: number;
+  onboarding_completed: boolean;
+  created_at: string;
+}
+
+interface Program {
+  id: string;
+  name: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  participants_count: number;
+}
+
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  position: string;
+  is_active: boolean;
+}
+
+export default function ClientManagePage() {
+  const params = useParams();
+  const companyId = params?.id as string;
+
+  const [company, setCompany] = useState<Company | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (companyId) {
+      loadCompanyData();
+    }
+  }, [companyId]);
+
+  const loadCompanyData = async () => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${companyId}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setCompany(data);
+      }
+    } catch (error) {
+      console.error("Error loading company:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600 font-medium">Cargando información del cliente...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!company) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="text-center">
+          <p className="text-xl text-red-600 font-bold">Cliente no encontrado</p>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="p-8">
+      {/* Header simple */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className={`w-2 h-2 rounded-full ${company.is_enabled ? 'bg-green-500' : 'bg-red-500'}`}></div>
+          <span className="text-sm font-semibold text-gray-600">
+            {company.is_enabled ? 'Cliente habilitado' : 'Cliente no habilitado - Complete todos los datos'}
+          </span>
+        </div>
+        <h1 className="text-3xl font-bold text-gray-900">Perfil del Cliente</h1>
+        <p className="text-gray-600 mt-1">{company.name}</p>
+      </div>
+
+      {/* Contenido del perfil */}
+      <ProfileTab company={company} onRefresh={loadCompanyData} />
+    </div>
+  );
+}
+
+// Componente para la pestaña de Perfil
+function ProfileTab({ company, onRefresh }: { company: Company; onRefresh?: () => void }) {
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<any>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [localCompany, setLocalCompany] = useState(company);
+
+  const handleEdit = (section: string, initialData: any) => {
+    setEditingSection(section);
+    setEditFormData(initialData);
+  };
+
+  const handleSearchRUT = async (rut: string | undefined) => {
+    if (!rut) {
+      alert("Por favor ingresa un RUT válido");
+      return;
+    }
+
+    // Limpiar el RUT (quitar puntos y guión)
+    const cleanRUT = rut.replace(/\./g, '').replace(/-/g, '');
+    
+    setIsSaving(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/search-rut?rut=${cleanRUT}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Autocompletar los campos con los datos encontrados
+        setEditFormData({
+          ...editFormData,
+          legal_name: data.razon_social || editFormData.legal_name,
+          rut: data.rut || editFormData.rut,
+          tax_id: data.rut || editFormData.tax_id,
+          business_type: data.tipo_empresa || editFormData.business_type,
+          legal_address: data.direccion || editFormData.legal_address,
+          city: data.ciudad || editFormData.city,
+          region: data.region || editFormData.region,
+        });
+        alert(`✅ Datos encontrados para: ${data.razon_social}`);
+      } else {
+        alert("No se encontraron datos para este RUT. Puedes ingresarlos manualmente.");
+      }
+    } catch (error) {
+      console.error("Error buscando RUT:", error);
+      alert("Error al buscar datos del RUT. Verifica que esté correctamente escrito.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${company.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editFormData),
+        }
+      );
+      
+      if (response.ok) {
+        const updatedCompany = await response.json();
+        setLocalCompany(updatedCompany);
+        setEditingSection(null);
+        setEditFormData({});
+        if (onRefresh) onRefresh();
+      } else {
+        alert("Error al actualizar los datos");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Error al actualizar los datos");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Acciones */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`w-2 h-2 rounded-full ${localCompany.is_enabled ? 'bg-green-500' : 'bg-red-500'}`}></div>
+          <span className="text-xs font-semibold text-gray-600">
+            {localCompany.is_enabled ? 'Cliente habilitado' : 'Cliente no habilitado - Complete todos los datos'}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        {/* COLUMNA IZQUIERDA */}
+        <div className="space-y-4">
+          
+          {/* Datos Básicos */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wide">Datos Básicos</h3>
+              </div>
+              <button
+                onClick={() => handleEdit('basicos', {
+                  name: localCompany.name,
+                  industry: localCompany.industry,
+                  company_size: localCompany.company_size,
+                  website: localCompany.website
+                })}
+                className="p-1 hover:bg-gray-100 rounded transition-all"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <DataField label="Nombre Comercial" value={localCompany.name} />
+              <DataField label="Slug" value={localCompany.slug} monospace />
+              <DataField label="Industria" value={localCompany.industry} />
+              <DataField label="Tamaño Empresa" value={localCompany.company_size ? `${localCompany.company_size} empleados` : undefined} />
+              <DataField label="Sitio Web" value={localCompany.website} link />
+            </div>
+          </div>
+
+          {/* Personalidad Jurídica */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wide">Personalidad Jurídica</h3>
+              </div>
+              <button
+                onClick={() => handleEdit('juridica', {
+                  legal_name: localCompany.legal_name,
+                  rut: localCompany.rut,
+                  tax_id: localCompany.tax_id,
+                  business_type: localCompany.business_type,
+                  foundation_year: localCompany.foundation_year
+                })}
+                className="p-1 hover:bg-gray-100 rounded transition-all"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <DataField label="Razón Social" value={localCompany.legal_name} />
+              <DataField label="RUT" value={localCompany.rut} monospace />
+              <DataField label="ID Tributario" value={localCompany.tax_id} monospace />
+              <DataField label="Tipo de Negocio" value={localCompany.business_type} />
+              <DataField label="Año de Fundación" value={localCompany.foundation_year?.toString()} />
+            </div>
+          </div>
+
+          {/* Dirección Legal */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wide">Dirección Legal</h3>
+              </div>
+              <button
+                onClick={() => handleEdit('direccion', {
+                  legal_address: localCompany.legal_address,
+                  city: localCompany.city,
+                  region: localCompany.region,
+                  country: localCompany.country,
+                  postal_code: localCompany.postal_code
+                })}
+                className="p-1 hover:bg-gray-100 rounded transition-all"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <DataField label="Dirección" value={localCompany.legal_address} multiline />
+              <div className="grid grid-cols-2 gap-2">
+                <DataField label="Ciudad" value={localCompany.city} />
+                <DataField label="Región" value={localCompany.region} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <DataField label="País" value={localCompany.country} />
+                <DataField label="Código Postal" value={localCompany.postal_code} />
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* COLUMNA DERECHA */}
+        <div className="space-y-4">
+
+          {/* Contacto Principal */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wide">Contacto Principal</h3>
+              </div>
+              <button
+                onClick={() => handleEdit('contacto', {
+                  contact_name: localCompany.contact_name,
+                  contact_position: localCompany.contact_position,
+                  contact_email: localCompany.contact_email,
+                  contact_phone: localCompany.contact_phone
+                })}
+                className="p-1 hover:bg-gray-100 rounded transition-all"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <DataField label="Nombre Completo" value={localCompany.contact_name} />
+              <DataField label="Cargo" value={localCompany.contact_position} />
+              <DataField label="Email" value={localCompany.contact_email} link />
+              <DataField label="Teléfono" value={localCompany.contact_phone} />
+            </div>
+          </div>
+
+          {/* Plan y Límites */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
+              <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wide">Plan y Límites</h3>
+            </div>
+            <div className="space-y-3">
+              <DataField label="Plan Contratado" value={localCompany.plan.toUpperCase()} />
+              <DataField label="Estado" value={localCompany.status.toUpperCase()} />
+              <div className="pt-2 border-t border-gray-100">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-blue-50 rounded-lg p-2">
+                    <p className="text-xs text-blue-600 font-semibold mb-1">Usuarios</p>
+                    <p className="text-lg font-bold text-blue-900">{localCompany.max_users}</p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-2">
+                    <p className="text-xs text-green-600 font-semibold mb-1">Programas</p>
+                    <p className="text-lg font-bold text-green-900">{localCompany.max_programs}</p>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-2">
+                    <p className="text-xs text-purple-600 font-semibold mb-1">Participantes</p>
+                    <p className="text-lg font-bold text-purple-900">{localCompany.max_participants}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Estado del Setup */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
+              <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wide">Estado Setup</h3>
+            </div>
+            <div className="space-y-2">
+              <StatusRow label="Datos Completos" status={localCompany.is_data_complete} />
+              <StatusRow label="Habilitado" status={localCompany.is_enabled} />
+              <StatusRow label="Onboarding" status={localCompany.onboarding_completed} />
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Modal de Edición */}
+      {editingSection && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-gray-900">
+                  Editar {editingSection === 'basicos' && 'Datos Básicos'}
+                  {editingSection === 'juridica' && 'Personalidad Jurídica'}
+                  {editingSection === 'direccion' && 'Dirección Legal'}
+                  {editingSection === 'contacto' && 'Contacto Principal'}
+                  {editingSection === 'plan' && 'Plan y Límites'}
+                </h3>
+                <button
+                  onClick={() => setEditingSection(null)}
+                  className="p-1 hover:bg-gray-100 rounded transition-all"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-4">
+                {/* Datos Básicos */}
+                {editingSection === 'basicos' && (
+                  <>
+                    <InputField
+                      label="Nombre Comercial"
+                      value={editFormData.name || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                      required
+                    />
+                    <InputField
+                      label="Industria"
+                      value={editFormData.industry || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, industry: e.target.value })}
+                    />
+                    <SelectField
+                      label="Tamaño Empresa"
+                      value={editFormData.company_size || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, company_size: e.target.value })}
+                      options={[
+                        { value: '', label: 'Seleccionar' },
+                        { value: '1-10', label: '1-10 empleados' },
+                        { value: '11-50', label: '11-50 empleados' },
+                        { value: '51-200', label: '51-200 empleados' },
+                        { value: '201-1000', label: '201-1000 empleados' },
+                        { value: '1000+', label: '1000+ empleados' },
+                      ]}
+                    />
+                    <InputField
+                      label="Sitio Web"
+                      type="url"
+                      value={editFormData.website || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, website: e.target.value })}
+                      placeholder="https://www.ejemplo.cl"
+                    />
+                  </>
+                )}
+
+                {/* Personalidad Jurídica */}
+                {editingSection === 'juridica' && (
+                  <>
+                    {/* RUT con búsqueda automática */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        RUT
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={editFormData.rut || ''}
+                          onChange={(e) => setEditFormData({ ...editFormData, rut: e.target.value })}
+                          placeholder="12.345.678-9 o 76.123.456-7"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSearchRUT(editFormData.rut)}
+                          disabled={!editFormData.rut || isSaving}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          {isSaving ? 'Buscando...' : 'Buscar Datos'}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Ingresa el RUT y haz clic en "Buscar Datos" para autocompletar la información
+                      </p>
+                    </div>
+
+                    <InputField
+                      label="Razón Social"
+                      value={editFormData.legal_name || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, legal_name: e.target.value })}
+                      placeholder="Se completará automáticamente al buscar RUT"
+                    />
+                    <InputField
+                      label="ID Tributario"
+                      value={editFormData.tax_id || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, tax_id: e.target.value })}
+                      placeholder="Se completará automáticamente"
+                    />
+                    <InputField
+                      label="Tipo de Negocio"
+                      value={editFormData.business_type || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, business_type: e.target.value })}
+                      placeholder="Ej: S.A., SPA, LTDA"
+                    />
+                    <InputField
+                      label="Año de Fundación"
+                      type="number"
+                      value={editFormData.foundation_year || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, foundation_year: parseInt(e.target.value) || null })}
+                      placeholder="2020"
+                    />
+                  </>
+                )}
+
+                {/* Dirección Legal */}
+                {editingSection === 'direccion' && (
+                  <>
+                    <TextAreaField
+                      label="Dirección Legal"
+                      value={editFormData.legal_address || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, legal_address: e.target.value })}
+                      placeholder="Av. Ejemplo 123, Oficina 456"
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <InputField
+                        label="Ciudad"
+                        value={editFormData.city || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+                      />
+                      <InputField
+                        label="Región"
+                        value={editFormData.region || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, region: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <InputField
+                        label="País"
+                        value={editFormData.country || 'Chile'}
+                        onChange={(e) => setEditFormData({ ...editFormData, country: e.target.value })}
+                      />
+                      <InputField
+                        label="Código Postal"
+                        value={editFormData.postal_code || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, postal_code: e.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Contacto Principal */}
+                {editingSection === 'contacto' && (
+                  <>
+                    <InputField
+                      label="Nombre Completo"
+                      value={editFormData.contact_name || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, contact_name: e.target.value })}
+                    />
+                    <InputField
+                      label="Cargo"
+                      value={editFormData.contact_position || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, contact_position: e.target.value })}
+                    />
+                    <InputField
+                      label="Email"
+                      type="email"
+                      value={editFormData.contact_email || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, contact_email: e.target.value })}
+                    />
+                    <InputField
+                      label="Teléfono"
+                      value={editFormData.contact_phone || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, contact_phone: e.target.value })}
+                      placeholder="+56 9 1234 5678"
+                    />
+                  </>
+                )}
+
+                {/* Botones */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setEditingSection(null)}
+                    className="flex-1 px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-all text-sm font-semibold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="flex-1 px-4 py-2 bg-primary-500 text-black rounded-lg hover:bg-primary-600 transition-all text-sm font-bold disabled:opacity-50"
+                  >
+                    {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Componente helper para mostrar campos de datos
+function DataField({ 
+  label, 
+  value, 
+  link = false, 
+  monospace = false,
+  multiline = false 
+}: { 
+  label: string; 
+  value?: string; 
+  link?: boolean;
+  monospace?: boolean;
+  multiline?: boolean;
+}) {
+  if (!value) {
+    return (
+      <div>
+        <label className="text-xs font-semibold text-gray-500 block mb-0.5">{label}</label>
+        <p className="text-xs text-red-500 font-medium">⚠ Falta completar</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label className="text-xs font-semibold text-gray-500 block mb-0.5">{label}</label>
+      {link ? (
+        <a 
+          href={value.startsWith('http') ? value : `mailto:${value}`}
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-xs text-blue-600 hover:underline font-medium block truncate"
+        >
+          {value}
+        </a>
+      ) : (
+        <p className={`text-xs text-gray-900 font-medium ${monospace ? 'font-mono' : ''} ${multiline ? '' : 'truncate'}`}>
+          {value}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Componente helper para mostrar estado
+function StatusRow({ label, status }: { label: string; status: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded">
+      <span className="text-xs font-medium text-gray-700">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <div className={`w-1.5 h-1.5 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'}`}></div>
+        <span className={`text-xs font-bold ${status ? 'text-green-700' : 'text-red-700'}`}>
+          {status ? 'SÍ' : 'NO'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// Componente Input Field para formularios
+function InputField({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required = false,
+  placeholder = "",
+}: {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: string;
+  required?: boolean;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-700 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        required={required}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+      />
+    </div>
+  );
+}
+
+// Componente Select Field para formularios
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  required = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  options: { value: string; label: string }[];
+  required?: boolean;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-700 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <select
+        value={value}
+        onChange={onChange}
+        required={required}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// Componente TextArea Field para formularios
+function TextAreaField({
+  label,
+  value,
+  onChange,
+  rows = 3,
+  required = false,
+  placeholder = "",
+}: {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  rows?: number;
+  required?: boolean;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-700 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <textarea
+        value={value}
+        onChange={onChange}
+        required={required}
+        rows={rows}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+      />
+    </div>
+  );
+}
+
+// Componente para la pestaña de Programas
+function ProgramsTab({ programs, company, onRefresh }: { programs: Program[]; company: Company; onRefresh: () => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Programas del Cliente</h2>
+      </div>
+
+      {programs.length === 0 ? (
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-12 text-center">
+          <div className="max-w-md mx-auto space-y-4">
+            <svg className="w-16 h-16 mx-auto text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            <p className="text-gray-900 text-lg font-bold">Sin programas activos</p>
+            <p className="text-gray-600 text-sm">
+              Para crear un programa, dirígete al <span className="font-bold">Diseño de Programa</span> en el menú lateral
+            </p>
+            <a
+              href="/dashboard/programs"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 text-black rounded-xl font-bold hover:bg-primary-600 transition-all"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Ir a Diseño de Programa
+            </a>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b-2 border-gray-200">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nombre</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Estado</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Fechas</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Participantes</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {programs.map((program) => (
+                <tr key={program.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4">
+                    <span className="font-bold text-gray-900">{program.name}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase ${
+                      program.status === 'designed' ? 'bg-blue-100 text-blue-800' :
+                      program.status === 'active' ? 'bg-green-100 text-green-800' :
+                      program.status === 'completed' ? 'bg-gray-100 text-gray-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {program.status === 'designed' ? 'Diseñado' :
+                       program.status === 'active' ? 'Activo' :
+                       program.status === 'completed' ? 'Completado' :
+                       program.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {program.start_date && program.end_date 
+                      ? `${program.start_date} - ${program.end_date}` 
+                      : '-'}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-gray-900 font-medium">{program.participants_count || 0}</span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <a
+                      href={`/dashboard/programs/${program.id}/manage`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-primary-500 hover:text-primary-700 font-bold transition-colors"
+                    >
+                      Ver Detalles
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Componente para la pestaña de Usuarios
+function UsersTab({ users, company, onRefresh }: { users: User[]; company: Company; onRefresh: () => void }) {
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [filterRole, setFilterRole] = React.useState("all");
+  const [filterStatus, setFilterStatus] = React.useState("all");
+
+  const filteredUsers = users.filter(user => {
+    const matchSearch = 
+      user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.position?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchRole = filterRole === "all" || user.role === filterRole;
+    const matchStatus = filterStatus === "all" || 
+      (filterStatus === "active" && user.is_active) ||
+      (filterStatus === "inactive" && !user.is_active);
+    
+    return matchSearch && matchRole && matchStatus;
+  });
+
+  // Get unique roles
+  const uniqueRoles = Array.from(new Set(users.map(u => u.role).filter(Boolean)));
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Usuarios de {company.name}</h2>
+      </div>
+
+      {/* Estadísticas */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+          <p className="text-sm text-gray-600 font-bold mb-1">Total Usuarios</p>
+          <p className="text-4xl font-bold text-primary-600">{users.length}</p>
+        </div>
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+          <p className="text-sm text-gray-600 font-bold mb-1">Activos</p>
+          <p className="text-4xl font-bold text-green-600">
+            {users.filter(u => u.is_active).length}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+          <p className="text-sm text-gray-600 font-bold mb-1">Inactivos</p>
+          <p className="text-4xl font-bold text-gray-600">
+            {users.filter(u => !u.is_active).length}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+          <p className="text-sm text-gray-600 font-bold mb-1">Roles Únicos</p>
+          <p className="text-4xl font-bold text-blue-600">{uniqueRoles.length}</p>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Buscar Usuario
+            </label>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Nombre, email o cargo..."
+              className="w-full px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Rol
+            </label>
+            <select
+              value={filterRole}
+              onChange={(e) => setFilterRole(e.target.value)}
+              className="w-full px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            >
+              <option value="all">Todos los roles</option>
+              {uniqueRoles.map((role, idx) => (
+                <option key={idx} value={role}>{role}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Estado
+            </label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            >
+              <option value="all">Todos</option>
+              <option value="active">Activos</option>
+              <option value="inactive">Inactivos</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabla de Usuarios */}
+      {filteredUsers.length === 0 ? (
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-12 text-center">
+          <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <p className="text-gray-900 text-lg font-bold mb-1">
+            {users.length === 0 ? 'No hay usuarios registrados' : 'No se encontraron usuarios'}
+          </p>
+          <p className="text-gray-600 text-sm">
+            {users.length === 0 ? 'Los usuarios aparecerán aquí una vez registrados' : 'Intenta ajustar los filtros de búsqueda'}
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b-2 border-gray-200">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Usuario</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Rol</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Cargo</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredUsers.map((user) => {
+                const initials = user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '??';
+                
+                return (
+                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+                          <span className="text-primary-700 font-bold text-sm">
+                            {initials}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900">{user.full_name}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-900">{user.email}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase ${
+                        user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                        user.role === 'client' ? 'bg-blue-100 text-blue-800' :
+                        user.role === 'coordinator' ? 'bg-indigo-100 text-indigo-800' :
+                        user.role === 'facilitator_internal' ? 'bg-green-100 text-green-800' :
+                        user.role === 'mentor' ? 'bg-orange-100 text-orange-800' :
+                        user.role === 'mentee' ? 'bg-pink-100 text-pink-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-900">{user.position || "-"}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {user.is_active ? (
+                          <>
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span className="text-green-700 font-bold text-sm">Activo</span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                            <span className="text-gray-600 font-bold text-sm">Inactivo</span>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Componente para la pestaña de Facturación
+function BillingTab({ company }: { company: Company }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Facturación</h2>
+        <button className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-black rounded-lg font-semibold hover:bg-primary-600 transition-all">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Nueva Factura
+        </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-6">
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-2">
+            <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <span className="text-sm font-semibold text-gray-600">Plan Actual</span>
+          </div>
+          <p className="text-3xl font-bold text-gray-900 mb-1">{company.plan.charAt(0).toUpperCase() + company.plan.slice(1)}</p>
+          <p className="text-sm text-gray-500">Renovación automática</p>
+        </div>
+
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-2">
+            <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm font-semibold text-gray-600">Facturas Pagadas</span>
+          </div>
+          <p className="text-3xl font-bold text-green-600 mb-1">12</p>
+          <p className="text-sm text-gray-500">Últimos 12 meses</p>
+        </div>
+
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-2">
+            <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm font-semibold text-gray-600">Pendientes</span>
+          </div>
+          <p className="text-3xl font-bold text-red-600 mb-1">0</p>
+          <p className="text-sm text-gray-500">Al día</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Historial de Facturación</h3>
+        <div className="text-center py-12 text-gray-500">
+          <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p className="font-semibold">No hay facturas disponibles</p>
+          <p className="text-sm mt-1">Las facturas aparecerán aquí cuando se generen</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Componente para la pestaña de Onboarding
+function OnboardingTab({ company }: { company: Company }) {
+  const onboardingSteps = [
+    { id: 1, title: "Completar perfil de empresa", completed: company.is_data_complete, icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+    )},
+    { id: 2, title: "Crear primer programa", completed: false, icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+      </svg>
+    )},
+    { id: 3, title: "Invitar usuarios", completed: false, icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+      </svg>
+    )},
+    { id: 4, title: "Configurar branding", completed: false, icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+      </svg>
+    )},
+    { id: 5, title: "Lanzamiento oficial", completed: company.onboarding_completed, icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+      </svg>
+    )},
+  ];
+
+  const completedSteps = onboardingSteps.filter(s => s.completed).length;
+  const progress = (completedSteps / onboardingSteps.length) * 100;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Proceso de Onboarding</h2>
+        <p className="text-gray-600">Sigue estos pasos para configurar completamente tu cuenta</p>
+      </div>
+
+      {/* Barra de progreso */}
+      <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm font-semibold text-gray-600">Progreso General</span>
+          <span className="text-2xl font-bold text-primary-600">{completedSteps}/{onboardingSteps.length}</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-3">
+          <div
+            className="bg-primary-500 h-3 rounded-full transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+        <p className="text-sm text-gray-500 mt-2">{Math.round(progress)}% completado</p>
+      </div>
+
+      {/* Pasos del onboarding */}
+      <div className="space-y-4">
+        {onboardingSteps.map((step, index) => (
+          <div
+            key={step.id}
+            className={`bg-white rounded-xl border-2 p-6 transition-all ${
+              step.completed
+                ? "border-green-200 bg-green-50"
+                : "border-gray-200 hover:border-primary-200"
+            }`}
+          >
+            <div className="flex items-center gap-4">
+              <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${
+                step.completed ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600"
+              }`}>
+                {step.completed ? (
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                  </svg>
+                ) : (
+                  step.icon
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-gray-900">{step.title}</h3>
+                <p className="text-sm text-gray-600">
+                  {step.completed ? "Completado" : "Pendiente"}
+                </p>
+              </div>
+              {!step.completed && (
+                <button className="px-4 py-2 bg-primary-500 text-black rounded-lg font-semibold hover:bg-primary-600 transition-all">
+                  Iniciar
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Componente para la pestaña de Configuración
+function SettingsTab({ company, onRefresh }: { company: Company; onRefresh?: () => void }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const handleDeleteCompany = async () => {
+    if (deleteConfirmText !== "eliminar-cliente") {
+      setDeleteError("Debes escribir exactamente 'eliminar-cliente' para confirmar");
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError("");
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${company.id}`,
+        { method: "DELETE" }
+      );
+
+      if (response.ok) {
+        alert("✅ Cliente eliminado exitosamente");
+        window.location.href = "/dashboard/clients";
+      } else {
+        const data = await response.json();
+        setDeleteError(data.detail || "Error al eliminar el cliente");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      setDeleteError("Error de conexión al eliminar el cliente");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Configuración del Cliente</h2>
+        <p className="text-gray-600">Administra configuraciones avanzadas y opciones peligrosas</p>
+      </div>
+
+      {/* Plan y Límites */}
+      <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          Plan y Límites
+        </h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <p className="text-sm text-gray-600 mb-1">Plan Actual</p>
+            <p className="text-xl font-bold text-gray-900 capitalize">{company.plan}</p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <p className="text-sm text-gray-600 mb-1">Usuarios Máximos</p>
+            <p className="text-xl font-bold text-gray-900">{company.max_users}</p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <p className="text-sm text-gray-600 mb-1">Programas Máximos</p>
+            <p className="text-xl font-bold text-gray-900">{company.max_programs}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Branding */}
+      <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+          </svg>
+          Colores de Marca
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <p className="text-sm text-gray-600 mb-2">Color Primario</p>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-12 h-12 rounded-lg border-2 border-gray-300"
+                style={{ backgroundColor: company.primary_color }}
+              ></div>
+              <p className="text-sm font-mono font-semibold text-gray-900">{company.primary_color}</p>
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <p className="text-sm text-gray-600 mb-2">Color Secundario</p>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-12 h-12 rounded-lg border-2 border-gray-300"
+                style={{ backgroundColor: company.secondary_color }}
+              ></div>
+              <p className="text-sm font-mono font-semibold text-gray-900">{company.secondary_color}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Zona de Peligro */}
+      <div className="bg-red-50 rounded-xl border-2 border-red-200 p-6">
+        <div className="flex items-start gap-3 mb-4">
+          <svg className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-red-900 mb-1">Zona de Peligro</h3>
+            <p className="text-sm text-red-700">Las acciones en esta sección son irreversibles y eliminarán permanentemente todos los datos asociados.</p>
+          </div>
+        </div>
+
+        {!showDeleteConfirm ? (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Eliminar Cliente
+          </button>
+        ) : (
+          <div className="bg-white rounded-lg border-2 border-red-300 p-4">
+            <h4 className="font-bold text-red-900 mb-2">⚠️ Confirma la eliminación</h4>
+            <p className="text-sm text-red-700 mb-4">
+              Esta acción eliminará <strong className="font-bold">{company.name}</strong> y todos sus programas, usuarios y datos asociados. Esta operación no se puede deshacer.
+            </p>
+            <p className="text-sm text-red-900 font-semibold mb-2">
+              Para confirmar, escribe exactamente: <code className="bg-red-100 px-2 py-1 rounded font-mono">eliminar-cliente</code>
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => {
+                setDeleteConfirmText(e.target.value);
+                setDeleteError("");
+              }}
+              placeholder="eliminar-cliente"
+              className="w-full px-4 py-2 border-2 border-red-300 rounded-lg mb-3 font-mono text-sm focus:outline-none focus:border-red-500"
+              disabled={isDeleting}
+            />
+            {deleteError && (
+              <div className="mb-3 p-3 bg-red-100 border border-red-300 rounded-lg">
+                <p className="text-sm text-red-800 font-medium">{deleteError}</p>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteCompany}
+                disabled={isDeleting || deleteConfirmText !== "eliminar-cliente"}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Sí, eliminar permanentemente
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteConfirmText("");
+                  setDeleteError("");
+                }}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-all disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
