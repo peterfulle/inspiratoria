@@ -16,8 +16,13 @@ export const pageStyles = `
     background: white;
     border: 1px solid #f0f0f0;
     border-radius: 16px;
-    padding: 24px;
+    padding: 16px;
     transition: all 0.2s ease;
+  }
+  @media (min-width: 640px) {
+    .stat-card {
+      padding: 24px;
+    }
   }
   .stat-card:hover {
     box-shadow: 0 4px 20px rgba(0,0,0,0.04);
@@ -30,11 +35,17 @@ export const pageStyles = `
   .btn-primary {
     background: #1a1a1a;
     color: white;
-    padding: 10px 20px;
+    padding: 8px 14px;
     border-radius: 10px;
     font-weight: 500;
-    font-size: 14px;
+    font-size: 13px;
     transition: all 0.2s ease;
+  }
+  @media (min-width: 640px) {
+    .btn-primary {
+      padding: 10px 20px;
+      font-size: 14px;
+    }
   }
   .btn-primary:hover {
     background: #333;
@@ -42,12 +53,18 @@ export const pageStyles = `
   .btn-secondary {
     background: white;
     color: #1a1a1a;
-    padding: 10px 20px;
+    padding: 8px 14px;
     border-radius: 10px;
     font-weight: 500;
-    font-size: 14px;
+    font-size: 13px;
     border: 1px solid #e5e5e5;
     transition: all 0.2s ease;
+  }
+  @media (min-width: 640px) {
+    .btn-secondary {
+      padding: 10px 20px;
+      font-size: 14px;
+    }
   }
   .btn-secondary:hover {
     background: #f5f5f5;
@@ -119,23 +136,34 @@ export const pageStyles = `
   }
   .modal-content {
     background: white;
-    border-radius: 20px;
+    border-radius: 16px;
     max-width: 1000px;
     width: 95%;
     max-height: 90vh;
     overflow-y: auto;
+  }
+  @media (min-width: 640px) {
+    .modal-content {
+      border-radius: 20px;
+    }
   }
   .modal-lg {
     max-width: 1200px;
   }
   .input-field {
     width: 100%;
-    padding: 12px 16px;
+    padding: 10px 14px;
     border: 1px solid #e5e5e5;
     border-radius: 10px;
-    font-size: 14px;
+    font-size: 13px;
     transition: all 0.15s ease;
     background: white;
+  }
+  @media (min-width: 640px) {
+    .input-field {
+      padding: 12px 16px;
+      font-size: 14px;
+    }
   }
   .input-field:focus {
     outline: none;
@@ -172,8 +200,13 @@ export const pageStyles = `
     background: white;
     border: 1px solid #f0f0f0;
     border-radius: 16px;
-    padding: 24px;
+    padding: 16px;
     transition: all 0.2s ease;
+  }
+  @media (min-width: 640px) {
+    .program-card {
+      padding: 24px;
+    }
   }
   .program-card:hover {
     box-shadow: 0 8px 30px rgba(0,0,0,0.06);
@@ -183,11 +216,17 @@ export const pageStyles = `
     background: white;
     border: 1px solid #f0f0f0;
     border-radius: 12px;
-    padding: 16px 24px;
+    padding: 12px 16px;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: 16px;
+  }
+  @media (min-width: 640px) {
+    .program-row {
+      padding: 16px 24px;
+      gap: 24px;
+    }
   }
   .program-row:hover {
     box-shadow: 0 4px 12px rgba(0,0,0,0.04);
@@ -254,8 +293,14 @@ export const pageStyles = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 0;
+    gap: 12px;
+    padding: 12px 0;
     border-bottom: 1px solid #f5f5f5;
+  }
+  @media (min-width: 640px) {
+    .config-row {
+      padding: 16px 0;
+    }
   }
   .config-row:last-child {
     border-bottom: none;
@@ -274,18 +319,38 @@ export const pageStyles = `
   }
   .tab-nav {
     display: flex;
-    gap: 4px;
+    gap: 2px;
     border-bottom: 1px solid #f0f0f0;
-    padding: 0 24px;
+    padding: 0 16px;
+    overflow-x: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .tab-nav::-webkit-scrollbar {
+    display: none;
+  }
+  @media (min-width: 640px) {
+    .tab-nav {
+      gap: 4px;
+      padding: 0 24px;
+    }
   }
   .tab-btn {
-    padding: 12px 16px;
-    font-size: 13px;
+    padding: 10px 12px;
+    font-size: 12px;
     font-weight: 500;
     color: #666;
     border-bottom: 2px solid transparent;
     transition: all 0.15s ease;
     margin-bottom: -1px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  @media (min-width: 640px) {
+    .tab-btn {
+      padding: 12px 16px;
+      font-size: 13px;
+    }
   }
   .tab-btn:hover {
     color: #333;
@@ -296,12 +361,20 @@ export const pageStyles = `
   }
   .resource-item {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
-    padding: 12px;
+    gap: 8px;
+    padding: 10px;
     background: #fafafa;
     border-radius: 8px;
     transition: all 0.15s ease;
+  }
+  @media (min-width: 640px) {
+    .resource-item {
+      flex-wrap: nowrap;
+      gap: 12px;
+      padding: 12px;
+    }
   }
   .resource-item:hover {
     background: #f5f5f5;
@@ -314,10 +387,18 @@ export const pageStyles = `
   }
   .milestone-item {
     display: flex;
-    gap: 16px;
-    padding: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px;
     background: #fafafa;
     border-radius: 10px;
+  }
+  @media (min-width: 640px) {
+    .milestone-item {
+      flex-wrap: nowrap;
+      gap: 16px;
+      padding: 16px;
+    }
   }
   .milestone-marker {
     width: 32px;
@@ -344,6 +425,23 @@ export const pageStyles = `
     text-align: center;
     padding: 40px;
     color: #999;
+  }
+  .upload-zone {
+    border: 2px dashed #e0e0e0;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #fafafa;
+  }
+  .upload-zone:hover {
+    border-color: #ccc;
+    background: #f5f5f5;
+  }
+  .upload-zone.drag-over {
+    border-color: #1a1a1a;
+    background: #f0f0f0;
   }
   .scrollbar-hide {
     -ms-overflow-style: none;

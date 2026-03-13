@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { pageStyles } from "./styles";
 import { Icon } from "./icons";
 import { 
@@ -12,7 +13,7 @@ import {
   initialTemplates, 
   defaultMentorReqs, defaultMenteeReqs, defaultMatchingRules, defaultSessionRules,
   getCategoryLabel, getAlgorithmLabel, getTotalSessions, getTotalResources, getTotalActivities,
-  getNextMonday, formatDateSpanish, generateModuleContent, generateSessionPlan
+  getNextMonday, formatDateSpanish, generateModuleContent, generateSessionPlan, generateSlug
 } from "./data";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -20,6 +21,8 @@ import {
 // ═══════════════════════════════════════════════════════════════════
 
 export default function ProgramsPage() {
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [templates, setTemplates] = useState<ProgramTemplate[]>(initialTemplates);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -83,9 +86,11 @@ export default function ProgramsPage() {
 
   // Handlers
   const handleCreate = () => {
+    const name = formData.name || "";
     const newTemplate: ProgramTemplate = {
       id: `tpl-${Date.now()}`,
-      name: formData.name || "",
+      slug: generateSlug(name),
+      name,
       description: formData.description || "",
       category: formData.category || "leadership",
       duration: formData.duration || "",
@@ -121,10 +126,12 @@ export default function ProgramsPage() {
   };
 
   const handleDuplicate = (template: ProgramTemplate) => {
+    const newName = `${template.name} (Copia)`;
     const newTemplate: ProgramTemplate = {
       ...template,
       id: `tpl-${Date.now()}`,
-      name: `${template.name} (Copia)`,
+      slug: generateSlug(newName),
+      name: newName,
       status: "draft",
       createdAt: new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
@@ -223,6 +230,30 @@ export default function ProgramsPage() {
       modules: (formData.modules || []).map(m => 
         m.id === moduleId ? { ...m, resources: m.resources.filter(r => r.id !== resourceId) } : m
       )
+    });
+  };
+
+  // File upload handler
+  const handleFileUpload = (moduleId: string, files: FileList | null) => {
+    if (!files) return;
+    const newResources: Resource[] = Array.from(files).map((file) => ({
+      id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: file.name.replace(/\.[^/.]+$/, ""),
+      type: file.type === "application/pdf" ? "pdf" as const 
+            : file.type.startsWith("video/") ? "video" as const 
+            : "document" as const,
+      url: URL.createObjectURL(file),
+      file,
+      fileName: file.name,
+      size: file.size < 1024 * 1024 
+        ? `${(file.size / 1024).toFixed(0)} KB` 
+        : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+    }));
+    setFormData({
+      ...formData,
+      modules: (formData.modules || []).map(m =>
+        m.id === moduleId ? { ...m, resources: [...m.resources, ...newResources] } : m
+      ),
     });
   };
 
@@ -341,40 +372,40 @@ export default function ProgramsPage() {
       <div className="programs-page">
         {/* Header */}
         <header className="programs-header sticky top-0 z-20">
-          <div className="px-8 py-5">
-            <div className="flex items-center justify-between">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h1 className="text-xl font-semibold text-neutral-900">Plantillas de Programas</h1>
+                <h1 className="text-lg sm:text-xl font-semibold text-neutral-900">Plantillas de Programas</h1>
                 <p className="text-neutral-500 text-sm mt-0.5">Catálogo white-label para clientes</p>
               </div>
               
-              <div className="flex items-center gap-3">
-                <button className="btn-secondary flex items-center gap-2">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <button className="btn-secondary flex items-center gap-2 text-xs sm:text-sm">
                   <Icon.Download className="w-4 h-4" />
-                  Exportar
+                  <span className="hidden sm:inline">Exportar</span>
                 </button>
                 <button
                   onClick={openAssignModal}
-                  className="btn-secondary flex items-center gap-2"
+                  className="btn-secondary flex items-center gap-2 text-xs sm:text-sm"
                 >
                   <Icon.Link className="w-4 h-4" />
-                  Asignar programa
+                  <span className="hidden sm:inline">Asignar programa</span>
                 </button>
                 <button 
                   onClick={() => { resetForm(); setShowCreateModal(true); }}
-                  className="btn-primary flex items-center gap-2"
+                  className="btn-primary flex items-center gap-2 text-xs sm:text-sm"
                 >
                   <Icon.Plus className="w-4 h-4" />
-                  Nueva Plantilla
+                  <span className="hidden sm:inline">Nueva Plantilla</span>
                 </button>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="p-8 max-w-7xl mx-auto">
+        <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
           {/* Info Banner */}
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+          <div className="mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-100 rounded-xl">
             <p className="text-sm text-blue-700">
               <strong>White-Label:</strong> Estas son plantillas base. Cada empresa las agrega a su dashboard donde gestiona sus propios mentores, mentees y sesiones.
             </p>
@@ -405,8 +436,8 @@ export default function ProgramsPage() {
           </div>
 
           {/* Filters */}
-          <div className="glass-card p-4 mb-6">
-            <div className="flex flex-col lg:flex-row gap-4">
+          <div className="glass-card p-3 sm:p-4 mb-6">
+            <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
               <div className="relative flex-1">
                 <Icon.Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
@@ -418,8 +449,8 @@ export default function ProgramsPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-4">
-                <div className="flex gap-2 overflow-x-auto">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                   {["all", "leadership", "tech", "sales", "diversity", "operations"].map((cat) => (
                     <button
                       key={cat}
@@ -432,7 +463,7 @@ export default function ProgramsPage() {
                 </div>
 
                 {/* View Toggle */}
-                <div className="flex items-center gap-1 border-l border-neutral-200 pl-4">
+                <div className="flex items-center gap-1 border-l border-neutral-200 pl-3 sm:pl-4 flex-shrink-0">
                   <button
                     onClick={() => setViewMode("grid")}
                     className={`btn-icon ${viewMode === "grid" ? "active" : ""}`}
@@ -452,15 +483,15 @@ export default function ProgramsPage() {
             </div>
           </div>
 
-          {/* Templates Grid View - Compact Horizontal Cards */}
+          {/* Templates Grid View - Responsive Cards */}
           {viewMode === "grid" && (
             <div className="space-y-3">
               {filteredTemplates.map((template) => (
-                <div key={template.id} className="program-card p-4">
-                  <div className="flex items-center gap-6">
+                <div key={template.id} className="program-card p-3 sm:p-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6">
                     {/* Left: Badges + Title + Description */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className={`badge badge-${template.category}`}>
                           {getCategoryLabel(template.category)}
                         </span>
@@ -468,35 +499,43 @@ export default function ProgramsPage() {
                           {template.status === "published" ? "Publicada" : "Borrador"}
                         </span>
                       </div>
-                      <h3 className="text-base font-semibold text-neutral-900">{template.name}</h3>
-                      <p className="text-neutral-500 text-sm truncate">{template.description}</p>
+                      <h3 className="text-sm sm:text-base font-semibold text-neutral-900">{template.name}</h3>
+                      <p className="text-neutral-500 text-xs sm:text-sm truncate">{template.description}</p>
                     </div>
 
                     {/* Center: Stats */}
-                    <div className="flex items-center gap-6 text-center flex-shrink-0">
-                      <div className="px-4">
-                        <p className="text-sm font-semibold text-neutral-900">{template.duration}</p>
+                    <div className="flex items-center gap-4 sm:gap-6 text-center flex-shrink-0">
+                      <div className="px-2 sm:px-4">
+                        <p className="text-xs sm:text-sm font-semibold text-neutral-900">{template.duration}</p>
                         <p className="text-xs text-neutral-400">Duración</p>
                       </div>
-                      <div className="px-4 border-l border-neutral-100">
-                        <p className="text-sm font-semibold text-neutral-900">{template.modules.length}</p>
+                      <div className="px-2 sm:px-4 border-l border-neutral-100">
+                        <p className="text-xs sm:text-sm font-semibold text-neutral-900">{template.modules.length}</p>
                         <p className="text-xs text-neutral-400">Módulos</p>
                       </div>
-                      <div className="px-4 border-l border-neutral-100">
-                        <p className="text-sm font-semibold text-neutral-900">{getTotalSessions(template.modules)}</p>
+                      <div className="px-2 sm:px-4 border-l border-neutral-100">
+                        <p className="text-xs sm:text-sm font-semibold text-neutral-900">{getTotalSessions(template.modules)}</p>
                         <p className="text-xs text-neutral-400">Sesiones</p>
                       </div>
                     </div>
 
-                    {/* Right: Config Summary */}
-                    <div className="text-xs text-neutral-500 flex-shrink-0 w-48">
+                    {/* Right: Config Summary - hidden on small screens */}
+                    <div className="hidden xl:block text-xs text-neutral-500 flex-shrink-0 w-48">
                       <p>• Máx {template.mentorRequirements.maxMentees} mentees/mentor</p>
                       <p>• {template.sessionRules.frequencyPerMonth} sesiones/mes ({template.sessionRules.defaultDuration} min)</p>
                       <p>• Matching: {getAlgorithmLabel(template.matchingRules.algorithm)}</p>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 flex-shrink-0 pl-4 border-l border-neutral-100">
+                    <div className="flex items-center gap-2 flex-shrink-0 lg:pl-4 lg:border-l border-neutral-100">
+                      <button
+                        onClick={() => router.push(`/dashboard/programs/preview/${template.slug}`)}
+                        className="btn-secondary flex items-center gap-2 text-sm py-2 px-4"
+                        title="Vista previa"
+                      >
+                        <Icon.Eye className="w-4 h-4" />
+                        <span className="hidden sm:inline">Ver</span>
+                      </button>
                       <button
                         onClick={() => openEditModal(template)}
                         className="btn-primary flex items-center gap-2 text-sm py-2 px-4"
@@ -525,8 +564,8 @@ export default function ProgramsPage() {
           {viewMode === "list" && (
             <div className="space-y-3">
               {filteredTemplates.map((template) => (
-                <div key={template.id} className="program-row">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div key={template.id} className="program-row flex-col sm:flex-row !gap-3 sm:!gap-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`badge badge-${template.category}`}>
                         {getCategoryLabel(template.category)}
@@ -536,31 +575,37 @@ export default function ProgramsPage() {
                       </span>
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-neutral-900 truncate">{template.name}</h3>
-                      <p className="text-sm text-neutral-500 truncate">{template.description}</p>
+                      <h3 className="font-semibold text-neutral-900 truncate text-sm sm:text-base">{template.name}</h3>
+                      <p className="text-xs sm:text-sm text-neutral-500 truncate">{template.description}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-8 flex-shrink-0 text-center">
+                  <div className="flex items-center gap-4 sm:gap-8 flex-shrink-0 text-center">
                     <div>
-                      <p className="font-semibold text-neutral-900">{template.duration}</p>
+                      <p className="text-sm font-semibold text-neutral-900">{template.duration}</p>
                       <p className="text-xs text-neutral-500">Duración</p>
                     </div>
                     <div>
-                      <p className="font-semibold text-neutral-900">{template.modules.length}</p>
+                      <p className="text-sm font-semibold text-neutral-900">{template.modules.length}</p>
                       <p className="text-xs text-neutral-500">Módulos</p>
                     </div>
                     <div>
-                      <p className="font-semibold text-neutral-900">{getTotalSessions(template.modules)}</p>
+                      <p className="text-sm font-semibold text-neutral-900">{getTotalSessions(template.modules)}</p>
                       <p className="text-xs text-neutral-500">Sesiones</p>
                     </div>
-                    <div>
-                      <p className="font-semibold text-neutral-900">{getTotalResources(template.modules)}</p>
+                    <div className="hidden sm:block">
+                      <p className="text-sm font-semibold text-neutral-900">{getTotalResources(template.modules)}</p>
                       <p className="text-xs text-neutral-500">Recursos</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => router.push(`/dashboard/programs/preview/${template.slug}`)}
+                      className="btn-ghost" title="Vista previa"
+                    >
+                      <Icon.Eye className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => openEditModal(template)}
                       className="btn-primary flex items-center gap-2 text-sm py-2"
@@ -639,7 +684,7 @@ export default function ProgramsPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-2">Categoría *</label>
                     <select
@@ -691,10 +736,10 @@ export default function ProgramsPage() {
         {showEditModal && selectedTemplate && (
           <div className="modal-overlay" onClick={() => { setShowEditModal(false); setSelectedTemplate(null); }}>
             <div className="modal-content modal-lg" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6 border-b border-neutral-100">
+              <div className="p-4 sm:p-6 border-b border-neutral-100">
                 <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-xl font-semibold text-neutral-900">{formData.name}</h2>
+                  <div className="min-w-0">
+                    <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 truncate">{formData.name}</h2>
                     <p className="text-sm text-neutral-500">Editor completo de plantilla</p>
                   </div>
                   <button
@@ -706,7 +751,7 @@ export default function ProgramsPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="tab-nav -mx-6 px-0">
+                <div className="tab-nav -mx-4 sm:-mx-6 px-0 overflow-x-auto scrollbar-hide">
                   {[
                     { id: "general", label: "General", icon: Icon.Settings },
                     { id: "modules", label: "Módulos", icon: Icon.Book },
@@ -728,11 +773,11 @@ export default function ProgramsPage() {
                 </div>
               </div>
 
-              <div className="p-6 max-h-[60vh] overflow-y-auto">
+              <div className="p-4 sm:p-6 max-h-[60vh] overflow-y-auto">
                 {/* General Tab */}
                 {editTab === "general" && (
                   <div className="space-y-5">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-neutral-700 mb-2">Nombre *</label>
                         <input
@@ -763,7 +808,7 @@ export default function ProgramsPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-neutral-700 mb-2">Categoría</label>
                         <select
@@ -865,8 +910,8 @@ export default function ProgramsPage() {
                         {expandedModules.includes(module.id) && (
                           <div className="mt-4 pt-4 border-t border-neutral-100 space-y-4">
                             {/* Module Basic Info */}
-                            <div className="grid grid-cols-3 gap-4">
-                              <div className="col-span-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                              <div className="sm:col-span-2">
                                 <label className="block text-xs font-medium text-neutral-600 mb-1">Nombre del módulo</label>
                                 <input
                                   type="text"
@@ -888,7 +933,7 @@ export default function ProgramsPage() {
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-xs font-medium text-neutral-600 mb-1">Descripción</label>
                                 <textarea
@@ -926,28 +971,60 @@ export default function ProgramsPage() {
                             <div className="pt-4 border-t border-neutral-100">
                               <div className="flex items-center justify-between mb-3">
                                 <label className="text-sm font-medium text-neutral-700">Recursos ({module.resources.length})</label>
-                                <button
-                                  onClick={() => addResource(module.id)}
-                                  className="btn-ghost text-sm flex items-center gap-1"
-                                >
-                                  <Icon.Plus className="w-3 h-3" />
-                                  Agregar
-                                </button>
                               </div>
+
+                              {/* Upload Zone */}
+                              <div
+                                className="upload-zone mb-3"
+                                onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
+                                onDragLeave={(e) => { e.currentTarget.classList.remove('drag-over'); }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  e.currentTarget.classList.remove('drag-over');
+                                  handleFileUpload(module.id, e.dataTransfer.files);
+                                }}
+                                onClick={() => {
+                                  const input = document.createElement('input');
+                                  input.type = 'file';
+                                  input.multiple = true;
+                                  input.accept = '.pdf,.doc,.docx,.xlsx,.xls,.pptx,.ppt,.mp4,.mov';
+                                  input.onchange = (e) => handleFileUpload(module.id, (e.target as HTMLInputElement).files);
+                                  input.click();
+                                }}
+                              >
+                                <Icon.Upload className="w-6 h-6 text-neutral-400 mx-auto mb-2" />
+                                <p className="text-xs text-neutral-500">Arrastra archivos aquí o <span className="text-neutral-900 font-medium">haz clic para subir</span></p>
+                                <p className="text-xs text-neutral-400 mt-1">PDF, DOCX, XLSX, PPTX, MP4</p>
+                              </div>
+
+                              {/* Resource List */}
                               {module.resources.map((resource) => (
                                 <div key={resource.id} className="resource-item mb-2">
-                                  <div className="flex-1 grid grid-cols-4 gap-2">
-                                    <input
-                                      type="text"
-                                      value={resource.name}
-                                      onChange={(e) => updateResource(module.id, resource.id, { name: e.target.value })}
-                                      className="input-field text-xs col-span-2"
-                                      placeholder="Nombre del recurso"
-                                    />
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center flex-shrink-0">
+                                      {resource.type === 'pdf' && <Icon.Document className="w-4 h-4 text-red-500" />}
+                                      {resource.type === 'video' && <Icon.Video className="w-4 h-4 text-blue-500" />}
+                                      {resource.type === 'template' && <Icon.Folder className="w-4 h-4 text-amber-500" />}
+                                      {resource.type === 'document' && <Icon.File className="w-4 h-4 text-neutral-500" />}
+                                      {resource.type === 'link' && <Icon.Link className="w-4 h-4 text-indigo-500" />}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <input
+                                        type="text"
+                                        value={resource.name}
+                                        onChange={(e) => updateResource(module.id, resource.id, { name: e.target.value })}
+                                        className="text-sm font-medium text-neutral-900 bg-transparent border-none outline-none w-full p-0"
+                                        placeholder="Nombre del recurso"
+                                      />
+                                      <p className="text-xs text-neutral-400 truncate">
+                                        {resource.fileName || resource.url || 'Sin archivo'}
+                                        {resource.size && ` • ${resource.size}`}
+                                      </p>
+                                    </div>
                                     <select
                                       value={resource.type}
                                       onChange={(e) => updateResource(module.id, resource.id, { type: e.target.value as Resource["type"] })}
-                                      className="select-field text-xs"
+                                      className="text-xs bg-neutral-100 rounded-md px-2 py-1 border-none outline-none flex-shrink-0"
                                     >
                                       <option value="pdf">PDF</option>
                                       <option value="video">Video</option>
@@ -955,17 +1032,10 @@ export default function ProgramsPage() {
                                       <option value="document">Documento</option>
                                       <option value="link">Link</option>
                                     </select>
-                                    <input
-                                      type="text"
-                                      value={resource.url}
-                                      onChange={(e) => updateResource(module.id, resource.id, { url: e.target.value })}
-                                      className="input-field text-xs"
-                                      placeholder="URL"
-                                    />
                                   </div>
                                   <button
                                     onClick={() => deleteResource(module.id, resource.id)}
-                                    className="p-1 text-red-500 hover:bg-red-50 rounded"
+                                    className="p-1 text-red-500 hover:bg-red-50 rounded flex-shrink-0"
                                   >
                                     <Icon.X className="w-3 h-3" />
                                   </button>
@@ -988,12 +1058,12 @@ export default function ProgramsPage() {
                               {module.activities.map((activity) => (
                                 <div key={activity.id} className="activity-item mb-2">
                                   <div className="flex items-start gap-2">
-                                    <div className="flex-1 grid grid-cols-4 gap-2">
+                                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                                       <input
                                         type="text"
                                         value={activity.name}
                                         onChange={(e) => updateActivity(module.id, activity.id, { name: e.target.value })}
-                                        className="input-field text-xs col-span-2"
+                                        className="input-field text-xs sm:col-span-2 lg:col-span-2"
                                         placeholder="Nombre de la actividad"
                                       />
                                       <select
@@ -1103,12 +1173,12 @@ export default function ProgramsPage() {
                         <div className="milestone-marker">
                           S{milestone.week}
                         </div>
-                        <div className="flex-1 grid grid-cols-4 gap-3">
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                           <input
                             type="text"
                             value={milestone.name}
                             onChange={(e) => updateMilestone(milestone.id, { name: e.target.value })}
-                            className="input-field text-sm col-span-2"
+                            className="input-field text-sm sm:col-span-2 lg:col-span-2"
                             placeholder="Nombre del hito"
                           />
                           <input
@@ -1130,7 +1200,7 @@ export default function ProgramsPage() {
                             type="text"
                             value={milestone.description}
                             onChange={(e) => updateMilestone(milestone.id, { description: e.target.value })}
-                            className="input-field text-sm col-span-3"
+                            className="input-field text-sm sm:col-span-2 lg:col-span-3"
                             placeholder="Descripción"
                           />
                           <button
@@ -1539,8 +1609,8 @@ export default function ProgramsPage() {
               </div>
 
               {/* Footer */}
-              <div className="p-6 border-t border-neutral-100 bg-neutral-50">
-                <div className="flex items-center justify-between">
+              <div className="p-4 sm:p-6 border-t border-neutral-100 bg-neutral-50">
+                <div className="flex items-center justify-between gap-3">
                   <button
                     onClick={() => { setShowEditModal(false); setSelectedTemplate(null); }}
                     className="btn-secondary"

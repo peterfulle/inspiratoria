@@ -135,6 +135,14 @@ export function formatDateSpanish(date: Date): string {
   });
 }
 
+export function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // DEFAULT CONFIGURATIONS
 // ═══════════════════════════════════════════════════════════════════
@@ -184,6 +192,7 @@ export const defaultSessionRules: SessionRules = {
 export const initialTemplates: ProgramTemplate[] = [
   {
     id: "tpl-001",
+    slug: "new-leaders",
     name: "New Leaders",
     description: "Programa integral de 6 meses para nuevos líderes que asumen roles de gestión por primera vez. Desarrolla habilidades de liderazgo, comunicación efectiva, gestión de equipos, coaching, toma de decisiones e inteligencia emocional. Incluye 19 sesiones de mentoría, recursos descargables, ejercicios prácticos y evaluaciones 360.",
     category: "leadership",
@@ -435,6 +444,7 @@ export const initialTemplates: ProgramTemplate[] = [
   },
   {
     id: "tpl-002",
+    slug: "tech-leadership",
     name: "Tech Leadership",
     description: "Transición de roles técnicos a liderazgo tecnológico. Para developers senior que pasan a Tech Lead o Engineering Manager.",
     category: "tech",
@@ -555,6 +565,7 @@ export const initialTemplates: ProgramTemplate[] = [
   },
   {
     id: "tpl-003",
+    slug: "sales-excellence",
     name: "Sales Excellence",
     description: "Metodología de ventas consultivas B2B. Desde prospecting hasta cierre, incluyendo negociación y gestión de cuentas.",
     category: "sales",
@@ -656,6 +667,7 @@ export const initialTemplates: ProgramTemplate[] = [
   },
   {
     id: "tpl-004",
+    slug: "women-in-leadership",
     name: "Women in Leadership",
     description: "Programa para mujeres líderes. Navegación de barreras, negociación, visibilidad estratégica y network building.",
     category: "diversity",
@@ -755,6 +767,7 @@ export const initialTemplates: ProgramTemplate[] = [
   },
   {
     id: "tpl-005",
+    slug: "operational-excellence",
     name: "Operational Excellence",
     description: "Optimización de procesos, gestión de proyectos y mejora continua. Metodologías Lean y Agile aplicadas.",
     category: "operations",
@@ -853,6 +866,7 @@ export const initialTemplates: ProgramTemplate[] = [
   },
   {
     id: "tpl-006",
+    slug: "executive-coaching",
     name: "Executive Coaching",
     description: "Programa de alto nivel para C-Suite y directores. Coaching 1:1 intensivo con coaches ejecutivos certificados.",
     category: "leadership",

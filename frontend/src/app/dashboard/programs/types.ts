@@ -7,6 +7,8 @@ export interface Resource {
   name: string;
   type: "pdf" | "video" | "link" | "document" | "template";
   url: string;
+  file?: File;
+  fileName?: string;
   size?: string;
   description?: string;
 }
@@ -94,6 +96,7 @@ export interface Milestone {
 
 export interface ProgramTemplate {
   id: string;
+  slug: string;
   name: string;
   description: string;
   category: "leadership" | "sales" | "diversity" | "operations" | "tech";
