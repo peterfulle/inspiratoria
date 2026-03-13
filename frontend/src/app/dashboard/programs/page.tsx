@@ -64,6 +64,41 @@ export default function ProgramsPage() {
     sessionRules: { ...defaultSessionRules },
   });
 
+  // Persist to localStorage on every change
+  const saveToStorage = (data: ProgramTemplate[]) => {
+    try {
+      // Strip non-serializable File objects before saving
+      const clean = data.map((t) => ({
+        ...t,
+        modules: t.modules.map((m) => ({
+          ...m,
+          resources: m.resources.map(({ file, ...rest }) => rest),
+        })),
+      }));
+      localStorage.setItem("inspiratoria_programs", JSON.stringify(clean));
+    } catch (e) {
+      console.warn("Could not save programs to localStorage", e);
+    }
+  };
+
+  // Load from localStorage on mount
+  const [initialized, setInitialized] = useState(false);
+  if (!initialized) {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("inspiratoria_programs");
+        if (stored) {
+          const parsed = JSON.parse(stored) as ProgramTemplate[];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // Use a microtask so React doesn't complain about setState during render
+            Promise.resolve().then(() => setTemplates(parsed));
+          }
+        }
+      } catch (e) { /* ignore */ }
+      setInitialized(true);
+    }
+  }
+
   // Stats
   const publishedCount = templates.filter(t => t.status === "published").length;
   const draftCount = templates.filter(t => t.status === "draft").length;
@@ -105,23 +140,29 @@ export default function ProgramsPage() {
       createdAt: new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
     };
-    setTemplates([...templates, newTemplate]);
+    const next = [...templates, newTemplate];
+    setTemplates(next);
+    saveToStorage(next);
     setShowCreateModal(false);
     resetForm();
   };
 
   const handleSave = () => {
     if (!selectedTemplate) return;
-    setTemplates(templates.map(t => 
+    const next = templates.map(t => 
       t.id === selectedTemplate.id ? { ...t, ...formData, updatedAt: new Date().toISOString().split('T')[0] } as ProgramTemplate : t
-    ));
+    );
+    setTemplates(next);
+    saveToStorage(next);
     setShowEditModal(false);
     setSelectedTemplate(null);
     resetForm();
   };
 
   const handleDelete = (id: string) => {
-    setTemplates(templates.filter(t => t.id !== id));
+    const next = templates.filter(t => t.id !== id);
+    setTemplates(next);
+    saveToStorage(next);
     setShowDeleteConfirm(null);
   };
 
@@ -136,7 +177,9 @@ export default function ProgramsPage() {
       createdAt: new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
     };
-    setTemplates([...templates, newTemplate]);
+    const next = [...templates, newTemplate];
+    setTemplates(next);
+    saveToStorage(next);
   };
 
   const openEditModal = (template: ProgramTemplate) => {
@@ -233,27 +276,48 @@ export default function ProgramsPage() {
     });
   };
 
-  // File upload handler
+  // File upload handler - converts files to base64 for persistence
   const handleFileUpload = (moduleId: string, files: FileList | null) => {
     if (!files) return;
-    const newResources: Resource[] = Array.from(files).map((file) => ({
-      id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      name: file.name.replace(/\.[^/.]+$/, ""),
-      type: file.type === "application/pdf" ? "pdf" as const 
-            : file.type.startsWith("video/") ? "video" as const 
-            : "document" as const,
-      url: URL.createObjectURL(file),
-      file,
-      fileName: file.name,
-      size: file.size < 1024 * 1024 
-        ? `${(file.size / 1024).toFixed(0)} KB` 
-        : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-    }));
-    setFormData({
-      ...formData,
-      modules: (formData.modules || []).map(m =>
-        m.id === moduleId ? { ...m, resources: [...m.resources, ...newResources] } : m
-      ),
+    const fileArray = Array.from(files);
+    
+    // Read each file as base64 data URL
+    Promise.all(
+      fileArray.map(
+        (file) =>
+          new Promise<Resource>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              resolve({
+                id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                name: file.name.replace(/\.[^/.]+$/, ""),
+                type:
+                  file.type === "application/pdf"
+                    ? ("pdf" as const)
+                    : file.type.startsWith("video/")
+                    ? ("video" as const)
+                    : ("document" as const),
+                url: "",
+                dataUrl: reader.result as string,
+                fileName: file.name,
+                size:
+                  file.size < 1024 * 1024
+                    ? `${(file.size / 1024).toFixed(0)} KB`
+                    : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+              });
+            };
+            reader.readAsDataURL(file);
+          })
+      )
+    ).then((newResources) => {
+      setFormData((prev) => ({
+        ...prev,
+        modules: (prev.modules || []).map((m) =>
+          m.id === moduleId
+            ? { ...m, resources: [...m.resources, ...newResources] }
+            : m
+        ),
+      }));
     });
   };
 

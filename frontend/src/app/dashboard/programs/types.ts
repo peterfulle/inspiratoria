@@ -7,7 +7,8 @@ export interface Resource {
   name: string;
   type: "pdf" | "video" | "link" | "document" | "template";
   url: string;
-  file?: File;
+  dataUrl?: string;   // base64 data URL for uploaded files (persistent)
+  file?: File;         // transient File object (not serializable)
   fileName?: string;
   size?: string;
   description?: string;
