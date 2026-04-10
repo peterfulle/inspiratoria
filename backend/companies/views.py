@@ -1827,10 +1827,11 @@ def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bo
             f"Equipo Inspiratoria"
         )
     else:
-        subject = "Bienvenido a Inspiratoria"
+        subject = "Bienvenido al equipo Inspiratoria"
         plain_message = (
             f"Hola, {first_name}.\n\n"
-            f"Te damos la bienvenida a la plataforma de Inspiratoria.\n\n"
+            f"Te damos la bienvenida al equipo de Inspiratoria.\n\n"
+            f"Ya tienes acceso a nuestra plataforma interna de gestión, donde podrás coordinar programas, gestionar cuentas, revisar métricas y colaborar con el resto del equipo.\n\n"
             f"Tu código de activación es: {otp_code}\n\n"
             f"Para comenzar, activa tu cuenta: {login_link}\n\n"
             f"Este código expira en 15 minutos.\n\n"
@@ -1849,10 +1850,10 @@ def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bo
     else:
         html_body = f"""
             <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:1.7;">
-                Te damos la bienvenida a la plataforma de Inspiratoria, un entorno digital de última tecnología diseñado para acompañar experiencias de formación, mentoría y desarrollo con una gestión clara, cercana e inteligente.
+                Te damos la bienvenida al equipo de Inspiratoria. Ya formas parte de nuestra plataforma interna de gestión.
             </p>
             <p style="margin:0 0 20px 0;color:#6b7280;font-size:14px;line-height:1.7;">
-                Desde aquí podrás acceder a tu programa, completar tu perfil, revisar contenidos, hacer seguimiento de tu avance y conectar con el ecosistema de personas que forman parte de esta experiencia &mdash; todo en un solo lugar.
+                Desde aquí podrás coordinar programas, gestionar cuentas de clientes, revisar métricas, administrar facturación y colaborar con el resto del equipo &mdash; todo en un solo lugar.
             </p>
             <p style="margin:0 0 28px 0;color:#374151;font-size:15px;line-height:1.7;">
                 Para comenzar, activa tu cuenta haciendo clic en el botón de abajo e ingresa tu código de acceso.

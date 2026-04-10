@@ -32,15 +32,10 @@ interface CompanyOption {
 
 // ============ CONSTANTS ============
 const ROLE_OPTIONS = [
-  { value: "client", label: "Cliente", color: "bg-blue-100 text-blue-700" },
-  { value: "admin", label: "Admin Empresa", color: "bg-purple-100 text-purple-700" },
-  { value: "inspiratoria_admin", label: "Admin Inspiratoria", color: "bg-amber-100 text-amber-700" },
-  { value: "facilitator_internal", label: "Facilitador Interno", color: "bg-green-100 text-green-700" },
-  { value: "facilitator_inspiratoria", label: "Facilitador Inspiratoria", color: "bg-teal-100 text-teal-700" },
-  { value: "mentor", label: "Mentor", color: "bg-indigo-100 text-indigo-700" },
-  { value: "mentee", label: "Mentee", color: "bg-pink-100 text-pink-700" },
-  { value: "participant", label: "Participante", color: "bg-gray-100 text-gray-700" },
+  { value: "admin_root", label: "Admin Root", color: "bg-red-100 text-red-700" },
   { value: "coordinator", label: "Coordinador", color: "bg-cyan-100 text-cyan-700" },
+  { value: "project_manager", label: "Project Manager", color: "bg-purple-100 text-purple-700" },
+  { value: "billing", label: "Facturación", color: "bg-amber-100 text-amber-700" },
 ];
 
 const getRoleStyle = (role: string) => {
@@ -111,11 +106,8 @@ export default function UsersPage() {
   const [createForm, setCreateForm] = useState({
     email: "",
     full_name: "",
-    role: "participant",
-    company_id: "",
+    role: "coordinator",
     position: "",
-    department: "",
-    phone: "",
     view_permissions: [...ALL_VIEW_KEYS],
   });
 
@@ -123,10 +115,7 @@ export default function UsersPage() {
   const [editForm, setEditForm] = useState({
     full_name: "",
     role: "",
-    company_id: "",
     position: "",
-    department: "",
-    phone: "",
     is_active: true,
     view_permissions: [] as string[],
   });
@@ -205,14 +194,11 @@ export default function UsersPage() {
     try {
       await apiFetch("/admin/create-user", {
         method: "POST",
-        body: JSON.stringify({
-          ...createForm,
-          company_id: createForm.company_id || null,
-        }),
+        body: JSON.stringify(createForm),
       });
       setActionMessage({ type: "success", text: `Usuario creado. OTP enviado a ${createForm.email}` });
       setShowCreateModal(false);
-      setCreateForm({ email: "", full_name: "", role: "participant", company_id: "", position: "", department: "", phone: "", view_permissions: [...ALL_VIEW_KEYS] });
+      setCreateForm({ email: "", full_name: "", role: "coordinator", position: "", view_permissions: [...ALL_VIEW_KEYS] });
       fetchUsers();
     } catch (err: any) {
       setActionMessage({ type: "error", text: err.message || "Error creando usuario" });
@@ -229,10 +215,7 @@ export default function UsersPage() {
     try {
       await apiFetch(`/admin/users/${selectedUser.id}`, {
         method: "PATCH",
-        body: JSON.stringify({
-          ...editForm,
-          company_id: editForm.company_id || null,
-        }),
+        body: JSON.stringify(editForm),
       });
 
       // If editing the currently logged-in user, update localStorage & notify sidebar
@@ -299,10 +282,7 @@ export default function UsersPage() {
     setEditForm({
       full_name: user.full_name || "",
       role: user.role || "",
-      company_id: user.company_id || "",
       position: user.position || "",
-      department: user.department || "",
-      phone: user.phone || "",
       is_active: user.is_active,
       view_permissions: user.view_permissions || [],
     });
@@ -440,7 +420,7 @@ export default function UsersPage() {
                 <tr className="border-b border-gray-100">
                   <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Usuario</th>
                   <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Rol</th>
-                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3 hidden lg:table-cell">Empresa</th>
+                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3 hidden lg:table-cell">Cargo</th>
                   <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3 hidden md:table-cell">Estado</th>
                   <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3 hidden xl:table-cell">Fecha</th>
                   <th className="text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Acciones</th>
@@ -467,9 +447,9 @@ export default function UsersPage() {
                         {getRoleLabel(user.role)}
                       </span>
                     </td>
-                    {/* Company */}
+                    {/* Cargo */}
                     <td className="px-5 py-3.5 hidden lg:table-cell">
-                      <span className="text-sm text-gray-500">{user.company_name || "\u2014"}</span>
+                      <span className="text-sm text-gray-500">{user.position || "\u2014"}</span>
                     </td>
                     {/* Status */}
                     <td className="px-5 py-3.5 hidden md:table-cell">
@@ -627,56 +607,15 @@ export default function UsersPage() {
                 </select>
               </div>
 
-              {/* Company */}
-              {companies.length > 0 && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Empresa</label>
-                  <select
-                    value={createForm.company_id}
-                    onChange={(e) => setCreateForm({ ...createForm, company_id: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
-                  >
-                    <option value="">Sin empresa</option>
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Position + Department */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Cargo</label>
-                  <input
-                    type="text"
-                    value={createForm.position}
-                    onChange={(e) => setCreateForm({ ...createForm, position: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
-                    placeholder="Director, Gerente..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Departamento</label>
-                  <input
-                    type="text"
-                    value={createForm.department}
-                    onChange={(e) => setCreateForm({ ...createForm, department: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
-                    placeholder="RR.HH., TI..."
-                  />
-                </div>
-              </div>
-
-              {/* Phone */}
+              {/* Cargo */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Teléfono</label>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Cargo</label>
                 <input
-                  type="tel"
-                  value={createForm.phone}
-                  onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
+                  type="text"
+                  value={createForm.position}
+                  onChange={(e) => setCreateForm({ ...createForm, position: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
-                  placeholder="+56 9 1234 5678"
+                  placeholder="Director, Gerente..."
                 />
               </div>
 
@@ -814,52 +753,13 @@ export default function UsersPage() {
                 </select>
               </div>
 
-              {/* Company */}
-              {companies.length > 0 && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Empresa</label>
-                  <select
-                    value={editForm.company_id}
-                    onChange={(e) => setEditForm({ ...editForm, company_id: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
-                  >
-                    <option value="">Sin empresa</option>
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Position + Department */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Cargo</label>
-                  <input
-                    type="text"
-                    value={editForm.position}
-                    onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Departamento</label>
-                  <input
-                    type="text"
-                    value={editForm.department}
-                    onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Phone */}
+              {/* Cargo */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Teléfono</label>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Cargo</label>
                 <input
-                  type="tel"
-                  value={editForm.phone}
-                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  type="text"
+                  value={editForm.position}
+                  onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
                 />
               </div>
