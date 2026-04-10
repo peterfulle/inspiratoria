@@ -132,7 +132,7 @@ export default function HomePage() {
       {/* ═══════════════ HEADER ═══════════════ */}
       <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
-          ? "bg-gray-950/95 backdrop-blur-2xl border-b border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.3)]"
+          ? "bg-gray-950 border-b border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.4)]"
           : "bg-transparent"
       }`}>
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
@@ -613,7 +613,7 @@ export default function HomePage() {
               Solicitar un Demo
               <IconArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <p className="mt-5 text-sm text-gray-400">Desde CLP $790.000/mes · Contrato anual</p>
+
           </div>
         </div>
       </section>
@@ -872,7 +872,6 @@ export default function HomePage() {
                 {[
                   { label: "Inspiratoria Core", href: "/register" },
                   { label: "Inspiratoria Studio", href: "/register" },
-                  { label: "Precios", href: "/register" },
                   { label: "Iniciar Sesión", href: "/login" },
                 ].map((link) => (
                   <li key={link.label}>

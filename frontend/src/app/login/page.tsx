@@ -354,13 +354,12 @@ export default function LoginPage() {
         {/* Content Over Video */}
         <div className="relative z-10 flex flex-col justify-between h-full p-10">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 backdrop-blur-md border border-white/15">
-              <svg className="h-5 w-5 text-primary-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9.937 15.5A2 2 0 008.5 14.063l-6.135-1.582a.5.5 0 010-.962L8.5 9.936A2 2 0 009.937 8.5l1.582-6.135a.5.5 0 01.962 0L14.063 8.5A2 2 0 0015.5 9.937l6.135 1.582a.5.5 0 010 .962L15.5 14.063a2 2 0 00-1.437 1.437l-1.582 6.135a.5.5 0 01-.962 0z" />
-              </svg>
-            </div>
-            <span className="text-lg font-semibold text-white/80 tracking-tight">Inspiratoria</span>
+          <div>
+            <img
+              src="/home/inspiratoria_negro-negro-300x68.png"
+              alt="Inspiratoria"
+              className="h-9 brightness-0 invert"
+            />
           </div>
 
           {/* Center - Hero */}
@@ -375,7 +374,7 @@ export default function LoginPage() {
                 Donde el talento<br />
                 <span className="bg-gradient-to-r from-primary-400 to-primary-300 bg-clip-text text-transparent">encuentra dirección</span>
               </h2>
-              <p className="text-base text-white/55 leading-relaxed max-w-sm">
+              <p className="text-base text-white leading-relaxed max-w-sm">
                 Conecta mentores y equipos. Mide el impacto en tiempo real con métricas que importan.
               </p>
 
@@ -815,28 +814,52 @@ export default function LoginPage() {
             </p>
 
             {/* Trust Badges */}
-            <div className="mt-12 pt-6 border-t border-gray-100 flex items-center justify-center gap-5">
-              <div className="flex items-center gap-1.5 text-gray-300">
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-                <span className="text-[11px] text-gray-300 font-medium">SSL</span>
+            <div className="mt-12 pt-6 border-t border-gray-100 flex flex-col items-center gap-4">
+              <div className="flex items-center justify-center gap-5">
+                <div className="flex items-center gap-1.5 text-gray-900">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                  <span className="text-[11px] text-gray-900 font-medium">SSL</span>
+                </div>
+                <div className="h-3 w-px bg-gray-200" />
+                <div className="flex items-center gap-1.5 text-gray-900">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0110 0v4" />
+                  </svg>
+                  <span className="text-[11px] text-gray-900 font-medium">AES-256</span>
+                </div>
+                <div className="h-3 w-px bg-gray-200" />
+                <div className="flex items-center gap-1.5 text-gray-900">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                  <span className="text-[11px] text-gray-900 font-medium">SOC 2</span>
+                </div>
               </div>
-              <div className="h-3 w-px bg-gray-200" />
-              <div className="flex items-center gap-1.5 text-gray-300">
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0110 0v4" />
-                </svg>
-                <span className="text-[11px] text-gray-300 font-medium">AES-256</span>
-              </div>
-              <div className="h-3 w-px bg-gray-200" />
-              <div className="flex items-center gap-1.5 text-gray-300">
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <span className="text-[11px] text-gray-300 font-medium">SOC 2</span>
+              {/* Authenticator logos */}
+              <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center gap-1.5 opacity-60">
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                  <span className="text-[10px] text-gray-400 font-medium">Google Authenticator</span>
+                </div>
+                <div className="h-3 w-px bg-gray-200" />
+                <div className="flex items-center gap-1.5 opacity-60">
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24">
+                    <path d="M11.4 24H0V12.6L11.4 24z" fill="#00A4EF"/>
+                    <path d="M24 24H12.6l-6-6H18V6.6l6 6V24z" fill="#FFB900"/>
+                    <path d="M24 0v11.4L12.6 0H24z" fill="#7FBA00"/>
+                    <path d="M0 0h11.4l6 6H6v11.4L0 11.4V0z" fill="#F25022"/>
+                  </svg>
+                  <span className="text-[10px] text-gray-400 font-medium">Microsoft Authenticator</span>
+                </div>
               </div>
             </div>
           </div>
