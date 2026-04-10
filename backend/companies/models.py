@@ -348,8 +348,8 @@ class User(AbstractUser):
     position = models.CharField(max_length=100, blank=True)  # Cargo en la empresa
     department = models.CharField(max_length=100, blank=True)
     
-    # Avatar
-    avatar_url = models.URLField(blank=True)
+    # Avatar (stored as base64 data URI in DB for Render compatibility)
+    avatar_url = models.TextField(blank=True, default="")
     
     # Onboarding
     is_onboarded = models.BooleanField(default=False)

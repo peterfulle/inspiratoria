@@ -2426,13 +2426,12 @@ async def update_profile(payload: ProfileUpdateRequest, authorization: Optional[
 from fastapi import UploadFile, File as FastAPIFile
 import os
 import hashlib
-
-AVATAR_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "avatars")
+import base64
 
 
 @router.post("/auth/avatar")
 async def upload_avatar(authorization: Optional[str] = Header(None), avatar: UploadFile = FastAPIFile(...)):
-    """Subir o reemplazar la foto de perfil del usuario."""
+    """Subir o reemplazar la foto de perfil del usuario. Se guarda como base64 en la DB."""
     user = await _get_user_from_token(authorization)
 
     # Validate file type
@@ -2444,31 +2443,11 @@ async def upload_avatar(authorization: Optional[str] = Header(None), avatar: Upl
     if len(contents) > 2 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="La imagen no debe superar 2 MB.")
 
-    # Create directory if needed
-    os.makedirs(AVATAR_DIR, exist_ok=True)
+    # Convert to base64 data URI and store in DB
+    b64 = base64.b64encode(contents).decode("utf-8")
+    content_type = avatar.content_type or "image/png"
+    avatar_url = f"data:{content_type};base64,{b64}"
 
-    # Generate safe filename
-    ext = avatar.filename.rsplit(".", 1)[-1].lower() if avatar.filename and "." in avatar.filename else "png"
-    if ext not in ("jpg", "jpeg", "png", "webp"):
-        ext = "png"
-    file_hash = hashlib.sha256(contents).hexdigest()[:12]
-    filename = f"{user.id}_{file_hash}.{ext}"
-    filepath = os.path.join(AVATAR_DIR, filename)
-
-    # Remove old avatar file if exists
-    if user.avatar_url:
-        old_filename = user.avatar_url.rsplit("/", 1)[-1] if "/" in user.avatar_url else ""
-        if old_filename:
-            old_path = os.path.join(AVATAR_DIR, old_filename)
-            if os.path.exists(old_path):
-                os.remove(old_path)
-
-    # Write new file
-    with open(filepath, "wb") as f:
-        f.write(contents)
-
-    # Update user
-    avatar_url = f"/static/avatars/{filename}"
     user.avatar_url = avatar_url
     await sync_to_async(user.save)(update_fields=['avatar_url'])
 
@@ -2481,11 +2460,6 @@ async def delete_avatar(authorization: Optional[str] = Header(None)):
     user = await _get_user_from_token(authorization)
 
     if user.avatar_url:
-        old_filename = user.avatar_url.rsplit("/", 1)[-1] if "/" in user.avatar_url else ""
-        if old_filename:
-            old_path = os.path.join(AVATAR_DIR, old_filename)
-            if os.path.exists(old_path):
-                os.remove(old_path)
         user.avatar_url = ""
         await sync_to_async(user.save)(update_fields=['avatar_url'])
 

@@ -555,7 +555,7 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
                 {/* Avatar with gradient border */}
                 <div className="relative">
                   {avatarUrl ? (
-                    <img src={avatarUrl.startsWith('http') ? avatarUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}${avatarUrl}`} alt="Avatar" className="w-10 h-10 rounded-full object-cover shadow-lg shadow-primary-500/25" />
+                    <img src={avatarUrl.startsWith('http') || avatarUrl.startsWith('data:') ? avatarUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}${avatarUrl}`} alt="Avatar" className="w-10 h-10 rounded-full object-cover shadow-lg shadow-primary-500/25" />
                   ) : (
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-primary-500/25">
                       {getInitials(username)}
@@ -583,7 +583,7 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
               <div className="relative group">
                 {avatarUrl ? (
                   <div className="w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full overflow-hidden shadow-lg shadow-primary-500/25 cursor-pointer">
-                    <img src={avatarUrl.startsWith('http') ? avatarUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}${avatarUrl}`} alt="Avatar" className="w-full h-full object-cover" />
+                    <img src={avatarUrl.startsWith('http') || avatarUrl.startsWith('data:') ? avatarUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}${avatarUrl}`} alt="Avatar" className="w-full h-full object-cover" />
                   </div>
                 ) : (
                   <div className="w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-primary-500/25 cursor-pointer">
