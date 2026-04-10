@@ -317,7 +317,11 @@ class User(AbstractUser):
     """
     ROLE_CHOICES = [
         ("superadmin", "Super Admin"),  # Administrador de Inspiratoria (Admin Root)
+        ("admin_root", "Admin Root"),  # Admin raíz del sistema
         ("inspiratoria_admin", "Admin Inspiratoria"),  # Administrador de Inspiratoria (Nuevo rol)
+        ("coordinator", "Coordinador"),  # Coordinador de programas
+        ("project_manager", "Project Manager"),  # Gestor de proyectos
+        ("billing", "Facturación"),  # Encargado de facturación
         ("client", "Cliente"),  # Contraparte en la empresa
         ("admin", "Administrador"),  # Admin interno de la empresa
         ("facilitator_internal", "Facilitador Interno"),

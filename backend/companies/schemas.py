@@ -205,8 +205,9 @@ class InviteUserRequest(BaseModel):
     @validator('role')
     def validate_role(cls, v):
         valid_roles = [
-            'client', 'admin', 'facilitator_internal', 
-            'facilitator_inspiratoria', 'mentor', 'mentee'
+            'client', 'admin', 'admin_root', 'facilitator_internal', 
+            'facilitator_inspiratoria', 'mentor', 'mentee',
+            'coordinator', 'project_manager', 'billing',
         ]
         if v not in valid_roles:
             raise ValueError(f'Rol inválido. Debe ser uno de: {", ".join(valid_roles)}')
@@ -262,8 +263,9 @@ class UserCreateRequest(BaseModel):
     @validator('role')
     def validate_role(cls, v):
         valid_roles = [
-            'superadmin', 'client', 'admin', 'facilitator_internal', 
-            'facilitator_inspiratoria', 'mentor', 'mentee'
+            'superadmin', 'client', 'admin', 'admin_root', 'facilitator_internal', 
+            'facilitator_inspiratoria', 'mentor', 'mentee',
+            'coordinator', 'project_manager', 'billing',
         ]
         if v not in valid_roles:
             raise ValueError(f'Rol inválido. Debe ser uno de: {", ".join(valid_roles)}')
@@ -363,9 +365,10 @@ class AdminCreateUserRequest(BaseModel):
     @validator('role')
     def validate_role(cls, v):
         valid_roles = [
-            'client', 'admin', 'facilitator_internal',
+            'client', 'admin', 'admin_root', 'facilitator_internal',
             'facilitator_inspiratoria', 'mentor', 'mentee',
             'inspiratoria_admin', 'participant', 'coordinator',
+            'project_manager', 'billing',
         ]
         if v not in valid_roles:
             raise ValueError(f'Rol inválido. Debe ser uno de: {", ".join(valid_roles)}')
