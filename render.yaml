@@ -24,6 +24,8 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: FRONTEND_URL
+        value: https://inspiratoria.aplifly.com
       - key: DATABASE_URL
         fromDatabase:
           name: inspiratoria-db

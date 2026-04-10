@@ -100,6 +100,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.68.58:3001",
     "http://192.168.68.58:3005",
     "https://inspiratoria-frontend.onrender.com",
+    "https://inspiratoria.aplifly.com",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -126,6 +127,9 @@ CORS_ALLOW_HEADERS = [
 ]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ============ FRONTEND URL ============
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
 # ============ EMAIL CONFIGURATION ============
 # SMTP real via Gmail (mismas credenciales que usa el frontend)
