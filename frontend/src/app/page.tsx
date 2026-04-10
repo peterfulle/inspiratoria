@@ -130,9 +130,9 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white scroll-smooth">
       {/* ═══════════════ HEADER ═══════════════ */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+      <header className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
         scrolled
-          ? "bg-gray-950 border-b border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.4)]"
+          ? "bg-black shadow-[0_2px_20px_rgba(0,0,0,0.5)]"
           : "bg-transparent"
       }`}>
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
