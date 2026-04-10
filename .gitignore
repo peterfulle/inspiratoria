@@ -25,10 +25,11 @@ out/
 .DS_Store
 Thumbs.db
 
-# Large media files
+# Large media files (except frontend public assets)
 *.mp4
 *.mov
 *.avi
+!frontend/public/**/*.mp4
 
 # IDE
 .vscode/
