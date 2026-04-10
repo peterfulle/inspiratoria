@@ -25,7 +25,7 @@ export default function AlertsPage() {
 
   const loadAlerts = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/alerts`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/alerts`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });

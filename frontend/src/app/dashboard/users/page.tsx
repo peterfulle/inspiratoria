@@ -1,1381 +1,991 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
-// ============================================================================
-// TYPES
-// ============================================================================
-interface User {
-  id: number;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+
+// ============ TYPES ============
+interface UserData {
+  id: string;
   username: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  full_name: string;
   role: string;
+  company_id: string | null;
+  company_name: string | null;
+  position: string;
+  department: string;
+  phone: string;
   is_active: boolean;
-  date_joined: string;
-  last_login: string | null;
+  is_account_activated: boolean;
+  is_onboarded: boolean;
+  view_permissions: string[];
+  created_at: string | null;
+  avatar_url: string | null;
 }
 
-interface NewUserForm {
-  username: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  role: string;
-  password: string;
+interface CompanyOption {
+  id: string;
+  name: string;
 }
 
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-const roleLabels: Record<string, string> = {
-  admin_root: 'Admin Root',
-  superadmin: 'Super Admin',
-  inspiratoria_admin: 'Admin Inspiratoria',
-  admin: 'Administrador',
-  coordinator: 'Coordinador',
-  client: 'Cliente',
-  facilitator: 'Facilitador',
-  mentor: 'Mentor',
-  mentee: 'Aprendiz',
-};
-
-// ============================================================================
-// ICONS
-// ============================================================================
-const Icons = {
-  search: (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  ),
-  grid: (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-    </svg>
-  ),
-  list: (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  ),
-  users: (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-  ),
-  check: (
-    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  ),
-  clock: (
-    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  x: (
-    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  ),
-  plus: (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-    </svg>
-  ),
-  edit: (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-    </svg>
-  ),
-  shield: (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-    </svg>
-  ),
-  activity: (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-    </svg>
-  ),
-  close: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  ),
-};
-
-// ============================================================================
-// STYLES
-// ============================================================================
-const styles = `
-  .users-container {
-    min-height: 100vh;
-    background: #fafafa;
-    padding: 2rem;
-  }
-
-  .users-header {
-    margin-bottom: 2rem;
-  }
-
-  .users-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #1a1a1a;
-    margin-bottom: 0.25rem;
-  }
-
-  .users-subtitle {
-    font-size: 0.875rem;
-    color: #6b7280;
-  }
-
-  /* Stats Cards */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    margin-bottom: 2rem;
-  }
-
-  .stat-card {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 1.25rem;
-  }
-
-  .stat-label {
-    font-size: 0.75rem;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.5rem;
-  }
-
-  .stat-value {
-    font-size: 1.75rem;
-    font-weight: 600;
-    color: #1a1a1a;
-  }
-
-  .stat-change {
-    font-size: 0.75rem;
-    color: #10b981;
-    margin-top: 0.25rem;
-  }
-
-  /* Glass Card */
-  .glass-card {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 1.25rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .glass-card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .search-container {
-    position: relative;
-    flex: 1;
-    max-width: 320px;
-  }
-
-  .search-icon {
-    position: absolute;
-    left: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #9ca3af;
-  }
-
-  .input-field {
-    width: 100%;
-    padding: 0.5rem 0.75rem 0.5rem 2.25rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    background: #fafafa;
-    transition: all 0.15s ease;
-  }
-
-  .input-field:focus {
-    outline: none;
-    border-color: #1a1a1a;
-    background: white;
-  }
-
-  .input-clean {
-    width: 100%;
-    padding: 0.625rem 0.875rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    background: #fafafa;
-    transition: all 0.15s ease;
-  }
-
-  .input-clean:focus {
-    outline: none;
-    border-color: #1a1a1a;
-    background: white;
-  }
-
-  .select-field {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    background: #fafafa;
-    cursor: pointer;
-    min-width: 140px;
-  }
-
-  .select-field:focus {
-    outline: none;
-    border-color: #1a1a1a;
-  }
-
-  .filter-tabs {
-    display: flex;
-    gap: 0.25rem;
-    background: #f3f4f6;
-    padding: 0.25rem;
-    border-radius: 0.5rem;
-  }
-
-  .filter-tab {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #6b7280;
-    background: transparent;
-    border: none;
-    border-radius: 0.375rem;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .filter-tab:hover {
-    color: #1a1a1a;
-  }
-
-  .filter-tab.active {
-    background: white;
-    color: #1a1a1a;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  }
-
-  .view-toggle {
-    display: flex;
-    gap: 0.25rem;
-    background: #f3f4f6;
-    padding: 0.25rem;
-    border-radius: 0.5rem;
-  }
-
-  .btn-icon {
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    border-radius: 0.375rem;
-    color: #6b7280;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .btn-icon:hover {
-    color: #1a1a1a;
-  }
-
-  .btn-icon.active {
-    background: white;
-    color: #1a1a1a;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  }
-
-  .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: #1a1a1a;
-    color: white;
-    border: none;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .btn-primary:hover {
-    background: #2d2d2d;
-  }
-
-  .btn-primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .btn-secondary {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: #f3f4f6;
-    color: #374151;
-    border: none;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .btn-secondary:hover {
-    background: #e5e7eb;
-  }
-
-  /* User List */
-  .user-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .user-row {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .user-row:hover {
-    border-color: #d1d5db;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  }
-
-  .user-avatar {
-    width: 2.5rem;
-    height: 2.5rem;
-    background: #f3f4f6;
-    border-radius: 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 0.875rem;
-    color: #1a1a1a;
-    flex-shrink: 0;
-  }
-
-  .user-info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .user-name {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #1a1a1a;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .user-meta {
-    font-size: 0.75rem;
-    color: #6b7280;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-top: 0.125rem;
-  }
-
-  .user-stat {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 0.75rem;
-    color: #6b7280;
-    min-width: 100px;
-  }
-
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.625rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
-    border-radius: 9999px;
-  }
-
-  .badge-active {
-    background: #d1fae5;
-    color: #065f46;
-  }
-
-  .badge-inactive {
-    background: #fee2e2;
-    color: #991b1b;
-  }
-
-  .badge-admin_root {
-    background: #ede9fe;
-    color: #5b21b6;
-  }
-
-  .badge-superadmin {
-    background: #fce7f3;
-    color: #9d174d;
-  }
-
-  .badge-inspiratoria_admin {
-    background: #dbeafe;
-    color: #1e40af;
-  }
-
-  .badge-admin {
-    background: #e0e7ff;
-    color: #3730a3;
-  }
-
-  .badge-coordinator {
-    background: #dcfce7;
-    color: #166534;
-  }
-
-  .badge-client {
-    background: #fef3c7;
-    color: #92400e;
-  }
-
-  .badge-facilitator {
-    background: #ccfbf1;
-    color: #115e59;
-  }
-
-  .badge-mentor {
-    background: #cffafe;
-    color: #155e75;
-  }
-
-  .badge-mentee {
-    background: #f3f4f6;
-    color: #374151;
-  }
-
-  .user-actions {
-    display: flex;
-    gap: 0.25rem;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-  }
-
-  .user-row:hover .user-actions {
-    opacity: 1;
-  }
-
-  .action-btn {
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f3f4f6;
-    border: none;
-    border-radius: 0.375rem;
-    color: #6b7280;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .action-btn:hover {
-    background: #e5e7eb;
-    color: #1a1a1a;
-  }
-
-  /* Grid View */
-  .user-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-  }
-
-  .user-card {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 1.25rem;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .user-card:hover {
-    border-color: #d1d5db;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  }
-
-  .user-card-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-  }
-
-  .user-card-stats {
-    display: flex;
-    gap: 1rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid #f3f4f6;
-  }
-
-  .user-card-stat {
-    font-size: 0.75rem;
-    color: #6b7280;
-  }
-
-  /* Summary Section */
-  .summary-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.5rem;
-    margin-top: 2rem;
-  }
-
-  .summary-card {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 1.25rem;
-  }
-
-  .summary-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #1a1a1a;
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .summary-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .summary-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem;
-    background: #fafafa;
-    border-radius: 0.5rem;
-  }
-
-  .summary-item-label {
-    font-size: 0.875rem;
-    color: #374151;
-  }
-
-  .summary-item-value {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #1a1a1a;
-  }
-
-  .activity-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    background: #fafafa;
-    border-radius: 0.5rem;
-  }
-
-  .activity-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    background: #1a1a1a;
-    border-radius: 50%;
-    margin-top: 0.375rem;
-    flex-shrink: 0;
-  }
-
-  .activity-content {
-    flex: 1;
-  }
-
-  .activity-text {
-    font-size: 0.875rem;
-    color: #374151;
-  }
-
-  .activity-time {
-    font-size: 0.75rem;
-    color: #9ca3af;
-    margin-top: 0.125rem;
-  }
-
-  /* Empty State */
-  .empty-state {
-    text-align: center;
-    padding: 3rem;
-    color: #6b7280;
-  }
-
-  .empty-icon {
-    width: 3rem;
-    height: 3rem;
-    margin: 0 auto 1rem;
-    color: #d1d5db;
-  }
-
-  /* Loading */
-  .loading-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 50vh;
-  }
-
-  .loading-spinner {
-    width: 2.5rem;
-    height: 2.5rem;
-    border: 2px solid #e5e7eb;
-    border-top-color: #1a1a1a;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  /* Modal */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-    padding: 1rem;
-  }
-
-  .modal-content {
-    background: white;
-    border-radius: 0.75rem;
-    width: 100%;
-    max-width: 28rem;
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-
-  .modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.25rem;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  .modal-title {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: #1a1a1a;
-  }
-
-  .modal-close {
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f3f4f6;
-    border: none;
-    border-radius: 0.375rem;
-    color: #6b7280;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .modal-close:hover {
-    background: #e5e7eb;
-    color: #1a1a1a;
-  }
-
-  .modal-body {
-    padding: 1.25rem;
-  }
-
-  .modal-footer {
-    display: flex;
-    gap: 0.75rem;
-    padding: 1.25rem;
-    border-top: 1px solid #e5e7eb;
-  }
-
-  .form-group {
-    margin-bottom: 1rem;
-  }
-
-  .form-label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #374151;
-    margin-bottom: 0.375rem;
-  }
-
-  .form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-  }
-
-  @media (max-width: 1024px) {
-    .stats-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-    .user-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-    .summary-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 640px) {
-    .stats-grid {
-      grid-template-columns: 1fr;
-    }
-    .user-grid {
-      grid-template-columns: 1fr;
-    }
-    .glass-card-header {
-      flex-direction: column;
-      align-items: stretch;
-    }
-    .search-container {
-      max-width: 100%;
-    }
-    .form-row {
-      grid-template-columns: 1fr;
-    }
-  }
-`;
-
-// ============================================================================
-// SAMPLE DATA
-// ============================================================================
-const sampleUsers: User[] = [
-  { id: 1, username: 'admin', email: 'admin@test.com', first_name: 'Admin', last_name: 'Principal', role: 'admin_root', is_active: true, date_joined: '2024-01-01', last_login: '2024-03-15T10:30:00' },
-  { id: 2, username: 'carolina', email: 'carolina@inspiratoria.com', first_name: 'Carolina', last_name: 'González', role: 'inspiratoria_admin', is_active: true, date_joined: '2024-01-15', last_login: '2024-03-14T15:45:00' },
-  { id: 3, username: 'juan.coord', email: 'juan@empresa.com', first_name: 'Juan', last_name: 'Martínez', role: 'coordinator', is_active: true, date_joined: '2024-02-01', last_login: '2024-03-13T09:20:00' },
-  { id: 4, username: 'maria.mentor', email: 'maria@empresa.com', first_name: 'María', last_name: 'López', role: 'mentor', is_active: true, date_joined: '2024-02-10', last_login: '2024-03-12T14:00:00' },
-  { id: 5, username: 'pedro.mentee', email: 'pedro@empresa.com', first_name: 'Pedro', last_name: 'Sánchez', role: 'mentee', is_active: true, date_joined: '2024-02-15', last_login: '2024-03-11T11:30:00' },
-  { id: 6, username: 'ana.client', email: 'ana@cliente.com', first_name: 'Ana', last_name: 'Ruiz', role: 'client', is_active: false, date_joined: '2024-01-20', last_login: null },
+// ============ CONSTANTS ============
+const ROLE_OPTIONS = [
+  { value: "client", label: "Cliente", color: "bg-blue-100 text-blue-700" },
+  { value: "admin", label: "Admin Empresa", color: "bg-purple-100 text-purple-700" },
+  { value: "inspiratoria_admin", label: "Admin Inspiratoria", color: "bg-amber-100 text-amber-700" },
+  { value: "facilitator_internal", label: "Facilitador Interno", color: "bg-green-100 text-green-700" },
+  { value: "facilitator_inspiratoria", label: "Facilitador Inspiratoria", color: "bg-teal-100 text-teal-700" },
+  { value: "mentor", label: "Mentor", color: "bg-indigo-100 text-indigo-700" },
+  { value: "mentee", label: "Mentee", color: "bg-pink-100 text-pink-700" },
+  { value: "participant", label: "Participante", color: "bg-gray-100 text-gray-700" },
+  { value: "coordinator", label: "Coordinador", color: "bg-cyan-100 text-cyan-700" },
 ];
 
-const recentActivity = [
-  { text: 'Carolina González inició sesión', time: 'Hace 2 horas' },
-  { text: 'Juan Martínez actualizó su perfil', time: 'Hace 5 horas' },
-  { text: 'María López completó mentoría', time: 'Hace 8 horas' },
-  { text: 'Pedro Sánchez se registró', time: 'Hace 1 día' },
+const getRoleStyle = (role: string) => {
+  return ROLE_OPTIONS.find((r) => r.value === role)?.color || "bg-gray-100 text-gray-600";
+};
+
+const getRoleLabel = (role: string) => {
+  return ROLE_OPTIONS.find((r) => r.value === role)?.label || role;
+};
+
+const VIEW_PERMISSIONS_OPTIONS = [
+  { key: "dashboard", label: "Vista General" },
+  { key: "accounts", label: "Cuentas Studio" },
+  { key: "programs", label: "Programas Studio" },
+  { key: "billing", label: "Facturación" },
+  { key: "users", label: "Usuarios" },
+  { key: "analytics", label: "Analytics (Pronto)" },
+  { key: "ecosystem", label: "Ecosistema" },
+  { key: "configuration", label: "Configuración" },
+  { key: "notifications", label: "Notificaciones" },
 ];
 
-// ============================================================================
-// COMPONENT
-// ============================================================================
+const ALL_VIEW_KEYS = VIEW_PERMISSIONS_OPTIONS.map((v) => v.key);
+
+// ============ API HELPERS ============
+function getAuthHeaders(): Record<string, string> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function apiFetch(path: string, options: RequestInit = {}) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...getAuthHeaders(),
+    ...(options.headers as Record<string, string> || {}),
+  };
+  const res = await fetch(`${API_URL}/api/companies${path}`, { ...options, headers });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `Error ${res.status}`);
+  }
+  return res.json();
+}
+
+// ============ MAIN COMPONENT ============
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "pending">("all");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  // Modals
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
-  const [newUser, setNewUser] = useState<NewUserForm>({
-    username: '',
-    email: '',
-    first_name: '',
-    last_name: '',
-    role: 'admin',
-    password: '',
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Create form state
+  const [createForm, setCreateForm] = useState({
+    email: "",
+    full_name: "",
+    role: "participant",
+    company_id: "",
+    position: "",
+    department: "",
+    phone: "",
+    view_permissions: [...ALL_VIEW_KEYS],
   });
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        setCurrentUserEmail(user.email);
-      } catch (e) {
-        console.error('Error parsing user data:', e);
-      }
-    }
-    loadUsers();
-  }, []);
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    full_name: "",
+    role: "",
+    company_id: "",
+    position: "",
+    department: "",
+    phone: "",
+    is_active: true,
+    view_permissions: [] as string[],
+  });
 
-  const loadUsers = async () => {
+  // ============ AUTH CHECK ============
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (!userStr) {
+      router.push("/login");
+      return;
+    }
+    const user = JSON.parse(userStr);
+    const adminRoles = ["superadmin", "admin_root", "inspiratoria_admin"];
+    if (!adminRoles.includes(user.role)) {
+      router.push("/dashboard");
+      return;
+    }
+    setCurrentUser(user);
+  }, [router]);
+
+  // ============ FETCH DATA ============
+  const fetchUsers = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8001/api/users');
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data);
-      } else {
-        setUsers(sampleUsers);
-      }
-    } catch (error) {
-      console.error('Error loading users:', error);
-      setUsers(sampleUsers);
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (roleFilter) params.set("role", roleFilter);
+      params.set("page", String(page));
+      params.set("limit", "20");
+
+      const data = await apiFetch(`/admin/users?${params.toString()}`);
+      let filtered = data.users || [];
+
+      if (statusFilter === "active") filtered = filtered.filter((u: UserData) => u.is_active && u.is_account_activated);
+      else if (statusFilter === "inactive") filtered = filtered.filter((u: UserData) => !u.is_active);
+      else if (statusFilter === "pending") filtered = filtered.filter((u: UserData) => !u.is_account_activated);
+
+      setUsers(filtered);
+      setTotal(data.total || 0);
+      setTotalPages(data.pages || 1);
+    } catch (err: any) {
+      console.error("Error fetching users:", err);
+      setActionMessage({ type: "error", text: err.message || "Error cargando usuarios" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, roleFilter, statusFilter, page]);
 
-  // Filter users
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || 
-      (statusFilter === 'active' && user.is_active) ||
-      (statusFilter === 'inactive' && !user.is_active);
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    return matchesSearch && matchesStatus && matchesRole;
-  });
-
-  // Stats
-  const stats = {
-    total: users.length,
-    active: users.filter(u => u.is_active).length,
-    admins: users.filter(u => ['admin_root', 'superadmin', 'inspiratoria_admin', 'admin'].includes(u.role)).length,
-    recentlyActive: users.filter(u => {
-      if (!u.last_login) return false;
-      const lastLogin = new Date(u.last_login);
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      return lastLogin > weekAgo;
-    }).length,
-  };
-
-  // Role summary
-  const roleSummary = Object.entries(
-    users.reduce((acc, u) => {
-      acc[u.role] = (acc[u.role] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>)
-  ).slice(0, 4);
-
-  const getInitials = (firstName: string, lastName: string): string => {
-    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || '??';
-  };
-
-  const formatLastLogin = (lastLogin: string | null): string => {
-    if (!lastLogin) return 'Nunca';
-    const date = new Date(lastLogin);
-    return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
-  };
-
-  const handleInviteUser = async () => {
-    if (!newUser.email || !newUser.first_name || !newUser.last_name || !newUser.password) {
-      alert('Por favor complete todos los campos obligatorios');
-      return;
-    }
-
-    setSubmitting(true);
+  const fetchCompanies = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8001/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUser),
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(`${API_URL}/api/companies/admin/companies-list`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (response.ok) {
-        await loadUsers();
-        setShowInviteModal(false);
-        setNewUser({ username: '', email: '', first_name: '', last_name: '', role: 'admin', password: '' });
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.detail}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCompanies(Array.isArray(data) ? data : data.companies || []);
       }
-    } catch (error) {
-      console.error('Error creating user:', error);
-      alert('Error al crear usuario');
+    } catch {
+      // Companies list not critical
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchUsers();
+      fetchCompanies();
+    }
+  }, [currentUser, fetchUsers, fetchCompanies]);
+
+  // ============ ACTIONS ============
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+    setActionMessage(null);
+    try {
+      await apiFetch("/admin/create-user", {
+        method: "POST",
+        body: JSON.stringify({
+          ...createForm,
+          company_id: createForm.company_id || null,
+        }),
+      });
+      setActionMessage({ type: "success", text: `Usuario creado. OTP enviado a ${createForm.email}` });
+      setShowCreateModal(false);
+      setCreateForm({ email: "", full_name: "", role: "participant", company_id: "", position: "", department: "", phone: "", view_permissions: [...ALL_VIEW_KEYS] });
+      fetchUsers();
+    } catch (err: any) {
+      setActionMessage({ type: "error", text: err.message || "Error creando usuario" });
     } finally {
-      setSubmitting(false);
+      setActionLoading(false);
     }
   };
 
-  const handleEditUser = async () => {
-    if (!editingUser) return;
-
-    setSubmitting(true);
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    setActionLoading(true);
+    setActionMessage(null);
     try {
-      const response = await fetch(`http://localhost:8001/api/users/${editingUser.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+      await apiFetch(`/admin/users/${selectedUser.id}`, {
+        method: "PATCH",
         body: JSON.stringify({
-          first_name: editingUser.first_name,
-          last_name: editingUser.last_name,
-          email: editingUser.email,
-          role: editingUser.role,
-          is_active: editingUser.is_active,
+          ...editForm,
+          company_id: editForm.company_id || null,
         }),
       });
 
-      if (response.ok) {
-        await loadUsers();
-        setShowEditModal(false);
-        setEditingUser(null);
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.detail}`);
+      // If editing the currently logged-in user, update localStorage & notify sidebar
+      if (currentUser && selectedUser.id === currentUser.id) {
+        try {
+          const stored = JSON.parse(localStorage.getItem("user") || "{}");
+          stored.view_permissions = editForm.view_permissions;
+          localStorage.setItem("user", JSON.stringify(stored));
+          window.dispatchEvent(new Event("viewPermissionsUpdated"));
+        } catch {}
       }
-    } catch (error) {
-      console.error('Error updating user:', error);
-      alert('Error al actualizar usuario');
+
+      setActionMessage({ type: "success", text: "Usuario actualizado correctamente" });
+      setShowEditModal(false);
+      fetchUsers();
+    } catch (err: any) {
+      setActionMessage({ type: "error", text: err.message || "Error actualizando usuario" });
     } finally {
-      setSubmitting(false);
+      setActionLoading(false);
     }
   };
 
-  const openEditModal = (user: User) => {
-    setEditingUser({ ...user });
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+    setActionLoading(true);
+    setActionMessage(null);
+    try {
+      await apiFetch(`/admin/users/${selectedUser.id}`, { method: "DELETE" });
+      setActionMessage({ type: "success", text: "Usuario eliminado correctamente" });
+      setShowDeleteConfirm(false);
+      setSelectedUser(null);
+      fetchUsers();
+    } catch (err: any) {
+      setActionMessage({ type: "error", text: err.message || "Error eliminando usuario" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResendOTP = async (userId: string) => {
+    setActionMessage(null);
+    try {
+      await apiFetch(`/admin/resend-otp/${userId}`, { method: "POST" });
+      setActionMessage({ type: "success", text: "OTP reenviado correctamente" });
+    } catch (err: any) {
+      setActionMessage({ type: "error", text: err.message || "Error reenviando OTP" });
+    }
+  };
+
+  const handleToggleActive = async (user: UserData) => {
+    try {
+      await apiFetch(`/admin/users/${user.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: !user.is_active }),
+      });
+      fetchUsers();
+    } catch (err: any) {
+      setActionMessage({ type: "error", text: err.message || "Error actualizando estado" });
+    }
+  };
+
+  const openEditModal = (user: UserData) => {
+    setSelectedUser(user);
+    setEditForm({
+      full_name: user.full_name || "",
+      role: user.role || "",
+      company_id: user.company_id || "",
+      position: user.position || "",
+      department: user.department || "",
+      phone: user.phone || "",
+      is_active: user.is_active,
+      view_permissions: user.view_permissions || [],
+    });
     setShowEditModal(true);
   };
 
-  if (loading) {
-    return (
-      <>
-        <style>{styles}</style>
-        <div className="users-container">
-          <div className="loading-container">
-            <div className="loading-spinner" />
-          </div>
-        </div>
-      </>
-    );
-  }
+  const openDeleteConfirm = (user: UserData) => {
+    setSelectedUser(user);
+    setShowDeleteConfirm(true);
+  };
+
+  // ============ RENDER ============
+  if (!currentUser) return null;
 
   return (
-    <>
-      <style>{styles}</style>
-      <div className="users-container">
-        {/* Header */}
-        <div className="users-header">
-          <h1 className="users-title">Usuarios</h1>
-          <p className="users-subtitle">Administra usuarios y permisos del sistema.</p>
+    <div className="p-6 lg:p-8 max-w-[1400px] mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de Usuarios</h1>
+          <p className="text-sm text-gray-500 mt-1">{total} usuarios registrados en la plataforma</p>
         </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 transition-all hover:shadow-lg hover:shadow-gray-900/10 active:scale-[0.98]"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Crear Usuario
+        </button>
+      </div>
 
-        {/* Stats */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-label">Total Usuarios</div>
-            <div className="stat-value">{stats.total}</div>
-            <div className="stat-change">+5 este mes</div>
+      {/* Action Message */}
+      {actionMessage && (
+        <div className={`mb-6 rounded-xl border px-4 py-3 flex items-center justify-between ${
+          actionMessage.type === "success"
+            ? "border-green-200 bg-green-50 text-green-700"
+            : "border-red-200 bg-red-50 text-red-700"
+        }`}>
+          <div className="flex items-center gap-2">
+            {actionMessage.type === "success" ? (
+              <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            ) : (
+              <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            )}
+            <span className="text-sm font-medium">{actionMessage.text}</span>
           </div>
-          <div className="stat-card">
-            <div className="stat-label">Usuarios Activos</div>
-            <div className="stat-value">{stats.active}</div>
-            <div className="stat-change">{Math.round((stats.active / stats.total) * 100)}% del total</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Administradores</div>
-            <div className="stat-value">{stats.admins}</div>
-            <div className="stat-change">Con permisos elevados</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Activos Esta Semana</div>
-            <div className="stat-value">{stats.recentlyActive}</div>
-            <div className="stat-change">Última semana</div>
-          </div>
+          <button onClick={() => setActionMessage(null)} className="text-current opacity-50 hover:opacity-100">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
+      )}
 
-        {/* Filters */}
-        <div className="glass-card">
-          <div className="glass-card-header">
-            <div className="search-container">
-              <span className="search-icon">{Icons.search}</span>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="Buscar usuarios..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Search */}
+          <div className="relative flex-1">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
             </div>
-
-            <select
-              className="select-field"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-            >
-              <option value="all">Todos los roles</option>
-              {Object.entries(roleLabels).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-
-            <div className="filter-tabs">
-              {(['all', 'active', 'inactive'] as const).map(status => (
-                <button
-                  key={status}
-                  className={`filter-tab ${statusFilter === status ? 'active' : ''}`}
-                  onClick={() => setStatusFilter(status)}
-                >
-                  {status === 'all' ? 'Todos' : status === 'active' ? 'Activos' : 'Inactivos'}
-                </button>
-              ))}
-            </div>
-
-            <div className="view-toggle">
-              <button
-                className={`btn-icon ${viewMode === 'list' ? 'active' : ''}`}
-                onClick={() => setViewMode('list')}
-                title="Vista lista"
-              >
-                {Icons.list}
-              </button>
-              <button
-                className={`btn-icon ${viewMode === 'grid' ? 'active' : ''}`}
-                onClick={() => setViewMode('grid')}
-                title="Vista grid"
-              >
-                {Icons.grid}
-              </button>
-            </div>
-
-            <button className="btn-primary" onClick={() => setShowInviteModal(true)}>
-              {Icons.plus}
-              Invitar Usuario
-            </button>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Buscar por nombre, email o usuario..."
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+            />
           </div>
-        </div>
-
-        {/* User List/Grid */}
-        {viewMode === 'list' ? (
-          <div className="user-list">
-            {filteredUsers.map(user => (
-              <div key={user.id} className="user-row">
-                <div className="user-avatar">
-                  {getInitials(user.first_name, user.last_name)}
-                </div>
-                <div className="user-info">
-                  <div className="user-name">
-                    {user.first_name} {user.last_name}
-                    {currentUserEmail === user.email && (
-                      <span style={{ marginLeft: '0.5rem', fontSize: '0.625rem', background: '#e0e7ff', color: '#3730a3', padding: '0.125rem 0.375rem', borderRadius: '9999px' }}>Tú</span>
-                    )}
-                  </div>
-                  <div className="user-meta">
-                    <span>{user.email}</span>
-                  </div>
-                </div>
-                <span className={`badge badge-${user.role}`}>
-                  {roleLabels[user.role] || user.role}
-                </span>
-                <span className={`badge ${user.is_active ? 'badge-active' : 'badge-inactive'}`}>
-                  {user.is_active ? <>{Icons.check} Activo</> : <>{Icons.x} Inactivo</>}
-                </span>
-                <div className="user-stat">
-                  {Icons.clock}
-                  <span>{formatLastLogin(user.last_login)}</span>
-                </div>
-                <div className="user-actions">
-                  <button className="action-btn" title="Editar" onClick={() => openEditModal(user)}>
-                    {Icons.edit}
-                  </button>
-                </div>
-              </div>
+          {/* Role filter */}
+          <select
+            value={roleFilter}
+            onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
+            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-600 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+          >
+            <option value="">Todos los roles</option>
+            {ROLE_OPTIONS.map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
             ))}
+          </select>
+          {/* Status filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value as any); setPage(1); }}
+            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-600 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+          >
+            <option value="all">Todos los estados</option>
+            <option value="active">Activos</option>
+            <option value="inactive">Inactivos</option>
+            <option value="pending">Pendiente OTP</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-2xl font-bold text-gray-900">{total}</p>
+          <p className="text-xs text-gray-400 mt-1">Total Usuarios</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-2xl font-bold text-green-600">{users.filter(u => u.is_active && u.is_account_activated).length}</p>
+          <p className="text-xs text-gray-400 mt-1">Activos</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-2xl font-bold text-amber-500">{users.filter(u => !u.is_account_activated).length}</p>
+          <p className="text-xs text-gray-400 mt-1">Pendiente OTP</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-2xl font-bold text-red-500">{users.filter(u => !u.is_active).length}</p>
+          <p className="text-xs text-gray-400 mt-1">Inactivos</p>
+        </div>
+      </div>
+
+      {/* Users Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="flex items-center gap-3 text-gray-400">
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+              <span className="text-sm">Cargando usuarios...</span>
+            </div>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+            <svg className="h-12 w-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            <p className="text-sm font-medium">No se encontraron usuarios</p>
+            <p className="text-xs mt-1">Ajusta los filtros o crea un nuevo usuario</p>
           </div>
         ) : (
-          <div className="user-grid">
-            {filteredUsers.map(user => (
-              <div key={user.id} className="user-card" onClick={() => openEditModal(user)}>
-                <div className="user-card-header">
-                  <div className="user-avatar">
-                    {getInitials(user.first_name, user.last_name)}
-                  </div>
-                  <div className="user-info">
-                    <div className="user-name">{user.first_name} {user.last_name}</div>
-                    <div className="user-meta">
-                      <span>{user.email}</span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                  <span className={`badge badge-${user.role}`}>
-                    {roleLabels[user.role] || user.role}
-                  </span>
-                  <span className={`badge ${user.is_active ? 'badge-active' : 'badge-inactive'}`}>
-                    {user.is_active ? 'Activo' : 'Inactivo'}
-                  </span>
-                </div>
-                <div className="user-card-stats">
-                  <div className="user-card-stat">
-                    Último acceso: {formatLastLogin(user.last_login)}
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Usuario</th>
+                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Rol</th>
+                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3 hidden lg:table-cell">Empresa</th>
+                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3 hidden md:table-cell">Estado</th>
+                  <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3 hidden xl:table-cell">Fecha</th>
+                  <th className="text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-3">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {users.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50/50 transition-colors group">
+                    {/* User info */}
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-xs font-bold text-gray-500">
+                          {user.full_name ? user.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() : user.email[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{user.full_name || user.username}</p>
+                          <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    {/* Role */}
+                    <td className="px-5 py-3.5">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${getRoleStyle(user.role)}`}>
+                        {getRoleLabel(user.role)}
+                      </span>
+                    </td>
+                    {/* Company */}
+                    <td className="px-5 py-3.5 hidden lg:table-cell">
+                      <span className="text-sm text-gray-500">{user.company_name || "\u2014"}</span>
+                    </td>
+                    {/* Status */}
+                    <td className="px-5 py-3.5 hidden md:table-cell">
+                      {!user.is_account_activated ? (
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-[11px] font-semibold text-amber-600">
+                            <svg className="h-3 w-3 animate-pulse" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                            Pendiente OTP
+                          </span>
+                          <button
+                            onClick={() => handleResendOTP(user.id)}
+                            title="Reenviar OTP"
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-amber-100 text-amber-500 transition-all"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                          </button>
+                        </div>
+                      ) : user.is_active ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-[11px] font-semibold text-green-600">
+                          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                          Activo
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 px-2.5 py-1 text-[11px] font-semibold text-red-600">
+                          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                          Inactivo
+                        </span>
+                      )}
+                    </td>
+                    {/* Date */}
+                    <td className="px-5 py-3.5 hidden xl:table-cell">
+                      <span className="text-xs text-gray-400">
+                        {user.created_at ? new Date(user.created_at).toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" }) : "\u2014"}
+                      </span>
+                    </td>
+                    {/* Actions */}
+                    <td className="px-5 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Toggle active */}
+                        <button
+                          onClick={() => handleToggleActive(user)}
+                          title={user.is_active ? "Desactivar" : "Activar"}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                        >
+                          {user.is_active ? (
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                          ) : (
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          )}
+                        </button>
+                        {/* Edit */}
+                        <button
+                          onClick={() => openEditModal(user)}
+                          title="Editar"
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        </button>
+                        {/* Delete */}
+                        <button
+                          onClick={() => openDeleteConfirm(user)}
+                          title="Eliminar"
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
-        {filteredUsers.length === 0 && (
-          <div className="empty-state">
-            <div className="empty-icon">{Icons.users}</div>
-            <p>No se encontraron usuarios</p>
-          </div>
-        )}
-
-        {/* Summary Section */}
-        <div className="summary-grid">
-          <div className="summary-card">
-            <div className="summary-title">
-              {Icons.shield}
-              Por Rol
-            </div>
-            <div className="summary-list">
-              {roleSummary.map(([role, count]) => (
-                <div key={role} className="summary-item">
-                  <span className="summary-item-label">{roleLabels[role] || role}</span>
-                  <span className="summary-item-value">{count} usuarios</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="summary-card">
-            <div className="summary-title">
-              {Icons.users}
-              Estado
-            </div>
-            <div className="summary-list">
-              <div className="summary-item">
-                <span className="summary-item-label">Activos</span>
-                <span className="summary-item-value">{stats.active} usuarios</span>
-              </div>
-              <div className="summary-item">
-                <span className="summary-item-label">Inactivos</span>
-                <span className="summary-item-value">{stats.total - stats.active} usuarios</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="summary-card">
-            <div className="summary-title">
-              {Icons.activity}
-              Actividad Reciente
-            </div>
-            <div className="summary-list">
-              {recentActivity.map((activity, index) => (
-                <div key={index} className="activity-item">
-                  <div className="activity-dot" />
-                  <div className="activity-content">
-                    <div className="activity-text">{activity.text}</div>
-                    <div className="activity-time">{activity.time}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Invite Modal */}
-        {showInviteModal && (
-          <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2 className="modal-title">Invitar Usuario</h2>
-                <button className="modal-close" onClick={() => setShowInviteModal(false)}>
-                  {Icons.close}
-                </button>
-              </div>
-              <div className="modal-body">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Nombre *</label>
-                    <input
-                      type="text"
-                      className="input-clean"
-                      value={newUser.first_name}
-                      onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })}
-                      placeholder="Juan"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Apellido *</label>
-                    <input
-                      type="text"
-                      className="input-clean"
-                      value={newUser.last_name}
-                      onChange={(e) => setNewUser({ ...newUser, last_name: e.target.value })}
-                      placeholder="Pérez"
-                    />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Email *</label>
-                  <input
-                    type="email"
-                    className="input-clean"
-                    value={newUser.email}
-                    onChange={(e) => {
-                      const email = e.target.value;
-                      setNewUser({ ...newUser, email, username: email.split('@')[0] || email });
-                    }}
-                    placeholder="juan@ejemplo.com"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Contraseña *</label>
-                  <input
-                    type="password"
-                    className="input-clean"
-                    value={newUser.password}
-                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                    placeholder="••••••••"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Rol *</label>
-                  <select
-                    className="input-clean"
-                    value={newUser.role}
-                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-                  >
-                    {Object.entries(roleLabels).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowInviteModal(false)} disabled={submitting}>
-                  Cancelar
-                </button>
-                <button className="btn-primary" style={{ flex: 1 }} onClick={handleInviteUser} disabled={submitting}>
-                  {submitting ? 'Creando...' : 'Crear Usuario'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Modal */}
-        {showEditModal && editingUser && (
-          <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2 className="modal-title">Editar Usuario</h2>
-                <button className="modal-close" onClick={() => setShowEditModal(false)}>
-                  {Icons.close}
-                </button>
-              </div>
-              <div className="modal-body">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Nombre *</label>
-                    <input
-                      type="text"
-                      className="input-clean"
-                      value={editingUser.first_name}
-                      onChange={(e) => setEditingUser({ ...editingUser, first_name: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Apellido *</label>
-                    <input
-                      type="text"
-                      className="input-clean"
-                      value={editingUser.last_name}
-                      onChange={(e) => setEditingUser({ ...editingUser, last_name: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Email *</label>
-                  <input
-                    type="email"
-                    className="input-clean"
-                    value={editingUser.email}
-                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Rol *</label>
-                  <select
-                    className="input-clean"
-                    value={editingUser.role}
-                    onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                  >
-                    {Object.entries(roleLabels).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Estado</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: '#fafafa', borderRadius: '0.5rem' }}>
-                    <input
-                      type="checkbox"
-                      id="is_active"
-                      checked={editingUser.is_active}
-                      onChange={(e) => setEditingUser({ ...editingUser, is_active: e.target.checked })}
-                      style={{ width: '1.25rem', height: '1.25rem' }}
-                    />
-                    <label htmlFor="is_active" style={{ fontSize: '0.875rem', color: '#374151' }}>Usuario activo</label>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowEditModal(false)} disabled={submitting}>
-                  Cancelar
-                </button>
-                <button className="btn-primary" style={{ flex: 1 }} onClick={handleEditUser} disabled={submitting}>
-                  {submitting ? 'Guardando...' : 'Guardar Cambios'}
-                </button>
-              </div>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3">
+            <p className="text-xs text-gray-400">Página {page} de {totalPages}</p>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1.5 text-xs font-medium text-gray-500 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Anterior
+              </button>
+              <button
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1.5 text-xs font-medium text-gray-500 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Siguiente
+              </button>
             </div>
           </div>
         )}
       </div>
-    </>
+
+      {/* ============ CREATE USER MODAL ============ */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowCreateModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Crear Usuario</h2>
+                  <p className="text-sm text-gray-400 mt-0.5">Se enviará un código OTP de 4 dígitos por email</p>
+                </div>
+                <button onClick={() => setShowCreateModal(false)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+              {/* Email */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Email *</label>
+                <input
+                  type="email"
+                  required
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                  placeholder="usuario@empresa.com"
+                />
+              </div>
+
+              {/* Full Name */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Nombre completo *</label>
+                <input
+                  type="text"
+                  required
+                  value={createForm.full_name}
+                  onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                  placeholder="Nombre Apellido"
+                />
+              </div>
+
+              {/* Role */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Rol *</label>
+                <select
+                  required
+                  value={createForm.role}
+                  onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                >
+                  {ROLE_OPTIONS.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Company */}
+              {companies.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Empresa</label>
+                  <select
+                    value={createForm.company_id}
+                    onChange={(e) => setCreateForm({ ...createForm, company_id: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                  >
+                    <option value="">Sin empresa</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Position + Department */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Cargo</label>
+                  <input
+                    type="text"
+                    value={createForm.position}
+                    onChange={(e) => setCreateForm({ ...createForm, position: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                    placeholder="Director, Gerente..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Departamento</label>
+                  <input
+                    type="text"
+                    value={createForm.department}
+                    onChange={(e) => setCreateForm({ ...createForm, department: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                    placeholder="RR.HH., TI..."
+                  />
+                </div>
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Teléfono</label>
+                <input
+                  type="tel"
+                  value={createForm.phone}
+                  onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                  placeholder="+56 9 1234 5678"
+                />
+              </div>
+
+              {/* View Permissions */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Vistas del Dashboard</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allSelected = createForm.view_permissions.length === ALL_VIEW_KEYS.length;
+                      setCreateForm({ ...createForm, view_permissions: allSelected ? [] : [...ALL_VIEW_KEYS] });
+                    }}
+                    className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {createForm.view_permissions.length === ALL_VIEW_KEYS.length ? "Quitar todas" : "Seleccionar todas"}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {VIEW_PERMISSIONS_OPTIONS.map((view) => {
+                    const checked = createForm.view_permissions.includes(view.key);
+                    return (
+                      <label
+                        key={view.key}
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm ${
+                          checked
+                            ? "border-gray-900 bg-gray-900/5 text-gray-900"
+                            : "border-gray-200 text-gray-400 hover:border-gray-300"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            const perms = checked
+                              ? createForm.view_permissions.filter((p) => p !== view.key)
+                              : [...createForm.view_permissions, view.key];
+                            setCreateForm({ ...createForm, view_permissions: perms });
+                          }}
+                          className="sr-only"
+                        />
+                        <div className={`h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
+                          checked ? "border-gray-900 bg-gray-900" : "border-gray-300"
+                        }`}>
+                          {checked && (
+                            <svg className="h-2.5 w-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-xs font-medium">{view.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* OTP Info */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                  <div>
+                    <p className="text-sm font-medium text-blue-700">Se enviará un email con código OTP</p>
+                    <p className="text-xs text-blue-500 mt-0.5">El usuario recibirá un código de 4 dígitos para activar su cuenta y establecer su contraseña.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit */}
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2.5 text-sm font-medium text-gray-500 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-5 py-2.5 text-sm font-semibold text-white bg-gray-900 rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-all active:scale-[0.98]"
+                >
+                  {actionLoading ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+                      Creando...
+                    </span>
+                  ) : "Crear y Enviar OTP"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============ EDIT USER MODAL ============ */}
+      {showEditModal && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowEditModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Editar Usuario</h2>
+                  <p className="text-sm text-gray-400 mt-0.5">{selectedUser.email}</p>
+                </div>
+                <button onClick={() => setShowEditModal(false)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleEditUser} className="p-6 space-y-4">
+              {/* Full Name */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Nombre completo</label>
+                <input
+                  type="text"
+                  value={editForm.full_name}
+                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                />
+              </div>
+
+              {/* Role */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Rol</label>
+                <select
+                  value={editForm.role}
+                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                >
+                  {ROLE_OPTIONS.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Company */}
+              {companies.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Empresa</label>
+                  <select
+                    value={editForm.company_id}
+                    onChange={(e) => setEditForm({ ...editForm, company_id: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                  >
+                    <option value="">Sin empresa</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Position + Department */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Cargo</label>
+                  <input
+                    type="text"
+                    value={editForm.position}
+                    onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Departamento</label>
+                  <input
+                    type="text"
+                    value={editForm.department}
+                    onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Teléfono</label>
+                <input
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all"
+                />
+              </div>
+
+              {/* View Permissions */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Vistas del Dashboard</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allSelected = editForm.view_permissions.length === ALL_VIEW_KEYS.length;
+                      setEditForm({ ...editForm, view_permissions: allSelected ? [] : [...ALL_VIEW_KEYS] });
+                    }}
+                    className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {editForm.view_permissions.length === ALL_VIEW_KEYS.length ? "Quitar todas" : "Seleccionar todas"}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {VIEW_PERMISSIONS_OPTIONS.map((view) => {
+                    const checked = editForm.view_permissions.includes(view.key);
+                    return (
+                      <label
+                        key={view.key}
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm ${
+                          checked
+                            ? "border-gray-900 bg-gray-900/5 text-gray-900"
+                            : "border-gray-200 text-gray-400 hover:border-gray-300"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            const perms = checked
+                              ? editForm.view_permissions.filter((p) => p !== view.key)
+                              : [...editForm.view_permissions, view.key];
+                            setEditForm({ ...editForm, view_permissions: perms });
+                          }}
+                          className="sr-only"
+                        />
+                        <div className={`h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
+                          checked ? "border-gray-900 bg-gray-900" : "border-gray-300"
+                        }`}>
+                          {checked && (
+                            <svg className="h-2.5 w-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-xs font-medium">{view.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active toggle */}
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Usuario activo</p>
+                  <p className="text-xs text-gray-400">Permite al usuario acceder a la plataforma</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditForm({ ...editForm, is_active: !editForm.is_active })}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${editForm.is_active ? "bg-green-500" : "bg-gray-200"}`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editForm.is_active ? "translate-x-5" : "translate-x-0"}`} />
+                </button>
+              </div>
+
+              {/* Submit */}
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2.5 text-sm font-medium text-gray-500 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-all active:scale-[0.98]"
+                >
+                  {actionLoading ? "Guardando..." : "Guardar Cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============ DELETE CONFIRMATION ============ */}
+      {showDeleteConfirm && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-center text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-100 mb-4">
+                <svg className="h-7 w-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Eliminar Usuario</h3>
+              <p className="text-sm text-gray-500 mb-6">
+                ¿Estás seguro de eliminar a <span className="font-semibold text-gray-700">{selectedUser.full_name || selectedUser.email}</span>? Esta acción no se puede deshacer.
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-500 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={actionLoading}
+                  className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50 transition-all active:scale-[0.98]"
+                >
+                  {actionLoading ? "Eliminando..." : "Sí, Eliminar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

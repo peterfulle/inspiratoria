@@ -62,7 +62,9 @@ export type Match = {
 
 export type Notification = {
   id: number;
-  recipient_id: number;
+  recipient_id: string;
+  sender_id?: string | null;
+  sender_name?: string | null;
   notification_type: string;
   title: string;
   message: string;
@@ -165,8 +167,8 @@ export interface AIMatchHealth {
   summary: string;
 }
 
-const FALLBACK_BASE_URL = "http://localhost:8001/api";
-const FALLBACK_BACKEND_URL = "http://localhost:8001";
+const FALLBACK_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001") + "/api";
+const FALLBACK_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
 export const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? FALLBACK_BASE_URL;
 export const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? FALLBACK_BACKEND_URL;
@@ -257,7 +259,7 @@ export const ApiClient = {
     safeFetch<any[]>("/sentiment"),
   
   // Notification methods
-  getUserNotifications: (userId: number, unreadOnly: boolean = false) =>
+  getUserNotifications: (userId: string | number, unreadOnly: boolean = false) =>
     safeFetch<Notification[]>(`/notifications/user/${userId}${unreadOnly ? "?unread_only=true" : ""}`),
   
   createNotification: (data: {
@@ -273,6 +275,18 @@ export const ApiClient = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  broadcastNotification: (data: {
+    sender_id?: string;
+    notification_type?: string;
+    title: string;
+    message: string;
+    link?: string;
+  }) =>
+    safeFetch<{ status: string; recipients: number; notification_ids: number[] }>("/notifications/broadcast", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   
   markNotificationsRead: (notificationIds: number[]) =>
     safeFetch<{ status: string; updated: number }>("/notifications/mark-read", {
@@ -280,7 +294,7 @@ export const ApiClient = {
       body: JSON.stringify({ notification_ids: notificationIds }),
     }),
   
-  getUnreadCount: (userId: number) =>
+  getUnreadCount: (userId: string | number) =>
     safeFetch<{ unread_count: number }>(`/notifications/unread-count/${userId}`),
   
   deleteNotification: (notificationId: number) =>

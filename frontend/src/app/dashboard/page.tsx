@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // ============================================================================
 // TYPES
@@ -659,40 +659,83 @@ const styles = `
   }
 `;
 
-// ============================================================================
-// SAMPLE DATA
-// ============================================================================
-const sampleCompanies: Company[] = [
-  { id: '1', name: 'Acme Corporation', plan: 'Enterprise', status: 'active', users: 245, programs: 8, created: '2024-01-15', lastActivity: 'Hace 2h' },
-  { id: '2', name: 'TechStart Inc', plan: 'Professional', status: 'active', users: 89, programs: 3, created: '2024-02-20', lastActivity: 'Hace 5h' },
-  { id: '3', name: 'Global Solutions', plan: 'Enterprise', status: 'active', users: 312, programs: 12, created: '2023-11-08', lastActivity: 'Hace 1d' },
-  { id: '4', name: 'Innovate Labs', plan: 'Starter', status: 'trial', users: 24, programs: 1, created: '2024-03-01', lastActivity: 'Hace 3h' },
-  { id: '5', name: 'NextGen Systems', plan: 'Professional', status: 'active', users: 156, programs: 5, created: '2024-01-28', lastActivity: 'Hace 12h' },
-  { id: '6', name: 'Cloud Dynamics', plan: 'Enterprise', status: 'inactive', users: 78, programs: 4, created: '2023-09-15', lastActivity: 'Hace 30d' },
-];
-
-const quickLinks: QuickLink[] = [
-  { id: 'accounts', title: 'Cuentas', description: 'Gestionar empresas', href: '/dashboard/accounts', count: 6 },
-  { id: 'programs', title: 'Programas', description: 'Templates de mentoría', href: '/dashboard/programs', count: 12 },
-  { id: 'users', title: 'Usuarios', description: 'Administrar usuarios', href: '/dashboard/users', count: 924 },
-  { id: 'settings', title: 'Configuración', description: 'Ajustes del sistema', href: '/dashboard/settings' },
-];
-
-const recentActivity = [
-  { text: 'Acme Corporation agregó 5 nuevos mentores', time: 'Hace 2 horas' },
-  { text: 'TechStart Inc inició programa "Liderazgo 2024"', time: 'Hace 5 horas' },
-  { text: 'Innovate Labs completó registro de prueba', time: 'Hace 8 horas' },
-  { text: 'Global Solutions renovó suscripción Enterprise', time: 'Hace 1 día' },
-];
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 export default function DashboardPage() {
-  const [companies, setCompanies] = useState<Company[]>(sampleCompanies);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'trial' | 'inactive'>('all');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [quickLinks, setQuickLinks] = useState<QuickLink[]>([
+    { id: 'accounts', title: 'Cuentas Studio', description: 'Gestionar empresas', href: '/dashboard/accounts', count: 0 },
+    { id: 'programs', title: 'Programas Studio', description: 'Templates de mentoría', href: '/dashboard/programs', count: 0 },
+    { id: 'users', title: 'Usuarios', description: 'Administrar usuarios', href: '/dashboard/users', count: 0 },
+    { id: 'settings', title: 'Configuración', description: 'Ajustes del sistema', href: '/dashboard/settings' },
+  ]);
+  const [recentActivity, setRecentActivity] = useState<{ text: string; time: string }[]>([]);
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        const [statsRes, companiesRes, templatesRes] = await Promise.all([
+          fetch(`${API_URL}/api/companies/stats`).catch(() => null),
+          fetch(`${API_URL}/api/companies/`).catch(() => null),
+          fetch(`${API_URL}/api/program-templates`).catch(() => null),
+        ]);
+
+        let totalAccounts = 0;
+        let totalUsers = 0;
+        if (statsRes?.ok) {
+          const s = await statsRes.json();
+          totalAccounts = s.total_companies || 0;
+          totalUsers = s.total_users || 0;
+        }
+
+        let totalTemplates = 0;
+        if (templatesRes?.ok) {
+          const t = await templatesRes.json();
+          totalTemplates = Array.isArray(t) ? t.length : 0;
+        }
+
+        setQuickLinks([
+          { id: 'accounts', title: 'Cuentas Studio', description: 'Gestionar empresas', href: '/dashboard/accounts', count: totalAccounts },
+          { id: 'programs', title: 'Programas Studio', description: 'Templates de mentoría', href: '/dashboard/programs', count: totalTemplates },
+          { id: 'users', title: 'Usuarios', description: 'Administrar usuarios', href: '/dashboard/users', count: totalUsers },
+          { id: 'settings', title: 'Configuración', description: 'Ajustes del sistema', href: '/dashboard/settings' },
+        ]);
+
+        if (companiesRes?.ok) {
+          const all = await companiesRes.json();
+          const mapped: Company[] = (Array.isArray(all) ? all : [])
+            .filter((c: any) => c.status !== 'pending')
+            .map((c: any) => ({
+              id: c.id,
+              name: c.name || 'Sin nombre',
+              plan: (c.plan || 'starter').charAt(0).toUpperCase() + (c.plan || 'starter').slice(1),
+              status: c.status === 'active' ? 'active' : c.status === 'trial' ? 'trial' : 'inactive',
+              users: c.user_count || c.users || 0,
+              programs: c.program_count || c.programs || 0,
+              created: c.created_at ? new Date(c.created_at).toLocaleDateString('es-CL') : 'N/A',
+              lastActivity: c.updated_at ? new Date(c.updated_at).toLocaleDateString('es-CL') : 'Hoy',
+            }));
+          setCompanies(mapped);
+
+          // Build recent activity from companies
+          const activity = mapped.slice(0, 5).map(c => ({
+            text: `${c.name} — cuenta ${c.status === 'active' ? 'activa' : c.status}`,
+            time: c.created,
+          }));
+          setRecentActivity(activity);
+        }
+      } catch (err) {
+        console.error('Error loading dashboard data:', err);
+      }
+    };
+    loadDashboardData();
+  }, []);
 
   // Filter companies
   const filteredCompanies = companies.filter(company => {

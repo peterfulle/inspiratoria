@@ -362,6 +362,26 @@ class User(AbstractUser):
     can_close_programs = models.BooleanField(default=False)  # Cierre: cerrar programas
     can_manage_alerts = models.BooleanField(default=False)  # Seguimiento: gestionar alertas
     
+    # OTP para activación de cuenta
+    otp_code = models.CharField(max_length=4, blank=True, default="")
+    otp_expires_at = models.DateTimeField(null=True, blank=True)
+    is_account_activated = models.BooleanField(default=False)
+    
+    # TOTP (Google Authenticator / Microsoft Authenticator)
+    totp_secret = models.CharField(max_length=64, blank=True, default="")
+    totp_enabled = models.BooleanField(default=False)
+    
+    # Token único para activación (link en email)
+    activation_token = models.CharField(max_length=128, blank=True, default="")
+    
+    # Permisos de vistas del dashboard
+    # Lista de vistas permitidas: dashboard, accounts, programs, billing, users, analytics, ecosystem, configuration
+    view_permissions = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Lista de vistas del dashboard que el usuario puede ver"
+    )
+    
     # Metadata
     last_login_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -387,6 +407,10 @@ class User(AbstractUser):
             self.can_view_reports = True
             self.can_close_programs = True
             self.can_manage_alerts = True
+        # Asignar todas las vistas si es admin/superadmin y no tiene permisos definidos
+        ALL_VIEWS = ["dashboard", "accounts", "programs", "billing", "users", "analytics", "ecosystem", "configuration"]
+        if (self.role in ("superadmin", "inspiratoria_admin") or self.is_superuser) and not self.view_permissions:
+            self.view_permissions = ALL_VIEWS
         super().save(*args, **kwargs)
     
     @property

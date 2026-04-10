@@ -99,7 +99,7 @@ class SentimentOut(BaseModel):
 
 
 class NotificationIn(BaseModel):
-    recipient_id: int
+    recipient_id: UUID
     notification_type: str
     title: str
     message: str
@@ -110,7 +110,9 @@ class NotificationIn(BaseModel):
 
 class NotificationOut(BaseModel):
     id: int
-    recipient_id: int
+    recipient_id: UUID
+    sender_id: Optional[UUID] = None
+    sender_name: Optional[str] = None
     notification_type: str
     title: str
     message: str
@@ -122,6 +124,14 @@ class NotificationOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class NotificationBroadcast(BaseModel):
+    sender_id: Optional[UUID] = None
+    notification_type: str = "system"
+    title: str
+    message: str
+    link: str = ""
 
 
 class NotificationMarkRead(BaseModel):
@@ -312,4 +322,45 @@ class UserUpdateIn(BaseModel):
     telefono: Optional[str] = None  # Agregado
     role: Optional[str] = None
     is_active: Optional[bool] = None
+
+
+# ─── Program Template Schemas ───
+
+class ProgramTemplateIn(BaseModel):
+    name: str
+    slug: Optional[str] = None
+    description: Optional[str] = ""
+    category: Optional[str] = "leadership"
+    duration: Optional[str] = ""
+    status: Optional[str] = "draft"
+    modules: Optional[List[Dict[str, Any]]] = []
+    milestones: Optional[List[Dict[str, Any]]] = []
+    tags: Optional[List[str]] = []
+    mentorRequirements: Optional[Dict[str, Any]] = {}
+    menteeRequirements: Optional[Dict[str, Any]] = {}
+    matchingRules: Optional[Dict[str, Any]] = {}
+    sessionRules: Optional[Dict[str, Any]] = {}
+
+
+class ProgramTemplateOut(BaseModel):
+    id: str
+    slug: str
+    name: str
+    description: str
+    category: str
+    duration: str
+    status: str
+    modules: List[Dict[str, Any]]
+    milestones: List[Dict[str, Any]]
+    tags: List[str]
+    mentorRequirements: Dict[str, Any]
+    menteeRequirements: Dict[str, Any]
+    matchingRules: Dict[str, Any]
+    sessionRules: Dict[str, Any]
+    createdAt: str
+    updatedAt: str
+    createdBy: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 

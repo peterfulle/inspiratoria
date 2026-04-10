@@ -27,7 +27,7 @@ export default function ActivitiesPage() {
 
   const loadActivities = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/activities`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/activities`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });

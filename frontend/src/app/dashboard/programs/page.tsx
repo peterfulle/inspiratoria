@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { pageStyles } from "./styles";
 import { Icon } from "./icons";
@@ -10,11 +10,142 @@ import {
   ViewMode, ConfigTab, SessionDetail 
 } from "./types";
 import { 
-  initialTemplates, 
   defaultMentorReqs, defaultMenteeReqs, defaultMatchingRules, defaultSessionRules,
   getCategoryLabel, getAlgorithmLabel, getTotalSessions, getTotalResources, getTotalActivities,
   getNextMonday, formatDateSpanish, generateModuleContent, generateSessionPlan, generateSlug
 } from "./data";
+
+// ═══════════════════════════════════════════════════════════════════
+// DELETE MODAL COMPONENT
+// ═══════════════════════════════════════════════════════════════════
+function DeleteModal({ countdown, setCountdown, confirmText, setConfirmText, templateName, onCancel, onDelete }: {
+  countdown: number; setCountdown: (n: number) => void;
+  confirmText: string; setConfirmText: (s: string) => void;
+  templateName: string; onCancel: () => void; onDelete: () => void;
+}) {
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const t = setTimeout(() => setCountdown(countdown - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown, setCountdown]);
+
+  const canDelete = countdown === 0 && confirmText === 'delete';
+  const progress = ((5 - countdown) / 5) * 100;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} onClick={onCancel} />
+      <div style={{
+        position: 'relative', width: '100%', maxWidth: 420, margin: '0 16px', background: '#fff',
+        borderRadius: 16, overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+        animation: 'deleteModalIn 0.2s ease-out',
+      }}>
+        <style>{`@keyframes deleteModalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }`}</style>
+        {/* Red top bar with progress */}
+        <div style={{ height: 4, background: '#fee2e2', position: 'relative' }}>
+          <div style={{ height: '100%', background: '#ef4444', width: `${progress}%`, transition: 'width 1s linear', borderRadius: '0 2px 2px 0' }} />
+        </div>
+
+        <div style={{ padding: '28px 28px 24px' }}>
+          {/* Icon + Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 20 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg style={{ width: 20, height: 20, color: '#ef4444' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </div>
+            <div>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#111', margin: 0 }}>Eliminar programa</h3>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
+                <span style={{ fontWeight: 500, color: '#374151' }}>{templateName}</span> ser\u00e1 eliminado permanentemente.
+              </p>
+            </div>
+          </div>
+
+          {/* Warning box */}
+          <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 10, padding: '10px 14px', marginBottom: 20 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <svg style={{ width: 16, height: 16, color: '#d97706', flexShrink: 0, marginTop: 1 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+              <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
+                <span style={{ fontWeight: 600 }}>Acci\u00f3n destructiva.</span> No se puede deshacer. La acci\u00f3n quedar\u00e1 registrada en el audit log con tu sesi\u00f3n.
+              </div>
+            </div>
+          </div>
+
+          {/* Type delete */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+              Escribe{' '}
+              <code style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', background: '#fef2f2', padding: '2px 6px', borderRadius: 4, letterSpacing: 0.5 }}>delete</code>
+              {' '}para confirmar
+            </label>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value.toLowerCase())}
+              placeholder="delete"
+              autoFocus
+              spellCheck={false}
+              autoComplete="off"
+              style={{
+                width: '100%', padding: '10px 14px', borderRadius: 10, fontSize: 14, fontFamily: 'monospace',
+                border: `1.5px solid ${confirmText === 'delete' ? '#22c55e' : '#e5e7eb'}`,
+                background: confirmText === 'delete' ? '#f0fdf4' : '#fafafa',
+                outline: 'none', transition: 'all 0.15s', boxSizing: 'border-box',
+                letterSpacing: 1,
+              }}
+            />
+          </div>
+
+          {/* Countdown + Buttons */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={onCancel}
+              style={{
+                flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 500,
+                background: '#f3f4f6', color: '#374151', border: 'none', cursor: 'pointer',
+                transition: 'background 0.15s',
+              }}
+              onMouseOver={(e) => (e.currentTarget.style.background = '#e5e7eb')}
+              onMouseOut={(e) => (e.currentTarget.style.background = '#f3f4f6')}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={canDelete ? onDelete : undefined}
+              disabled={!canDelete}
+              style={{
+                flex: 1.2, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                background: canDelete ? '#ef4444' : '#e5e7eb', color: canDelete ? '#fff' : '#9ca3af',
+                border: 'none', cursor: canDelete ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+              onMouseOver={(e) => { if (canDelete) e.currentTarget.style.background = '#dc2626'; }}
+              onMouseOut={(e) => { if (canDelete) e.currentTarget.style.background = '#ef4444'; }}
+            >
+              {countdown > 0 ? (
+                <>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%', border: '2px solid #d1d5db',
+                    borderTopColor: '#9ca3af', animation: 'spin 1s linear infinite',
+                    display: 'inline-block',
+                  }} />
+                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                  Espera {countdown}s
+                </>
+              ) : confirmText !== 'delete' ? (
+                'Escribe delete'
+              ) : (
+                <>
+                  <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  Eliminar
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -23,7 +154,7 @@ import {
 export default function ProgramsPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [templates, setTemplates] = useState<ProgramTemplate[]>(initialTemplates);
+  const [templates, setTemplates] = useState<ProgramTemplate[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -33,13 +164,15 @@ export default function ProgramsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteCountdown, setDeleteCountdown] = useState(5);
   
   // Assign Program Modal
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignSuccess, setAssignSuccess] = useState(false);
   const [assignError, setAssignError] = useState("");
-  const [activeCompanies, setActiveCompanies] = useState<Array<{id: string; name: string; corp_id: string; plan: string; status: string}>>([]);
+  const [activeCompanies, setActiveCompanies] = useState<Array<{id: string; name: string; account_type?: string; plan: string; status?: string}>>([]);
   const [assignForm, setAssignForm] = useState({ programId: "", companyId: "" });
   
   // Edit tabs
@@ -47,6 +180,22 @@ export default function ProgramsPage() {
   
   // Expanded modules
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
+
+  // Tag input state
+  const [tagInput, setTagInput] = useState("");
+  // Resource type selector per module
+  const [resTypeTab, setResTypeTab] = useState<Record<string, Resource["type"]>>({});
+  const [linkInput, setLinkInput] = useState<Record<string, string>>({});
+  const [linkNameInput, setLinkNameInput] = useState<Record<string, string>>({});
+
+  // Dirty state for unsaved changes warning
+  const [isDirty, setIsDirty] = useState(false);
+  // Save status feedback
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  // Loading state
+  const [loading, setLoading] = useState(true);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
   // Form state
   const [formData, setFormData] = useState<Partial<ProgramTemplate>>({
@@ -64,40 +213,47 @@ export default function ProgramsPage() {
     sessionRules: { ...defaultSessionRules },
   });
 
-  // Persist to localStorage on every change
-  const saveToStorage = (data: ProgramTemplate[]) => {
-    try {
-      // Strip non-serializable File objects before saving
-      const clean = data.map((t) => ({
-        ...t,
-        modules: t.modules.map((m) => ({
-          ...m,
-          resources: m.resources.map(({ file, ...rest }) => rest),
-        })),
-      }));
-      localStorage.setItem("inspiratoria_programs", JSON.stringify(clean));
-    } catch (e) {
-      console.warn("Could not save programs to localStorage", e);
+  // Track formData changes to mark dirty
+  const setFormDataTracked = (updater: Partial<ProgramTemplate> | ((prev: Partial<ProgramTemplate>) => Partial<ProgramTemplate>)) => {
+    setIsDirty(true);
+    if (typeof updater === 'function') {
+      setFormData(updater);
+    } else {
+      setFormData(updater);
     }
   };
 
-  // Load from localStorage on mount
-  const [initialized, setInitialized] = useState(false);
-  if (!initialized) {
-    if (typeof window !== "undefined") {
+  // Helper: strip File objects for API serialization
+  const cleanForApi = (t: Partial<ProgramTemplate>) => {
+    const { id, createdAt, updatedAt, ...rest } = t as any;
+    return {
+      ...rest,
+      modules: (rest.modules || []).map((m: any) => ({
+        ...m,
+        resources: (m.resources || []).map(({ file, ...r }: any) => r),
+      })),
+    };
+  };
+
+  // ─── LOAD FROM API ON MOUNT ───
+  useEffect(() => {
+    const fetchTemplates = async () => {
       try {
-        const stored = localStorage.getItem("inspiratoria_programs");
-        if (stored) {
-          const parsed = JSON.parse(stored) as ProgramTemplate[];
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            // Use a microtask so React doesn't complain about setState during render
-            Promise.resolve().then(() => setTemplates(parsed));
+        const res = await fetch(`${API_URL}/api/program-templates`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setTemplates(data);
           }
         }
-      } catch (e) { /* ignore */ }
-      setInitialized(true);
-    }
-  }
+      } catch (e) {
+        console.warn("Could not fetch templates from API, using local defaults", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTemplates();
+  }, []);
 
   // Stats
   const publishedCount = templates.filter(t => t.status === "published").length;
@@ -119,76 +275,102 @@ export default function ProgramsPage() {
     );
   };
 
-  // Handlers
-  const handleCreate = () => {
-    const name = formData.name || "";
-    const newTemplate: ProgramTemplate = {
-      id: `tpl-${Date.now()}`,
-      slug: generateSlug(name),
-      name,
-      description: formData.description || "",
-      category: formData.category || "leadership",
-      duration: formData.duration || "",
-      status: formData.status || "draft",
-      modules: formData.modules || [],
-      milestones: formData.milestones || [],
-      tags: formData.tags || [],
-      mentorRequirements: formData.mentorRequirements || { ...defaultMentorReqs },
-      menteeRequirements: formData.menteeRequirements || { ...defaultMenteeReqs },
-      matchingRules: formData.matchingRules || { ...defaultMatchingRules },
-      sessionRules: formData.sessionRules || { ...defaultSessionRules },
-      createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: new Date().toISOString().split('T')[0],
-    };
-    const next = [...templates, newTemplate];
-    setTemplates(next);
-    saveToStorage(next);
+  // Handlers — all persist to backend API
+  const handleCreate = async () => {
+    const payload = cleanForApi(formData);
+    payload.slug = generateSlug(formData.name || "");
+    setSaveStatus('saving');
+    try {
+      const res = await fetch(`${API_URL}/api/program-templates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Error al crear");
+      const created = await res.json();
+      setTemplates(prev => [...prev, created]);
+      setSaveStatus('saved');
+    } catch {
+      setSaveStatus('error');
+    }
     setShowCreateModal(false);
+    setIsDirty(false);
     resetForm();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedTemplate) return;
-    const next = templates.map(t => 
-      t.id === selectedTemplate.id ? { ...t, ...formData, updatedAt: new Date().toISOString().split('T')[0] } as ProgramTemplate : t
-    );
-    setTemplates(next);
-    saveToStorage(next);
+    const payload = cleanForApi(formData);
+    const selId = selectedTemplate.id;
+    setSaveStatus('saving');
+    try {
+      const res = await fetch(`${API_URL}/api/program-templates/${selId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Error al guardar");
+      const updated = await res.json();
+      setTemplates(prev => prev.map(t => t.id === selId ? updated : t));
+      setSaveStatus('saved');
+    } catch {
+      setSaveStatus('error');
+    }
     setShowEditModal(false);
     setSelectedTemplate(null);
+    setIsDirty(false);
     resetForm();
   };
 
-  const handleDelete = (id: string) => {
-    const next = templates.filter(t => t.id !== id);
-    setTemplates(next);
-    saveToStorage(next);
+  const handleDelete = async (id: string) => {
+    try {
+      await fetch(`${API_URL}/api/program-templates/${id}`, { method: "DELETE" });
+      setTemplates(prev => prev.filter(t => t.id !== id));
+    } catch { /* ignore */ }
     setShowDeleteConfirm(null);
   };
 
-  const handleDuplicate = (template: ProgramTemplate) => {
-    const newName = `${template.name} (Copia)`;
-    const newTemplate: ProgramTemplate = {
-      ...template,
-      id: `tpl-${Date.now()}`,
-      slug: generateSlug(newName),
-      name: newName,
-      status: "draft",
-      createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: new Date().toISOString().split('T')[0],
-    };
-    const next = [...templates, newTemplate];
-    setTemplates(next);
-    saveToStorage(next);
+  const handleDuplicate = async (template: ProgramTemplate) => {
+    try {
+      const res = await fetch(`${API_URL}/api/program-templates/${template.id}/duplicate`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        const dup = await res.json();
+        setTemplates(prev => [...prev, dup]);
+      }
+    } catch { /* ignore */ }
+  };
+
+  // Close edit modal — warn if unsaved changes
+  const closeEditModal = () => {
+    if (isDirty) {
+      const ok = window.confirm('Tienes cambios sin guardar. ¿Seguro que quieres cerrar?');
+      if (!ok) return;
+    }
+    setShowEditModal(false);
+    setSelectedTemplate(null);
+    setIsDirty(false);
+    resetForm();
   };
 
   const openEditModal = (template: ProgramTemplate) => {
     setSelectedTemplate(template);
-    setFormData({ ...template });
+    // Deep copy to avoid reference issues
+    setFormData(JSON.parse(JSON.stringify(template)));
     setEditTab("general");
     setExpandedModules([]);
+    setIsDirty(false);
     setShowEditModal(true);
   };
+
+  // Auto-save feedback timer
+  useEffect(() => {
+    if (saveStatus === 'saved' || saveStatus === 'error') {
+      const t = setTimeout(() => setSaveStatus('idle'), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [saveStatus]);
 
   const resetForm = () => {
     setFormData({
@@ -209,7 +391,7 @@ export default function ProgramsPage() {
     setExpandedModules([]);
   };
 
-  // Module handlers
+  // Module handlers — all use functional updater to prevent stale state
   const addModule = () => {
     const newModule: Module = {
       id: `mod-${Date.now()}`,
@@ -221,25 +403,25 @@ export default function ProgramsPage() {
       resources: [],
       activities: [],
     };
-    setFormData({ ...formData, modules: [...(formData.modules || []), newModule] });
-    setExpandedModules([...expandedModules, newModule.id]);
+    setFormDataTracked(prev => ({ ...prev, modules: [...(prev.modules || []), newModule] }));
+    setExpandedModules(prev => [...prev, newModule.id]);
   };
 
   const updateModule = (moduleId: string, updates: Partial<Module>) => {
-    setFormData({
-      ...formData,
-      modules: (formData.modules || []).map(m => m.id === moduleId ? { ...m, ...updates } : m)
-    });
+    setFormDataTracked(prev => ({
+      ...prev,
+      modules: (prev.modules || []).map(m => m.id === moduleId ? { ...m, ...updates } : m)
+    }));
   };
 
   const deleteModule = (moduleId: string) => {
-    setFormData({
-      ...formData,
-      modules: (formData.modules || []).filter(m => m.id !== moduleId)
-    });
+    setFormDataTracked(prev => ({
+      ...prev,
+      modules: (prev.modules || []).filter(m => m.id !== moduleId)
+    }));
   };
 
-  // Resource handlers
+  // Resource handlers — functional updaters
   const addResource = (moduleId: string) => {
     const newResource: Resource = {
       id: `res-${Date.now()}`,
@@ -247,56 +429,56 @@ export default function ProgramsPage() {
       type: "pdf",
       url: "",
     };
-    setFormData({
-      ...formData,
-      modules: (formData.modules || []).map(m => 
+    setFormDataTracked(prev => ({
+      ...prev,
+      modules: (prev.modules || []).map(m => 
         m.id === moduleId ? { ...m, resources: [...m.resources, newResource] } : m
       )
-    });
+    }));
   };
 
   const updateResource = (moduleId: string, resourceId: string, updates: Partial<Resource>) => {
-    setFormData({
-      ...formData,
-      modules: (formData.modules || []).map(m => 
+    setFormDataTracked(prev => ({
+      ...prev,
+      modules: (prev.modules || []).map(m => 
         m.id === moduleId ? {
           ...m,
           resources: m.resources.map(r => r.id === resourceId ? { ...r, ...updates } : r)
         } : m
       )
-    });
+    }));
   };
 
   const deleteResource = (moduleId: string, resourceId: string) => {
-    setFormData({
-      ...formData,
-      modules: (formData.modules || []).map(m => 
+    setFormDataTracked(prev => ({
+      ...prev,
+      modules: (prev.modules || []).map(m => 
         m.id === moduleId ? { ...m, resources: m.resources.filter(r => r.id !== resourceId) } : m
       )
-    });
+    }));
   };
 
   // File upload handler - converts files to base64 for persistence
-  const handleFileUpload = (moduleId: string, files: FileList | null) => {
+  const handleFileUpload = (moduleId: string, files: FileList | null, forceType?: Resource["type"]) => {
     if (!files) return;
     const fileArray = Array.from(files);
+    const selectedType = forceType || resTypeTab[moduleId] || "pdf";
     
-    // Read each file as base64 data URL
     Promise.all(
       fileArray.map(
         (file) =>
           new Promise<Resource>((resolve) => {
             const reader = new FileReader();
             reader.onload = () => {
+              const autoType: Resource["type"] =
+                selectedType !== "pdf" ? selectedType :
+                file.type === "application/pdf" ? "pdf" :
+                file.type.startsWith("video/") ? "video" :
+                "document";
               resolve({
                 id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
                 name: file.name.replace(/\.[^/.]+$/, ""),
-                type:
-                  file.type === "application/pdf"
-                    ? ("pdf" as const)
-                    : file.type.startsWith("video/")
-                    ? ("video" as const)
-                    : ("document" as const),
+                type: autoType,
                 url: "",
                 dataUrl: reader.result as string,
                 fileName: file.name,
@@ -310,7 +492,7 @@ export default function ProgramsPage() {
           })
       )
     ).then((newResources) => {
-      setFormData((prev) => ({
+      setFormDataTracked((prev) => ({
         ...prev,
         modules: (prev.modules || []).map((m) =>
           m.id === moduleId
@@ -321,7 +503,29 @@ export default function ProgramsPage() {
     });
   };
 
-  // Activity handlers
+  // Add link/video URL resource
+  const addLinkResource = (moduleId: string) => {
+    const url = (linkInput[moduleId] || "").trim();
+    if (!url) return;
+    const selectedType = resTypeTab[moduleId] || "link";
+    const name = (linkNameInput[moduleId] || "").trim() || url.replace(/^https?:\/\//, "").split("/")[0];
+    const newResource: Resource = {
+      id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      type: selectedType,
+      url,
+    };
+    setFormDataTracked(prev => ({
+      ...prev,
+      modules: (prev.modules || []).map(m =>
+        m.id === moduleId ? { ...m, resources: [...m.resources, newResource] } : m
+      )
+    }));
+    setLinkInput(p => ({ ...p, [moduleId]: "" }));
+    setLinkNameInput(p => ({ ...p, [moduleId]: "" }));
+  };
+
+  // Activity handlers — functional updaters
   const addActivity = (moduleId: string) => {
     const newActivity: Activity = {
       id: `act-${Date.now()}`,
@@ -330,36 +534,36 @@ export default function ProgramsPage() {
       duration: "",
       description: "",
     };
-    setFormData({
-      ...formData,
-      modules: (formData.modules || []).map(m => 
+    setFormDataTracked(prev => ({
+      ...prev,
+      modules: (prev.modules || []).map(m => 
         m.id === moduleId ? { ...m, activities: [...m.activities, newActivity] } : m
       )
-    });
+    }));
   };
 
   const updateActivity = (moduleId: string, activityId: string, updates: Partial<Activity>) => {
-    setFormData({
-      ...formData,
-      modules: (formData.modules || []).map(m => 
+    setFormDataTracked(prev => ({
+      ...prev,
+      modules: (prev.modules || []).map(m => 
         m.id === moduleId ? {
           ...m,
           activities: m.activities.map(a => a.id === activityId ? { ...a, ...updates } : a)
         } : m
       )
-    });
+    }));
   };
 
   const deleteActivity = (moduleId: string, activityId: string) => {
-    setFormData({
-      ...formData,
-      modules: (formData.modules || []).map(m => 
+    setFormDataTracked(prev => ({
+      ...prev,
+      modules: (prev.modules || []).map(m => 
         m.id === moduleId ? { ...m, activities: m.activities.filter(a => a.id !== activityId) } : m
       )
-    });
+    }));
   };
 
-  // Milestone handlers
+  // Milestone handlers — functional updaters
   const addMilestone = () => {
     const newMilestone: Milestone = {
       id: `ms-${Date.now()}`,
@@ -368,25 +572,24 @@ export default function ProgramsPage() {
       description: "",
       deliverable: "",
     };
-    setFormData({ ...formData, milestones: [...(formData.milestones || []), newMilestone] });
+    setFormDataTracked(prev => ({ ...prev, milestones: [...(prev.milestones || []), newMilestone] }));
   };
 
   const updateMilestone = (milestoneId: string, updates: Partial<Milestone>) => {
-    setFormData({
-      ...formData,
-      milestones: (formData.milestones || []).map(m => m.id === milestoneId ? { ...m, ...updates } : m)
-    });
+    setFormDataTracked(prev => ({
+      ...prev,
+      milestones: (prev.milestones || []).map(m => m.id === milestoneId ? { ...m, ...updates } : m)
+    }));
   };
 
   const deleteMilestone = (milestoneId: string) => {
-    setFormData({
-      ...formData,
-      milestones: (formData.milestones || []).filter(m => m.id !== milestoneId)
-    });
+    setFormDataTracked(prev => ({
+      ...prev,
+      milestones: (prev.milestones || []).filter(m => m.id !== milestoneId)
+    }));
   };
 
   // ─── ASSIGN PROGRAM HANDLERS ───
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
   const openAssignModal = async () => {
     setShowAssignModal(true);
@@ -400,7 +603,8 @@ export default function ProgramsPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setActiveCompanies(data.companies || []);
+        // Backend returns array directly
+        setActiveCompanies(Array.isArray(data) ? data : (data.companies || []));
       }
     } catch {}
   };
@@ -414,13 +618,33 @@ export default function ProgramsPage() {
     setAssignError("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/api/companies/programs/assign`, {
+      // Find the selected template
+      const selectedTemplate = templates.find(t => t.id === assignForm.programId);
+      if (!selectedTemplate) throw new Error("Plantilla no encontrada");
+
+      // Step 1: Create program in Django DB from template
+      const createRes = await fetch(`${API_URL}/api/programs`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ program_id: assignForm.programId, company_id: assignForm.companyId }),
+        body: JSON.stringify({
+          name: selectedTemplate.name,
+          description: selectedTemplate.description || "",
+          theme: selectedTemplate.category || "General",
+          company_id: assignForm.companyId,
+          status: "designed",
+          activities: (selectedTemplate.modules || []).flatMap(m =>
+            (m.activities || []).map(a => ({
+              type: a.type || "training",
+              name: (a as any).title || a.name || "Actividad",
+              description: a.description || "",
+              modality: (a as any).modality || "online",
+            }))
+          ),
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || data.error || "Error al asignar");
+      const createData = await createRes.json();
+      if (!createRes.ok) throw new Error(createData.detail || createData.error || "Error al crear programa");
+
       setAssignSuccess(true);
     } catch (err: any) {
       setAssignError(err.message);
@@ -434,6 +658,15 @@ export default function ProgramsPage() {
     <>
       <style dangerouslySetInnerHTML={{ __html: pageStyles }} />
       <div className="programs-page">
+        {/* Loading */}
+        {loading && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 12 }}>
+            <div style={{ width: 24, height: 24, border: '3px solid #e5e7eb', borderTopColor: '#111', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+            <span style={{ color: '#6b7280', fontSize: 14 }}>Cargando plantillas...</span>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        )}
+        {!loading && (<>
         {/* Header */}
         <header className="programs-header sticky top-0 z-20">
           <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
@@ -798,16 +1031,16 @@ export default function ProgramsPage() {
 
         {/* Edit Modal - Full Editor */}
         {showEditModal && selectedTemplate && (
-          <div className="modal-overlay" onClick={() => { setShowEditModal(false); setSelectedTemplate(null); }}>
+          <div className="modal-overlay" onClick={closeEditModal}>
             <div className="modal-content modal-lg" onClick={(e) => e.stopPropagation()}>
               <div className="p-4 sm:p-6 border-b border-neutral-100">
                 <div className="flex items-center justify-between mb-4">
                   <div className="min-w-0">
                     <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 truncate">{formData.name}</h2>
-                    <p className="text-sm text-neutral-500">Editor completo de plantilla</p>
+                    <p className="text-sm text-neutral-500">Editor completo de plantilla{isDirty ? ' • cambios sin guardar' : ''}</p>
                   </div>
                   <button
-                    onClick={() => { setShowEditModal(false); setSelectedTemplate(null); }}
+                    onClick={closeEditModal}
                     className="p-2 hover:bg-neutral-100 rounded-lg"
                   >
                     <Icon.X className="w-5 h-5 text-neutral-500" />
@@ -847,7 +1080,7 @@ export default function ProgramsPage() {
                         <input
                           type="text"
                           value={formData.name || ""}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          onChange={(e) => setFormDataTracked({ ...formData, name: e.target.value })}
                           className="input-field"
                         />
                       </div>
@@ -856,7 +1089,7 @@ export default function ProgramsPage() {
                         <input
                           type="text"
                           value={formData.duration || ""}
-                          onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                          onChange={(e) => setFormDataTracked({ ...formData, duration: e.target.value })}
                           className="input-field"
                         />
                       </div>
@@ -866,7 +1099,7 @@ export default function ProgramsPage() {
                       <label className="block text-sm font-medium text-neutral-700 mb-2">Descripción *</label>
                       <textarea
                         value={formData.description || ""}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        onChange={(e) => setFormDataTracked({ ...formData, description: e.target.value })}
                         className="textarea-field"
                         rows={3}
                       />
@@ -877,7 +1110,7 @@ export default function ProgramsPage() {
                         <label className="block text-sm font-medium text-neutral-700 mb-2">Categoría</label>
                         <select
                           value={formData.category || "leadership"}
-                          onChange={(e) => setFormData({ ...formData, category: e.target.value as ProgramTemplate["category"] })}
+                          onChange={(e) => setFormDataTracked({ ...formData, category: e.target.value as ProgramTemplate["category"] })}
                           className="select-field"
                         >
                           <option value="leadership">Leadership</option>
@@ -891,7 +1124,7 @@ export default function ProgramsPage() {
                         <label className="block text-sm font-medium text-neutral-700 mb-2">Estado</label>
                         <select
                           value={formData.status || "draft"}
-                          onChange={(e) => setFormData({ ...formData, status: e.target.value as ProgramTemplate["status"] })}
+                          onChange={(e) => setFormDataTracked({ ...formData, status: e.target.value as ProgramTemplate["status"] })}
                           className="select-field"
                         >
                           <option value="draft">Borrador</option>
@@ -901,14 +1134,50 @@ export default function ProgramsPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-2">Tags (separados por coma)</label>
-                      <input
-                        type="text"
-                        value={(formData.tags || []).join(", ")}
-                        onChange={(e) => setFormData({ ...formData, tags: e.target.value.split(",").map(t => t.trim()).filter(Boolean) })}
-                        placeholder="liderazgo, soft skills, managers"
-                        className="input-field"
-                      />
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">Tags (presiona Enter para agregar)</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 10, background: '#fafafa', minHeight: 42, alignItems: 'center' }}>
+                        {(formData.tags || []).map((tag, i) => {
+                          const colors = [
+                            { bg: '#dbeafe', text: '#1e40af' },
+                            { bg: '#d1fae5', text: '#065f46' },
+                            { bg: '#fef3c7', text: '#92400e' },
+                            { bg: '#ede9fe', text: '#5b21b6' },
+                            { bg: '#fce7f3', text: '#9d174d' },
+                            { bg: '#e0e7ff', text: '#3730a3' },
+                            { bg: '#ccfbf1', text: '#115e59' },
+                          ];
+                          const c = colors[i % colors.length];
+                          return (
+                            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 9999, fontSize: 12, fontWeight: 500, background: c.bg, color: c.text }}>
+                              {tag}
+                              <button
+                                type="button"
+                                onClick={() => setFormDataTracked({ ...formData, tags: (formData.tags || []).filter((_, idx) => idx !== i) })}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: c.text, opacity: 0.6, fontSize: 14, lineHeight: 1, padding: 0, marginLeft: 2 }}
+                              >×</button>
+                            </span>
+                          );
+                        })}
+                        <input
+                          type="text"
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const val = tagInput.trim();
+                              if (val && !(formData.tags || []).includes(val)) {
+                                setFormDataTracked({ ...formData, tags: [...(formData.tags || []), val] });
+                              }
+                              setTagInput('');
+                            } else if (e.key === 'Backspace' && !tagInput && (formData.tags || []).length > 0) {
+                              setFormDataTracked({ ...formData, tags: (formData.tags || []).slice(0, -1) });
+                            }
+                          }}
+                          placeholder={((formData.tags || []).length === 0) ? 'liderazgo, soft skills...' : ''}
+                          style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, flex: 1, minWidth: 80, padding: 0 }}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1037,74 +1306,291 @@ export default function ProgramsPage() {
                                 <label className="text-sm font-medium text-neutral-700">Recursos ({module.resources.length})</label>
                               </div>
 
-                              {/* Upload Zone */}
-                              <div
-                                className="upload-zone mb-3"
-                                onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
-                                onDragLeave={(e) => { e.currentTarget.classList.remove('drag-over'); }}
-                                onDrop={(e) => {
-                                  e.preventDefault();
-                                  e.currentTarget.classList.remove('drag-over');
-                                  handleFileUpload(module.id, e.dataTransfer.files);
-                                }}
-                                onClick={() => {
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.multiple = true;
-                                  input.accept = '.pdf,.doc,.docx,.xlsx,.xls,.pptx,.ppt,.mp4,.mov';
-                                  input.onchange = (e) => handleFileUpload(module.id, (e.target as HTMLInputElement).files);
-                                  input.click();
-                                }}
-                              >
-                                <Icon.Upload className="w-6 h-6 text-neutral-400 mx-auto mb-2" />
-                                <p className="text-xs text-neutral-500">Arrastra archivos aquí o <span className="text-neutral-900 font-medium">haz clic para subir</span></p>
-                                <p className="text-xs text-neutral-400 mt-1">PDF, DOCX, XLSX, PPTX, MP4</p>
-                              </div>
+                              {/* Resource Type Tabs */}
+                              {(() => {
+                                const curType = resTypeTab[module.id] || "pdf";
+                                const typeTabs: { key: Resource["type"]; label: string; icon: any; color: string; bg: string }[] = [
+                                  { key: "pdf", label: "PDF", icon: Icon.Document, color: "text-red-600", bg: "bg-red-50 border-red-200" },
+                                  { key: "video", label: "Video", icon: Icon.Video, color: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
+                                  { key: "template", label: "Template", icon: Icon.Folder, color: "text-amber-600", bg: "bg-amber-50 border-amber-200" },
+                                  { key: "document", label: "Documento", icon: Icon.File, color: "text-neutral-600", bg: "bg-neutral-50 border-neutral-200" },
+                                  { key: "link", label: "Link", icon: Icon.Link, color: "text-indigo-600", bg: "bg-indigo-50 border-indigo-200" },
+                                ];
+                                const activeTab = typeTabs.find(t => t.key === curType) || typeTabs[0];
+                                const isUrlType = curType === "link" || curType === "video";
+                                const fileAccept: Record<string, string> = {
+                                  pdf: ".pdf",
+                                  video: ".mp4,.mov,.avi,.webm,.mkv",
+                                  template: ".doc,.docx,.xlsx,.xls,.pptx,.ppt,.csv",
+                                  document: ".doc,.docx,.txt,.rtf,.xlsx,.xls,.pptx,.ppt,.csv,.pdf",
+                                };
+
+                                return (
+                                  <div className="mb-3">
+                                    {/* Type selector pills */}
+                                    <div className="flex gap-1.5 mb-3 flex-wrap">
+                                      {typeTabs.map(t => (
+                                        <button
+                                          key={t.key}
+                                          type="button"
+                                          onClick={() => setResTypeTab(p => ({ ...p, [module.id]: t.key }))}
+                                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                                            curType === t.key
+                                              ? `${t.bg} ${t.color} shadow-sm`
+                                              : "bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50"
+                                          }`}
+                                        >
+                                          <t.icon className="w-3.5 h-3.5" />
+                                          {t.label}
+                                        </button>
+                                      ))}
+                                    </div>
+
+                                    {/* Upload / Input area based on type */}
+                                    {curType === "link" ? (
+                                      /* LINK INPUT */
+                                      <div className={`rounded-xl border-2 border-dashed p-4 ${activeTab.bg} transition-all`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                          <Icon.Link className={`w-5 h-5 ${activeTab.color}`} />
+                                          <span className={`text-sm font-semibold ${activeTab.color}`}>Agregar enlace</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                          <input
+                                            type="text"
+                                            placeholder="Nombre del recurso (opcional)"
+                                            value={linkNameInput[module.id] || ""}
+                                            onChange={(e) => setLinkNameInput(p => ({ ...p, [module.id]: e.target.value }))}
+                                            className="w-full text-sm px-3 py-2 rounded-lg border border-neutral-200 bg-white outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition-all"
+                                          />
+                                          <div className="flex gap-2">
+                                            <input
+                                              type="url"
+                                              placeholder="https://ejemplo.com/recurso"
+                                              value={linkInput[module.id] || ""}
+                                              onChange={(e) => setLinkInput(p => ({ ...p, [module.id]: e.target.value }))}
+                                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLinkResource(module.id); } }}
+                                              className="flex-1 text-sm px-3 py-2 rounded-lg border border-neutral-200 bg-white outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition-all"
+                                            />
+                                            <button
+                                              type="button"
+                                              onClick={() => addLinkResource(module.id)}
+                                              disabled={!(linkInput[module.id] || "").trim()}
+                                              className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
+                                            >
+                                              <Icon.Plus className="w-3.5 h-3.5" />
+                                              Agregar
+                                            </button>
+                                          </div>
+                                          {/* Link Preview */}
+                                          {(linkInput[module.id] || "").trim() && /^https?:\/\//i.test(linkInput[module.id] || "") && (
+                                            <div className="mt-2 rounded-lg border border-indigo-200 bg-white overflow-hidden">
+                                              <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border-b border-indigo-100">
+                                                <Icon.Eye className="w-3.5 h-3.5 text-indigo-500" />
+                                                <span className="text-xs font-medium text-indigo-600">Vista previa</span>
+                                              </div>
+                                              <div className="p-3">
+                                                <a href={linkInput[module.id]} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:underline break-all flex items-center gap-1.5">
+                                                  <Icon.Link className="w-3.5 h-3.5 flex-shrink-0" />
+                                                  {linkInput[module.id]}
+                                                </a>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ) : curType === "video" ? (
+                                      /* VIDEO: URL or file */
+                                      <div className={`rounded-xl border-2 border-dashed p-4 ${activeTab.bg} transition-all`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                          <Icon.Video className={`w-5 h-5 ${activeTab.color}`} />
+                                          <span className={`text-sm font-semibold ${activeTab.color}`}>Video</span>
+                                        </div>
+                                        {/* Toggle: URL or Upload */}
+                                        <div className="flex gap-2 mb-3">
+                                          <button
+                                            type="button"
+                                            onClick={() => setLinkInput(p => ({ ...p, [`${module.id}_vmode`]: "url" }))}
+                                            className={`flex-1 text-xs font-semibold py-2 rounded-lg border transition-all ${
+                                              (linkInput[`${module.id}_vmode`] || "url") === "url"
+                                                ? "bg-blue-100 border-blue-300 text-blue-700"
+                                                : "bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50"
+                                            }`}
+                                          >
+                                            URL de video
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setLinkInput(p => ({ ...p, [`${module.id}_vmode`]: "file" }))}
+                                            className={`flex-1 text-xs font-semibold py-2 rounded-lg border transition-all ${
+                                              linkInput[`${module.id}_vmode`] === "file"
+                                                ? "bg-blue-100 border-blue-300 text-blue-700"
+                                                : "bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50"
+                                            }`}
+                                          >
+                                            Subir archivo
+                                          </button>
+                                        </div>
+
+                                        {(linkInput[`${module.id}_vmode`] || "url") === "url" ? (
+                                          <div className="space-y-2">
+                                            <input
+                                              type="text"
+                                              placeholder="Nombre del video (opcional)"
+                                              value={linkNameInput[module.id] || ""}
+                                              onChange={(e) => setLinkNameInput(p => ({ ...p, [module.id]: e.target.value }))}
+                                              className="w-full text-sm px-3 py-2 rounded-lg border border-neutral-200 bg-white outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-all"
+                                            />
+                                            <div className="flex gap-2">
+                                              <input
+                                                type="url"
+                                                placeholder="https://youtube.com/watch?v=... o URL de video"
+                                                value={linkInput[module.id] || ""}
+                                                onChange={(e) => setLinkInput(p => ({ ...p, [module.id]: e.target.value }))}
+                                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLinkResource(module.id); } }}
+                                                className="flex-1 text-sm px-3 py-2 rounded-lg border border-neutral-200 bg-white outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-all"
+                                              />
+                                              <button
+                                                type="button"
+                                                onClick={() => addLinkResource(module.id)}
+                                                disabled={!(linkInput[module.id] || "").trim()}
+                                                className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
+                                              >
+                                                <Icon.Plus className="w-3.5 h-3.5" />
+                                                Agregar
+                                              </button>
+                                            </div>
+                                            {/* Video preview */}
+                                            {(() => {
+                                              const vUrl = (linkInput[module.id] || "").trim();
+                                              if (!vUrl) return null;
+                                              const ytMatch = vUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]+)/);
+                                              const vimeoMatch = vUrl.match(/vimeo\.com\/(\d+)/);
+                                              if (ytMatch) return (
+                                                <div className="mt-2 rounded-lg overflow-hidden border border-blue-200 bg-black">
+                                                  <iframe src={`https://www.youtube.com/embed/${ytMatch[1]}`} width="100%" height="200" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="Vista previa" className="block" />
+                                                </div>
+                                              );
+                                              if (vimeoMatch) return (
+                                                <div className="mt-2 rounded-lg overflow-hidden border border-blue-200 bg-black">
+                                                  <iframe src={`https://player.vimeo.com/video/${vimeoMatch[1]}`} width="100%" height="200" frameBorder="0" allow="autoplay; fullscreen" allowFullScreen title="Vista previa" className="block" />
+                                                </div>
+                                              );
+                                              if (/^https?:\/\//i.test(vUrl)) return (
+                                                <div className="mt-2 rounded-lg border border-blue-200 bg-white p-3">
+                                                  <a href={vUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline break-all flex items-center gap-1.5">
+                                                    <Icon.Play className="w-4 h-4 flex-shrink-0" />
+                                                    {vUrl}
+                                                  </a>
+                                                </div>
+                                              );
+                                              return null;
+                                            })()}
+                                          </div>
+                                        ) : (
+                                          /* Video file upload */
+                                          <div
+                                            className="rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/50 p-5 text-center cursor-pointer hover:bg-blue-50 transition-all"
+                                            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('!bg-blue-100'); }}
+                                            onDragLeave={(e) => { e.currentTarget.classList.remove('!bg-blue-100'); }}
+                                            onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('!bg-blue-100'); handleFileUpload(module.id, e.dataTransfer.files, "video"); }}
+                                            onClick={() => {
+                                              const input = document.createElement('input');
+                                              input.type = 'file'; input.accept = '.mp4,.mov,.avi,.webm,.mkv'; input.multiple = true;
+                                              input.onchange = (ev) => handleFileUpload(module.id, (ev.target as HTMLInputElement).files, "video");
+                                              input.click();
+                                            }}
+                                          >
+                                            <Icon.Upload className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+                                            <p className="text-xs text-blue-600 font-medium">Arrastra video aquí o haz clic</p>
+                                            <p className="text-xs text-blue-400 mt-1">MP4, MOV, AVI, WebM</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      /* FILE UPLOAD: PDF, Template, Document */
+                                      <div
+                                        className={`upload-zone mb-0 ${activeTab.bg} !border-2`}
+                                        style={{ borderColor: curType === 'pdf' ? '#fca5a5' : curType === 'template' ? '#fcd34d' : '#d4d4d4' }}
+                                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
+                                        onDragLeave={(e) => { e.currentTarget.classList.remove('drag-over'); }}
+                                        onDrop={(e) => {
+                                          e.preventDefault();
+                                          e.currentTarget.classList.remove('drag-over');
+                                          handleFileUpload(module.id, e.dataTransfer.files, curType);
+                                        }}
+                                        onClick={() => {
+                                          const input = document.createElement('input');
+                                          input.type = 'file'; input.multiple = true;
+                                          input.accept = fileAccept[curType] || '*';
+                                          input.onchange = (ev) => handleFileUpload(module.id, (ev.target as HTMLInputElement).files, curType);
+                                          input.click();
+                                        }}
+                                      >
+                                        <activeTab.icon className={`w-6 h-6 ${activeTab.color} mx-auto mb-2`} />
+                                        <p className="text-xs text-neutral-600">
+                                          Arrastra {curType === 'pdf' ? 'PDFs' : curType === 'template' ? 'plantillas' : 'documentos'} aquí o{' '}
+                                          <span className="text-neutral-900 font-medium">haz clic para subir</span>
+                                        </p>
+                                        <p className="text-xs text-neutral-400 mt-1">
+                                          {curType === 'pdf' ? 'PDF' : curType === 'template' ? 'DOC, DOCX, XLSX, PPTX, CSV' : 'DOC, DOCX, TXT, XLSX, PPTX, PDF'}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
 
                               {/* Resource List */}
-                              {module.resources.map((resource) => (
-                                <div key={resource.id} className="resource-item mb-2">
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center flex-shrink-0">
-                                      {resource.type === 'pdf' && <Icon.Document className="w-4 h-4 text-red-500" />}
-                                      {resource.type === 'video' && <Icon.Video className="w-4 h-4 text-blue-500" />}
-                                      {resource.type === 'template' && <Icon.Folder className="w-4 h-4 text-amber-500" />}
-                                      {resource.type === 'document' && <Icon.File className="w-4 h-4 text-neutral-500" />}
-                                      {resource.type === 'link' && <Icon.Link className="w-4 h-4 text-indigo-500" />}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <input
-                                        type="text"
-                                        value={resource.name}
-                                        onChange={(e) => updateResource(module.id, resource.id, { name: e.target.value })}
-                                        className="text-sm font-medium text-neutral-900 bg-transparent border-none outline-none w-full p-0"
-                                        placeholder="Nombre del recurso"
-                                      />
-                                      <p className="text-xs text-neutral-400 truncate">
-                                        {resource.fileName || resource.url || 'Sin archivo'}
-                                        {resource.size && ` • ${resource.size}`}
-                                      </p>
-                                    </div>
-                                    <select
-                                      value={resource.type}
-                                      onChange={(e) => updateResource(module.id, resource.id, { type: e.target.value as Resource["type"] })}
-                                      className="text-xs bg-neutral-100 rounded-md px-2 py-1 border-none outline-none flex-shrink-0"
-                                    >
-                                      <option value="pdf">PDF</option>
-                                      <option value="video">Video</option>
-                                      <option value="template">Template</option>
-                                      <option value="document">Documento</option>
-                                      <option value="link">Link</option>
-                                    </select>
-                                  </div>
-                                  <button
-                                    onClick={() => deleteResource(module.id, resource.id)}
-                                    className="p-1 text-red-500 hover:bg-red-50 rounded flex-shrink-0"
-                                  >
-                                    <Icon.X className="w-3 h-3" />
-                                  </button>
+                              {module.resources.length > 0 && (
+                                <div className="space-y-2 mt-3">
+                                  {module.resources.map((resource) => {
+                                    const typeConf: Record<string, { icon: any; color: string; bg: string; label: string }> = {
+                                      pdf: { icon: Icon.Document, color: "text-red-600", bg: "bg-red-50", label: "PDF" },
+                                      video: { icon: Icon.Video, color: "text-blue-600", bg: "bg-blue-50", label: "VIDEO" },
+                                      template: { icon: Icon.Folder, color: "text-amber-600", bg: "bg-amber-50", label: "TEMPLATE" },
+                                      document: { icon: Icon.File, color: "text-neutral-600", bg: "bg-neutral-100", label: "DOC" },
+                                      link: { icon: Icon.Link, color: "text-indigo-600", bg: "bg-indigo-50", label: "LINK" },
+                                    };
+                                    const rc = typeConf[resource.type] || typeConf.document;
+                                    const RIcon = rc.icon;
+                                    return (
+                                      <div key={resource.id} className="resource-item group">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                          <div className={`w-9 h-9 rounded-lg ${rc.bg} flex items-center justify-center flex-shrink-0`}>
+                                            <RIcon className={`w-4 h-4 ${rc.color}`} />
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <input
+                                              type="text"
+                                              value={resource.name}
+                                              onChange={(e) => updateResource(module.id, resource.id, { name: e.target.value })}
+                                              className="text-sm font-medium text-neutral-900 bg-transparent border-none outline-none w-full p-0"
+                                              placeholder="Nombre del recurso"
+                                            />
+                                            <p className="text-xs text-neutral-400 truncate">
+                                              {resource.type === 'link' || resource.type === 'video'
+                                                ? (resource.url ? (
+                                                    <a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline">{resource.url}</a>
+                                                  ) : 'Sin URL')
+                                                : (resource.fileName || 'Sin archivo')}
+                                              {resource.size && ` • ${resource.size}`}
+                                            </p>
+                                          </div>
+                                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${rc.bg} ${rc.color}`}>
+                                            {rc.label}
+                                          </span>
+                                        </div>
+                                        <button
+                                          onClick={() => deleteResource(module.id, resource.id)}
+                                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                        >
+                                          <Icon.X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                              ))}
+                              )}
                             </div>
 
                             {/* Activities */}
@@ -1290,7 +1776,7 @@ export default function ProgramsPage() {
                       <input
                         type="number"
                         value={formData.mentorRequirements?.maxMentees || 5}
-                        onChange={(e) => setFormData({
+                        onChange={(e) => setFormDataTracked({
                           ...formData,
                           mentorRequirements: { ...formData.mentorRequirements!, maxMentees: Number(e.target.value) }
                         })}
@@ -1307,7 +1793,7 @@ export default function ProgramsPage() {
                       <input
                         type="number"
                         value={formData.mentorRequirements?.minExperienceYears || 3}
-                        onChange={(e) => setFormData({
+                        onChange={(e) => setFormDataTracked({
                           ...formData,
                           mentorRequirements: { ...formData.mentorRequirements!, minExperienceYears: Number(e.target.value) }
                         })}
@@ -1323,7 +1809,7 @@ export default function ProgramsPage() {
                       </div>
                       <select
                         value={formData.mentorRequirements?.requiredLevel || "senior"}
-                        onChange={(e) => setFormData({
+                        onChange={(e) => setFormDataTracked({
                           ...formData,
                           mentorRequirements: { ...formData.mentorRequirements!, requiredLevel: e.target.value }
                         })}
@@ -1344,7 +1830,7 @@ export default function ProgramsPage() {
                       </div>
                       <div
                         className={`toggle-switch ${formData.mentorRequirements?.requireProfile ? "active" : ""}`}
-                        onClick={() => setFormData({
+                        onClick={() => setFormDataTracked({
                           ...formData,
                           mentorRequirements: { ...formData.mentorRequirements!, requireProfile: !formData.mentorRequirements?.requireProfile }
                         })}
@@ -1357,7 +1843,7 @@ export default function ProgramsPage() {
                       </div>
                       <div
                         className={`toggle-switch ${formData.mentorRequirements?.requireLinkedIn ? "active" : ""}`}
-                        onClick={() => setFormData({
+                        onClick={() => setFormDataTracked({
                           ...formData,
                           mentorRequirements: { ...formData.mentorRequirements!, requireLinkedIn: !formData.mentorRequirements?.requireLinkedIn }
                         })}
@@ -1376,7 +1862,7 @@ export default function ProgramsPage() {
                       </div>
                       <div
                         className={`toggle-switch ${formData.menteeRequirements?.canSelectMentor ? "active" : ""}`}
-                        onClick={() => setFormData({
+                        onClick={() => setFormDataTracked({
                           ...formData,
                           menteeRequirements: { ...formData.menteeRequirements!, canSelectMentor: !formData.menteeRequirements?.canSelectMentor }
                         })}
@@ -1390,7 +1876,7 @@ export default function ProgramsPage() {
                       <input
                         type="number"
                         value={formData.menteeRequirements?.maxMentors || 1}
-                        onChange={(e) => setFormData({
+                        onChange={(e) => setFormDataTracked({
                           ...formData,
                           menteeRequirements: { ...formData.menteeRequirements!, maxMentors: Number(e.target.value) }
                         })}
@@ -1406,7 +1892,7 @@ export default function ProgramsPage() {
                       </div>
                       <div
                         className={`toggle-switch ${formData.menteeRequirements?.requiredGoals ? "active" : ""}`}
-                        onClick={() => setFormData({
+                        onClick={() => setFormDataTracked({
                           ...formData,
                           menteeRequirements: { ...formData.menteeRequirements!, requiredGoals: !formData.menteeRequirements?.requiredGoals }
                         })}
@@ -1419,7 +1905,7 @@ export default function ProgramsPage() {
                       </div>
                       <div
                         className={`toggle-switch ${formData.menteeRequirements?.requireProfile ? "active" : ""}`}
-                        onClick={() => setFormData({
+                        onClick={() => setFormDataTracked({
                           ...formData,
                           menteeRequirements: { ...formData.menteeRequirements!, requireProfile: !formData.menteeRequirements?.requireProfile }
                         })}
@@ -1433,7 +1919,7 @@ export default function ProgramsPage() {
                       <input
                         type="number"
                         value={formData.menteeRequirements?.minTenure || 0}
-                        onChange={(e) => setFormData({
+                        onChange={(e) => setFormDataTracked({
                           ...formData,
                           menteeRequirements: { ...formData.menteeRequirements!, minTenure: Number(e.target.value) }
                         })}
@@ -1454,7 +1940,7 @@ export default function ProgramsPage() {
                       </div>
                       <select
                         value={formData.matchingRules?.algorithm || "hybrid"}
-                        onChange={(e) => setFormData({
+                        onChange={(e) => setFormDataTracked({
                           ...formData,
                           matchingRules: { ...formData.matchingRules!, algorithm: e.target.value as MatchingRules["algorithm"] }
                         })}
@@ -1473,7 +1959,7 @@ export default function ProgramsPage() {
                       </div>
                       <div
                         className={`toggle-switch ${formData.matchingRules?.allowPreferences ? "active" : ""}`}
-                        onClick={() => setFormData({
+                        onClick={() => setFormDataTracked({
                           ...formData,
                           matchingRules: { ...formData.matchingRules!, allowPreferences: !formData.matchingRules?.allowPreferences }
                         })}
@@ -1488,7 +1974,7 @@ export default function ProgramsPage() {
                             <input
                               type="number"
                               value={formData.matchingRules?.weighSkills || 30}
-                              onChange={(e) => setFormData({
+                              onChange={(e) => setFormDataTracked({
                                 ...formData,
                                 matchingRules: { ...formData.matchingRules!, weighSkills: Number(e.target.value) }
                               })}
@@ -1505,7 +1991,7 @@ export default function ProgramsPage() {
                             <input
                               type="number"
                               value={formData.matchingRules?.weighGoals || 40}
-                              onChange={(e) => setFormData({
+                              onChange={(e) => setFormDataTracked({
                                 ...formData,
                                 matchingRules: { ...formData.matchingRules!, weighGoals: Number(e.target.value) }
                               })}
@@ -1522,7 +2008,7 @@ export default function ProgramsPage() {
                             <input
                               type="number"
                               value={formData.matchingRules?.weighDepartment || 15}
-                              onChange={(e) => setFormData({
+                              onChange={(e) => setFormDataTracked({
                                 ...formData,
                                 matchingRules: { ...formData.matchingRules!, weighDepartment: Number(e.target.value) }
                               })}
@@ -1539,7 +2025,7 @@ export default function ProgramsPage() {
                             <input
                               type="number"
                               value={formData.matchingRules?.weighSeniority || 15}
-                              onChange={(e) => setFormData({
+                              onChange={(e) => setFormDataTracked({
                                 ...formData,
                                 matchingRules: { ...formData.matchingRules!, weighSeniority: Number(e.target.value) }
                               })}
@@ -1565,7 +2051,7 @@ export default function ProgramsPage() {
                       </div>
                       <select
                         value={formData.sessionRules?.defaultDuration || 60}
-                        onChange={(e) => setFormData({
+                        onChange={(e) => setFormDataTracked({
                           ...formData,
                           sessionRules: { ...formData.sessionRules!, defaultDuration: Number(e.target.value) }
                         })}
@@ -1586,7 +2072,7 @@ export default function ProgramsPage() {
                       <input
                         type="number"
                         value={formData.sessionRules?.frequencyPerMonth || 2}
-                        onChange={(e) => setFormData({
+                        onChange={(e) => setFormDataTracked({
                           ...formData,
                           sessionRules: { ...formData.sessionRules!, frequencyPerMonth: Number(e.target.value) }
                         })}
@@ -1602,7 +2088,7 @@ export default function ProgramsPage() {
                       </div>
                       <div
                         className={`toggle-switch ${formData.sessionRules?.allowReschedule ? "active" : ""}`}
-                        onClick={() => setFormData({
+                        onClick={() => setFormDataTracked({
                           ...formData,
                           sessionRules: { ...formData.sessionRules!, allowReschedule: !formData.sessionRules?.allowReschedule }
                         })}
@@ -1616,7 +2102,7 @@ export default function ProgramsPage() {
                       <input
                         type="number"
                         value={formData.sessionRules?.maxReschedules || 2}
-                        onChange={(e) => setFormData({
+                        onChange={(e) => setFormDataTracked({
                           ...formData,
                           sessionRules: { ...formData.sessionRules!, maxReschedules: Number(e.target.value) }
                         })}
@@ -1633,7 +2119,7 @@ export default function ProgramsPage() {
                       <input
                         type="number"
                         value={formData.sessionRules?.reminderDays || 2}
-                        onChange={(e) => setFormData({
+                        onChange={(e) => setFormDataTracked({
                           ...formData,
                           sessionRules: { ...formData.sessionRules!, reminderDays: Number(e.target.value) }
                         })}
@@ -1649,7 +2135,7 @@ export default function ProgramsPage() {
                       </div>
                       <div
                         className={`toggle-switch ${formData.sessionRules?.requireAgenda ? "active" : ""}`}
-                        onClick={() => setFormData({
+                        onClick={() => setFormDataTracked({
                           ...formData,
                           sessionRules: { ...formData.sessionRules!, requireAgenda: !formData.sessionRules?.requireAgenda }
                         })}
@@ -1662,7 +2148,7 @@ export default function ProgramsPage() {
                       </div>
                       <div
                         className={`toggle-switch ${formData.sessionRules?.requireFeedback ? "active" : ""}`}
-                        onClick={() => setFormData({
+                        onClick={() => setFormDataTracked({
                           ...formData,
                           sessionRules: { ...formData.sessionRules!, requireFeedback: !formData.sessionRules?.requireFeedback }
                         })}
@@ -1675,15 +2161,20 @@ export default function ProgramsPage() {
               {/* Footer */}
               <div className="p-4 sm:p-6 border-t border-neutral-100 bg-neutral-50">
                 <div className="flex items-center justify-between gap-3">
-                  <button
-                    onClick={() => { setShowEditModal(false); setSelectedTemplate(null); }}
-                    className="btn-secondary"
-                  >
-                    Cancelar
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button onClick={closeEditModal} className="btn-secondary">Cancelar</button>
+                    {saveStatus === 'saved' && (
+                      <span className="text-xs text-green-600 flex items-center gap-1">
+                        <Icon.Check className="w-3 h-3" /> Guardado
+                      </span>
+                    )}
+                    {saveStatus === 'error' && (
+                      <span className="text-xs text-red-600">Error al guardar (almacenamiento lleno)</span>
+                    )}
+                  </div>
                   <button onClick={handleSave} className="btn-primary flex items-center gap-2">
                     <Icon.Check className="w-4 h-4" />
-                    Guardar Cambios
+                    {isDirty ? 'Guardar Cambios *' : 'Guardar Cambios'}
                   </button>
                 </div>
               </div>
@@ -1693,28 +2184,15 @@ export default function ProgramsPage() {
 
         {/* Delete Confirmation */}
         {showDeleteConfirm && (
-          <div className="modal-overlay" onClick={() => setShowDeleteConfirm(null)}>
-            <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6">
-                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-                  <Icon.Trash className="w-6 h-6 text-red-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-neutral-900 text-center mb-2">Eliminar Plantilla</h3>
-                <p className="text-neutral-500 text-center mb-6">
-                  ¿Eliminar esta plantilla? Las empresas que ya la usan conservarán su copia.
-                </p>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setShowDeleteConfirm(null)} className="btn-secondary flex-1">Cancelar</button>
-                  <button
-                    onClick={() => handleDelete(showDeleteConfirm)}
-                    className="flex-1 bg-red-600 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-red-700"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <DeleteModal
+            countdown={deleteCountdown}
+            setCountdown={setDeleteCountdown}
+            confirmText={deleteConfirmText}
+            setConfirmText={setDeleteConfirmText}
+            templateName={templates.find(t => t.id === showDeleteConfirm)?.name || ''}
+            onCancel={() => { setShowDeleteConfirm(null); setDeleteConfirmText(""); setDeleteCountdown(5); }}
+            onDelete={() => { handleDelete(showDeleteConfirm); setDeleteConfirmText(""); setDeleteCountdown(5); }}
+          />
         )}
 
         {/* ─── ASSIGN PROGRAM MODAL ─── */}
@@ -1762,7 +2240,7 @@ export default function ProgramsPage() {
                       >
                         <option value="">Seleccionar empresa...</option>
                         {activeCompanies.map(c => (
-                          <option key={c.id} value={c.id}>{c.name} ({c.corp_id} · {c.plan})</option>
+                          <option key={c.id} value={c.id}>{c.name} · {c.plan}</option>
                         ))}
                       </select>
                       {activeCompanies.length === 0 && (
@@ -1817,6 +2295,7 @@ export default function ProgramsPage() {
             </div>
           </div>
         )}
+        </>)}
       </div>
     </>
   );

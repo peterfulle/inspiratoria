@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import TopNavbar from "@/components/TopNavbar";
-import Footer from "@/components/Footer";
 import PushNotificationPrompt from "@/components/PushNotificationPrompt";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -61,6 +60,16 @@ export default function DashboardLayout({
     return () => window.removeEventListener("sidebarToggle", handleSidebarToggle);
   }, []);
 
+  // Listen for theme toggle from header or sidebar
+  useEffect(() => {
+    const handleThemeToggle = () => {
+      const theme = localStorage.getItem("theme");
+      setDarkMode(theme === "dark");
+    };
+    window.addEventListener("themeToggle", handleThemeToggle);
+    return () => window.removeEventListener("themeToggle", handleThemeToggle);
+  }, []);
+
   if (loading) {
     return (
       <div className="flex min-h-screen h-full bg-white overflow-x-hidden">
@@ -82,7 +91,6 @@ export default function DashboardLayout({
         <main className={`${isInClientRoute ? '' : 'ml-72 mt-16 p-8 pb-64'} flex-1 bg-white`}>
           <DashboardSkeleton darkMode={darkMode} />
         </main>
-        {!isInClientRoute && <Footer />}
       </div>
     );
   }
@@ -96,13 +104,13 @@ export default function DashboardLayout({
       {!isInClientRoute && (
         <>
           <Sidebar
-            username={user.username || user.full_name || user.email}
+            username={user.full_name || user.username || user.email}
             role={user.role || ""}
             userId={user.id || 1}
           />
 
           <TopNavbar
-            username={user.username || user.full_name || user.email}
+            username={user.full_name || user.username || user.email}
             role={user.role || ""}
             userId={user.id || 1}
             darkMode={darkMode}
@@ -113,8 +121,6 @@ export default function DashboardLayout({
       <main className={`${isInClientRoute ? '' : sidebarCollapsed ? 'ml-[72px] mt-16 p-8 pb-64' : 'ml-72 mt-16 p-8 pb-64'} flex-1 bg-white transition-all duration-300`}>
         {children}
       </main>
-
-      {!isInClientRoute && <Footer />}
 
       {/* Push Notification Prompt - solo fuera de rutas de programa */}
       {!isInClientRoute && (

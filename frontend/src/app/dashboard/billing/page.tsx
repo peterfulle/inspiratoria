@@ -3,146 +3,237 @@
 import { useState, useEffect } from "react";
 
 // ═══════════════════════════════════════════════════════════════════
-// STYLES
+// STYLES — same visual language as accounts & dashboard
 // ═══════════════════════════════════════════════════════════════════
 
 const pageStyles = `
-  .billing-page {
+  .bill-page {
     min-height: 100vh;
     background: #fafafa;
     color: #1a1a1a;
   }
-  .billing-header {
+  .bill-header {
     background: white;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid #e5e7eb;
+    position: sticky;
+    top: 0;
+    z-index: 20;
   }
-  .stat-card {
+  .bill-stat {
     background: white;
-    border: 1px solid #f0f0f0;
-    border-radius: 16px;
-    padding: 24px;
-    transition: all 0.2s ease;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 20px 24px;
+    transition: box-shadow 0.2s ease;
   }
-  .stat-card:hover {
-    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+  .bill-stat:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.04);
   }
-  .glass-card {
+  .bill-card {
     background: white;
-    border: 1px solid #f0f0f0;
-    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    overflow: hidden;
   }
-  .tab-btn {
+  .bill-tab {
     padding: 10px 20px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     border-bottom: 2px solid transparent;
     transition: all 0.15s ease;
-    color: #666;
+    color: #6b7280;
+    cursor: pointer;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
   }
-  .tab-btn.active {
+  .bill-tab.active {
     color: #1a1a1a;
     border-bottom-color: #1a1a1a;
   }
-  .tab-btn:hover:not(.active) {
-    color: #333;
+  .bill-tab:hover:not(.active) {
+    color: #374151;
   }
-  .btn-primary {
-    background: #1a1a1a;
-    color: white;
-    padding: 10px 20px;
-    border-radius: 10px;
-    font-weight: 500;
-    font-size: 14px;
-    transition: all 0.2s ease;
+  .bill-row {
+    border-bottom: 1px solid #f3f4f6;
+    transition: background 0.15s ease;
+    cursor: pointer;
   }
-  .btn-primary:hover {
-    background: #333;
+  .bill-row:hover {
+    background: #f9fafb;
   }
-  .btn-secondary {
-    background: white;
-    color: #1a1a1a;
-    padding: 10px 20px;
-    border-radius: 10px;
-    font-weight: 500;
-    font-size: 14px;
-    border: 1px solid #e5e5e5;
-    transition: all 0.2s ease;
-  }
-  .btn-secondary:hover {
-    background: #f5f5f5;
-  }
-  .badge {
-    padding: 4px 10px;
+  .bill-badge {
+    padding: 3px 10px;
     border-radius: 6px;
     font-size: 11px;
     font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
-  .badge-paid { background: #dcfce7; color: #16a34a; }
-  .badge-pending { background: #fef3c7; color: #d97706; }
-  .badge-overdue { background: #fee2e2; color: #dc2626; }
-  .badge-enterprise { background: #f3e8ff; color: #7c3aed; }
-  .badge-growth { background: #dbeafe; color: #2563eb; }
-  .badge-starter { background: #e0f2fe; color: #0369a1; }
-  .table-row {
-    border-bottom: 1px solid #f5f5f5;
+  .bill-badge-active { background: #dcfce7; color: #16a34a; }
+  .bill-badge-trial { background: #dbeafe; color: #2563eb; }
+  .bill-badge-overdue { background: #fee2e2; color: #dc2626; }
+  .bill-badge-cancelled { background: #f3f4f6; color: #6b7280; }
+  .bill-badge-pending { background: #fef3c7; color: #d97706; }
+  .bill-badge-paid { background: #dcfce7; color: #16a34a; }
+  .bill-badge-starter { background: #e0f2fe; color: #0369a1; }
+  .bill-badge-growth { background: #dbeafe; color: #2563eb; }
+  .bill-badge-enterprise { background: #f3e8ff; color: #7c3aed; }
+  .bill-badge-trial-plan { background: #fef3c7; color: #d97706; }
+  .bill-btn {
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
     transition: all 0.15s ease;
+    border: none;
   }
-  .table-row:hover {
-    background: #fafafa;
-  }
-  .plan-card {
-    background: white;
-    border: 2px solid #f0f0f0;
-    border-radius: 20px;
-    padding: 32px;
-    transition: all 0.3s ease;
-    position: relative;
-  }
-  .plan-card:hover {
-    border-color: #1a1a1a;
-    transform: translateY(-4px);
-    box-shadow: 0 20px 40px rgba(0,0,0,0.08);
-  }
-  .plan-card.popular {
-    border-color: #1a1a1a;
-  }
-  .plan-card.popular::before {
-    content: 'Más Popular';
-    position: absolute;
-    top: -12px;
-    left: 50%;
-    transform: translateX(-50%);
+  .bill-btn-primary {
     background: #1a1a1a;
     color: white;
-    padding: 4px 16px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
   }
-  .section-title {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #999;
-    margin-bottom: 16px;
+  .bill-btn-primary:hover {
+    background: #333;
   }
-  .modal-overlay {
+  .bill-btn-secondary {
+    background: white;
+    color: #1a1a1a;
+    border: 1px solid #e5e7eb;
+  }
+  .bill-btn-secondary:hover {
+    background: #f9fafb;
+  }
+  .bill-btn-sm {
+    padding: 5px 12px;
+    font-size: 12px;
+  }
+  .bill-modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.45);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 50;
+    animation: fadeIn 0.15s ease;
   }
-  .modal-content {
+  .bill-modal {
     background: white;
-    border-radius: 20px;
-    max-width: 600px;
-    width: 90%;
+    border-radius: 16px;
+    max-width: 720px;
+    width: 94%;
     max-height: 90vh;
     overflow-y: auto;
+    animation: slideUp 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  .bill-input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  .bill-input:focus {
+    border-color: #9ca3af;
+    box-shadow: 0 0 0 2px rgba(156,163,175,0.1);
+  }
+  .bill-select {
+    padding: 8px 32px 8px 12px;
+    font-size: 13px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    appearance: none;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+  }
+  .bill-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .bill-detail-item {
+    padding: 14px;
+    background: #f9fafb;
+    border-radius: 10px;
+  }
+  .bill-detail-item label {
+    display: block;
+    font-size: 11px;
+    color: #9ca3af;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+  .bill-detail-item span {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a1a1a;
+  }
+  .bill-role-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .bill-role-bar:last-child {
+    border-bottom: none;
+  }
+  .bill-role-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .bill-plan-card {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 28px;
+    transition: all 0.25s ease;
+    position: relative;
+  }
+  .bill-plan-card:hover {
+    border-color: #1a1a1a;
+    transform: translateY(-3px);
+    box-shadow: 0 16px 32px rgba(0,0,0,0.06);
+  }
+  .bill-plan-card.popular {
+    border-color: #1a1a1a;
+  }
+  .bill-plan-card.popular::before {
+    content: 'Más Popular';
+    position: absolute;
+    top: -11px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a1a;
+    color: white;
+    padding: 3px 14px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .bill-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #9ca3af;
+    margin-bottom: 12px;
   }
 `;
 
@@ -150,237 +241,232 @@ const pageStyles = `
 // TYPES
 // ═══════════════════════════════════════════════════════════════════
 
-interface Company {
+interface RoleCounts {
+  admin_root: number;
+  coordinator: number;
+  mentor: number;
+  mentee: number;
+  facilitator: number;
+  client: number;
+}
+
+interface ProgramInfo {
   id: string;
   name: string;
-  plan: "enterprise" | "growth" | "starter";
-  status: "paid" | "pending" | "overdue";
-  nextBilling: string;
+  status: string;
+  theme: string;
+  created_at: string | null;
+}
+
+interface BillingClient {
+  id: string;
+  name: string;
+  slug: string;
+  corp_id: string;
+  account_type: string;
+  plan: string;
+  status: string;
+  billing_status: string;
   amount: number;
-  users: number;
-  paymentMethod: string;
-  lastPayment: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  contact_position: string;
+  legal_name: string;
+  rut: string;
+  country: string;
+  city: string;
+  contract_start: string | null;
+  contract_end: string | null;
+  total_users: number;
+  users_by_role: RoleCounts;
+  max_users: number;
+  total_programs: number;
+  programs: ProgramInfo[];
+  max_programs: number;
+  plan_limits: Record<string, number>;
+  plan_features: Record<string, unknown>;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+interface BillingStats {
+  total_clients: number;
+  active: number;
+  trial: number;
+  overdue: number;
+  cancelled: number;
+  mrr: number;
+  arr: number;
+  total_users: number;
+  total_programs: number;
+  by_plan: Record<string, { count: number; revenue: number }>;
 }
 
 interface Invoice {
-  id: string;
-  companyId: string;
-  companyName: string;
-  date: string;
+  invoice_id: string;
+  company_id: string;
+  company_name: string;
   amount: number;
-  status: "paid" | "pending" | "overdue";
   description: string;
-}
-
-interface Plan {
-  id: string;
-  name: string;
-  price: number | null;
-  period: string;
-  description: string;
-  features: string[];
-  popular?: boolean;
-  users: string;
-  programs: string;
+  due_date: string;
+  status: string;
+  created_at: string;
+  plan: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ICONS
+// ICONS (inline SVGs)
 // ═══════════════════════════════════════════════════════════════════
 
-const Icon = {
-  CreditCard: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-    </svg>
-  ),
-  DollarSign: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+const Icons = {
+  dollar: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   ),
-  TrendUp: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+  trendUp: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
     </svg>
   ),
-  Users: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+  users: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
     </svg>
   ),
-  AlertCircle: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  building: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
     </svg>
   ),
-  Check: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  search: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
     </svg>
   ),
-  Download: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-    </svg>
-  ),
-  Eye: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+  eye: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
     </svg>
   ),
-  X: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+  x: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
     </svg>
   ),
-  Star: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+  download: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
     </svg>
   ),
-  Search: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  receipt: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
     </svg>
   ),
-  Filter: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+  plus: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
     </svg>
   ),
-  ChevronDown: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+  check: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
   ),
-  MoreVertical: ({ className = "w-5 h-5" }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+  alert: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  calendar: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  ),
+  program: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+    </svg>
+  ),
+  mail: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7" />
+    </svg>
+  ),
+  phone: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
     </svg>
   ),
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// DEMO DATA
+// HELPERS
 // ═══════════════════════════════════════════════════════════════════
 
-const demoCompanies: Company[] = [
-  { id: "1", name: "TechCorp Solutions", plan: "enterprise", status: "paid", nextBilling: "2026-03-15", amount: 4833, users: 250, paymentMethod: "Visa •••• 4242", lastPayment: "2026-02-15" },
-  { id: "2", name: "DesignLab Studio", plan: "growth", status: "paid", nextBilling: "2026-03-01", amount: 899, users: 65, paymentMethod: "Mastercard •••• 5555", lastPayment: "2026-02-01" },
-  { id: "3", name: "DataFlow Analytics", plan: "starter", status: "pending", nextBilling: "2026-02-20", amount: 299, users: 18, paymentMethod: "Visa •••• 1234", lastPayment: "2026-01-20" },
-  { id: "4", name: "StartupX Ventures", plan: "starter", status: "paid", nextBilling: "2026-02-25", amount: 299, users: 12, paymentMethod: "Amex •••• 3782", lastPayment: "2026-01-25" },
-  { id: "5", name: "MediHealth Corp", plan: "enterprise", status: "overdue", nextBilling: "2026-02-01", amount: 4833, users: 320, paymentMethod: "Visa •••• 9876", lastPayment: "2026-01-01" },
-];
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
-const demoInvoices: Invoice[] = [
-  { id: "INV-2026-001", companyId: "1", companyName: "TechCorp Solutions", date: "2026-02-15", amount: 4833, status: "paid", description: "Plan Enterprise - Febrero 2026" },
-  { id: "INV-2026-002", companyId: "2", companyName: "DesignLab Studio", date: "2026-02-01", amount: 899, status: "paid", description: "Plan Growth - Febrero 2026" },
-  { id: "INV-2026-003", companyId: "3", companyName: "DataFlow Analytics", date: "2026-02-20", amount: 299, status: "pending", description: "Plan Starter - Febrero 2026" },
-  { id: "INV-2026-004", companyId: "5", companyName: "MediHealth Corp", date: "2026-02-01", amount: 4833, status: "overdue", description: "Plan Enterprise - Febrero 2026" },
-  { id: "INV-2026-005", companyId: "1", companyName: "TechCorp Solutions", date: "2026-01-15", amount: 4833, status: "paid", description: "Plan Enterprise - Enero 2026" },
-  { id: "INV-2026-006", companyId: "2", companyName: "DesignLab Studio", date: "2026-01-01", amount: 899, status: "paid", description: "Plan Growth - Enero 2026" },
-];
+const fmtCurrency = (n: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
 
-const plans: Plan[] = [
+const fmtDate = (d: string | null) => {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const initials = (name: string) =>
+  name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+
+const gradients = [
+  "linear-gradient(135deg,#3b82f6,#6366f1)",
+  "linear-gradient(135deg,#10b981,#14b8a6)",
+  "linear-gradient(135deg,#f97316,#ef4444)",
+  "linear-gradient(135deg,#8b5cf6,#ec4899)",
+  "linear-gradient(135deg,#06b6d4,#3b82f6)",
+  "linear-gradient(135deg,#f59e0b,#f97316)",
+];
+const gradient = (name: string) => gradients[name.charCodeAt(0) % gradients.length];
+
+const planLabel: Record<string, string> = { trial: "Trial", starter: "Starter", growth: "Growth", enterprise: "Enterprise" };
+const statusLabel: Record<string, string> = { active: "Activa", trial: "Trial", overdue: "Vencida", cancelled: "Cancelada", pending: "Pendiente" };
+const roleLabels: Record<string, string> = {
+  admin_root: "Administradores",
+  coordinator: "Coordinadores",
+  mentor: "Mentores",
+  mentee: "Mentees",
+  facilitator: "Facilitadores",
+  client: "Clientes",
+};
+const roleColors: Record<string, string> = {
+  admin_root: "#7c3aed",
+  coordinator: "#2563eb",
+  mentor: "#10b981",
+  mentee: "#f59e0b",
+  facilitator: "#ec4899",
+  client: "#6b7280",
+};
+
+const plans = [
   {
-    id: "starter",
-    name: "Starter",
-    price: 299,
-    period: "/mes",
-    description: "Empezar con Mentoría Profesional. Ideal para equipos pequeños y pilotos.",
-    users: "Hasta 20 usuarios",
-    programs: "1 programa activo",
-    features: [
-      "1 programa pre-armado a elección",
-      "Matching IA básico",
-      "Dashboard estándar (KPIs básicos)",
-      "Certificación digital",
-      "Soporte email (72hr SLA)",
-      "Updates contenido trimestral",
-    ],
+    id: "starter", name: "Starter", price: 299, period: "/mes", annual: "$3,200", description: "Empezar con Mentoría. Ideal para equipos pequeños.",
+    users: "Hasta 20 usuarios", programs: "1 programa activo",
+    features: ["1 programa pre-armado", "Matching IA básico", "Dashboard estándar", "Certificación digital", "Soporte email (72hr SLA)"],
   },
   {
-    id: "growth",
-    name: "Growth",
-    price: 899,
-    period: "/mes",
-    description: "Escalar Desarrollo de Talento. Para empresas en crecimiento.",
-    users: "Hasta 80 usuarios",
-    programs: "3 programas simultáneos",
-    popular: true,
-    features: [
-      "Todo en Starter",
-      "IA matching avanzado",
-      "Dashboard ejecutivo (custom KPIs)",
-      "API acceso + integraciones",
-      "SSO (Google/Microsoft/Okta)",
-      "Account Manager compartido",
-      "Soporte prioritario (24hr SLA)",
-      "QBRs trimestrales",
-      "Custom branding (logo, colores)",
-    ],
+    id: "growth", name: "Growth", price: 899, period: "/mes", annual: "$9,600", description: "Escalar Desarrollo de Talento. Para empresas en crecimiento.", popular: true,
+    users: "Hasta 80 usuarios", programs: "3 programas simultáneos",
+    features: ["Todo en Starter", "IA matching avanzado", "Dashboard ejecutivo", "API + Integraciones", "SSO (Google/Microsoft)", "Account Manager compartido", "Soporte prioritario (24hr SLA)"],
   },
   {
-    id: "enterprise",
-    name: "Enterprise",
-    price: null,
-    period: "",
-    description: "Academia Corporativa Completa. Solución para grandes organizaciones.",
-    users: "Usuarios ilimitados",
-    programs: "Programas ilimitados",
-    features: [
-      "Todo en Growth",
-      "White-label completo",
-      "SSO + SAML + SCIM",
-      "Integraciones enterprise (Workday, SAP)",
-      "CSM dedicado (1:5 ratio)",
-      "SLA 99.9% uptime garantizado",
-      "Soporte 24/7 priority hotline",
-      "Workshops on-site (2/año incluidos)",
-      "Customización hasta 30% contenido",
-      "Roadmap influence",
-    ],
+    id: "enterprise", name: "Enterprise", price: null, period: "", annual: "$28,000+", description: "Solución completa para grandes organizaciones.",
+    users: "Usuarios ilimitados", programs: "Programas ilimitados",
+    features: ["Todo en Growth", "White-label completo", "SSO + SAML + SCIM", "Integraciones enterprise", "CSM dedicado (1:5)", "SLA 99.9% uptime", "Soporte 24/7", "Custom 30% contenido"],
   },
 ];
-
-// ═══════════════════════════════════════════════════════════════════
-// HELPER FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
-
-const formatDate = (dateStr: string): string => {
-  if (dateStr === "-") return "-";
-  return new Date(dateStr).toLocaleDateString('es-ES', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-};
-
-const getCompanyInitials = (name: string): string => {
-  return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
-};
-
-const getCompanyGradient = (name: string): string => {
-  const gradients = [
-    "from-blue-500 to-indigo-600",
-    "from-emerald-500 to-teal-600",
-    "from-orange-500 to-red-600",
-    "from-purple-500 to-pink-600",
-    "from-cyan-500 to-blue-600",
-  ];
-  return gradients[name.charCodeAt(0) % gradients.length];
-};
 
 // ═══════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -388,654 +474,789 @@ const getCompanyGradient = (name: string): string => {
 
 export default function BillingPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "invoices" | "plans">("overview");
-  const [companies] = useState<Company[]>(demoCompanies);
-  const [invoices] = useState<Invoice[]>(demoInvoices);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  
-  // Filters state
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterPlan, setFilterPlan] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<string>("name");
+  const [clients, setClients] = useState<BillingClient[]>([]);
+  const [stats, setStats] = useState<BillingStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Stats calculations
-  const totalMRR = companies.reduce((acc, c) => acc + c.amount, 0);
-  const paidCount = companies.filter(c => c.status === "paid").length;
-  const pendingCount = companies.filter(c => c.status === "pending").length;
-  const overdueCount = companies.filter(c => c.status === "overdue").length;
-  const overdueAmount = companies.filter(c => c.status === "overdue").reduce((acc, c) => acc + c.amount, 0);
+  // Filters
+  const [search, setSearch] = useState("");
+  const [filterPlan, setFilterPlan] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [sortBy, setSortBy] = useState("name");
 
-  // Filtered and sorted companies
-  const filteredCompanies = companies
+  // Detail modal
+  const [selected, setSelected] = useState<BillingClient | null>(null);
+
+  // Invoice modal
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [invoiceTarget, setInvoiceTarget] = useState<BillingClient | null>(null);
+  const [invoiceForm, setInvoiceForm] = useState({ amount: "", description: "", due_date: "" });
+  const [createdInvoices, setCreatedInvoices] = useState<Invoice[]>([]);
+
+  // Payment order modal
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentTarget, setPaymentTarget] = useState<BillingClient | null>(null);
+  const [paymentForm, setPaymentForm] = useState({ amount: "", concept: "", due_date: "" });
+
+  // ── Fetch billing data ──
+  useEffect(() => {
+    loadBilling();
+  }, []);
+
+  async function loadBilling() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API}/api/companies/billing/overview`);
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const data = await res.json();
+      setClients(data.clients || []);
+      setStats(data.stats || null);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error desconocido";
+      console.error("Billing fetch error:", msg);
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Create invoice ──
+  async function handleCreateInvoice() {
+    if (!invoiceTarget) return;
+    try {
+      const res = await fetch(`${API}/api/companies/billing/invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: invoiceTarget.id,
+          amount: invoiceForm.amount ? Number(invoiceForm.amount) : undefined,
+          description: invoiceForm.description || undefined,
+          due_date: invoiceForm.due_date || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error("Error creando factura");
+      const inv = await res.json();
+      setCreatedInvoices(prev => [inv, ...prev]);
+      setShowInvoiceModal(false);
+      setInvoiceForm({ amount: "", description: "", due_date: "" });
+    } catch (e) {
+      alert("Error al crear factura");
+    }
+  }
+
+  // ── Create payment order ──
+  async function handleCreatePayment() {
+    if (!paymentTarget) return;
+    try {
+      const res = await fetch(`${API}/api/companies/billing/payment-order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: paymentTarget.id,
+          amount: paymentForm.amount ? Number(paymentForm.amount) : undefined,
+          concept: paymentForm.concept || undefined,
+          due_date: paymentForm.due_date || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error("Error creando orden");
+      await res.json();
+      setShowPaymentModal(false);
+      setPaymentForm({ amount: "", concept: "", due_date: "" });
+      alert("Orden de pago creada exitosamente");
+    } catch (e) {
+      alert("Error al crear orden de pago");
+    }
+  }
+
+  // ── Filter & sort ──
+  const filtered = clients
     .filter(c => {
-      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesPlan = filterPlan === "all" || c.plan === filterPlan;
-      const matchesStatus = filterStatus === "all" || c.status === filterStatus;
-      return matchesSearch && matchesPlan && matchesStatus;
+      const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.contact_email.toLowerCase().includes(search.toLowerCase());
+      const matchPlan = filterPlan === "all" || c.plan === filterPlan;
+      const matchStatus = filterStatus === "all" || c.billing_status === filterStatus;
+      return matchSearch && matchPlan && matchStatus;
     })
     .sort((a, b) => {
       switch (sortBy) {
         case "name": return a.name.localeCompare(b.name);
         case "amount": return b.amount - a.amount;
-        case "users": return b.users - a.users;
-        case "date": return new Date(a.nextBilling).getTime() - new Date(b.nextBilling).getTime();
+        case "users": return b.total_users - a.total_users;
+        case "date": return (a.contract_start || "").localeCompare(b.contract_start || "");
         default: return 0;
       }
     });
 
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════════
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: pageStyles }} />
-      <div className="billing-page">
-        {/* Header */}
-        <header className="billing-header sticky top-0 z-20">
-          <div className="px-8 py-5">
-            <div className="flex items-center justify-between">
+      <div className="bill-page">
+        {/* ── HEADER ── */}
+        <header className="bill-header">
+          <div style={{ padding: "20px 32px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <h1 className="text-xl font-semibold text-neutral-900">Facturación</h1>
-                <p className="text-neutral-500 text-sm mt-0.5">Gestiona pagos, suscripciones y facturas</p>
+                <h1 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>Facturación</h1>
+                <p style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Suite completa de gestión de pagos, facturación y suscripciones</p>
               </div>
-              
-              <div className="flex items-center gap-3">
-                <button className="btn-secondary flex items-center gap-2">
-                  <Icon.Download className="w-4 h-4" />
-                  Exportar
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="bill-btn bill-btn-secondary" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {Icons.download} Exportar
                 </button>
-                <button className="btn-primary flex items-center gap-2">
-                  Configurar Stripe
+                <button className="bill-btn bill-btn-primary" onClick={loadBilling} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  ↻ Actualizar
                 </button>
               </div>
             </div>
-
             {/* Tabs */}
-            <div className="flex gap-1 mt-6 -mb-px">
-              {[
-                { id: "overview", label: "Resumen" },
-                { id: "invoices", label: "Facturas" },
-                { id: "plans", label: "Planes" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                  className={`tab-btn ${activeTab === tab.id ? "active" : ""}`}
-                >
-                  {tab.label}
+            <div style={{ display: "flex", gap: 4, marginTop: 20, borderBottom: "1px solid #f3f4f6" }}>
+              {([
+                { id: "overview" as const, label: "Resumen" },
+                { id: "invoices" as const, label: "Facturas" },
+                { id: "plans" as const, label: "Catálogo de Planes" },
+              ]).map(t => (
+                <button key={t.id} className={`bill-tab ${activeTab === t.id ? "active" : ""}`} onClick={() => setActiveTab(t.id)}>
+                  {t.label}
                 </button>
               ))}
             </div>
           </div>
         </header>
 
-        <main className="p-8 max-w-7xl mx-auto">
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* OVERVIEW TAB */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === "overview" && (
-            <>
-              {/* Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div className="stat-card">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="section-title" style={{ margin: 0 }}>MRR</span>
-                    <span className="badge badge-paid flex items-center gap-1">
-                      <Icon.TrendUp className="w-3 h-3" />
-                      +8%
-                    </span>
-                  </div>
-                  <p className="text-3xl font-semibold text-neutral-900">{formatCurrency(totalMRR)}</p>
-                  <p className="text-neutral-500 text-xs mt-1">ingresos mensuales recurrentes</p>
-                </div>
-
-                <div className="stat-card">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="section-title" style={{ margin: 0 }}>Pagados</span>
-                  </div>
-                  <p className="text-3xl font-semibold text-green-600">{paidCount}</p>
-                  <p className="text-neutral-500 text-xs mt-1">cuentas al día</p>
-                </div>
-
-                <div className="stat-card">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="section-title" style={{ margin: 0 }}>Pendientes</span>
-                  </div>
-                  <p className="text-3xl font-semibold text-amber-600">{pendingCount}</p>
-                  <p className="text-neutral-500 text-xs mt-1">esperando pago</p>
-                </div>
-
-                <div className="stat-card">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="section-title" style={{ margin: 0 }}>Vencidos</span>
-                    {overdueCount > 0 && (
-                      <Icon.AlertCircle className="w-4 h-4 text-red-500" />
-                    )}
-                  </div>
-                  <p className="text-3xl font-semibold text-red-600">{formatCurrency(overdueAmount)}</p>
-                  <p className="text-neutral-500 text-xs mt-1">{overdueCount} cuenta(s) vencida(s)</p>
-                </div>
-              </div>
-
-              {/* Accounts Table - Enhanced */}
-              <div className="glass-card overflow-hidden">
-                {/* Header with Filters */}
-                <div className="p-4 border-b border-neutral-100">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <h2 className="font-semibold text-neutral-900">Suscripciones</h2>
-                      <span className="text-xs bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full">
-                        {filteredCompanies.length} de {companies.length}
-                      </span>
-                    </div>
-                    
-                    {/* Advanced Filters */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* Search */}
-                      <div className="relative">
-                        <Icon.Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                        <input
-                          type="text"
-                          placeholder="Buscar empresa..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-9 pr-3 py-1.5 text-sm border border-neutral-200 rounded-lg bg-white focus:outline-none focus:border-neutral-400 focus:ring-1 focus:ring-neutral-200 w-48"
-                        />
-                      </div>
-                      
-                      {/* Plan Filter */}
-                      <select
-                        value={filterPlan}
-                        onChange={(e) => setFilterPlan(e.target.value)}
-                        className="px-3 py-1.5 text-sm border border-neutral-200 rounded-lg bg-white focus:outline-none focus:border-neutral-400 appearance-none cursor-pointer pr-8"
-                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px' }}
-                      >
-                        <option value="all">Todos los planes</option>
-                        <option value="starter">Starter</option>
-                        <option value="growth">Growth</option>
-                        <option value="enterprise">Enterprise</option>
-                      </select>
-                      
-                      {/* Status Filter */}
-                      <select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="px-3 py-1.5 text-sm border border-neutral-200 rounded-lg bg-white focus:outline-none focus:border-neutral-400 appearance-none cursor-pointer pr-8"
-                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px' }}
-                      >
-                        <option value="all">Todos los estados</option>
-                        <option value="paid">Pagado</option>
-                        <option value="pending">Pendiente</option>
-                        <option value="overdue">Vencido</option>
-                      </select>
-                      
-                      {/* Sort */}
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value)}
-                        className="px-3 py-1.5 text-sm border border-neutral-200 rounded-lg bg-white focus:outline-none focus:border-neutral-400 appearance-none cursor-pointer pr-8"
-                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px' }}
-                      >
-                        <option value="name">Ordenar: Nombre</option>
-                        <option value="amount">Ordenar: Monto</option>
-                        <option value="users">Ordenar: Usuarios</option>
-                        <option value="date">Ordenar: Próximo cobro</option>
-                      </select>
-                      
-                      {/* Clear Filters */}
-                      {(searchTerm || filterPlan !== "all" || filterStatus !== "all") && (
-                        <button
-                          onClick={() => { setSearchTerm(""); setFilterPlan("all"); setFilterStatus("all"); }}
-                          className="text-xs text-neutral-500 hover:text-neutral-700 px-2 py-1.5 hover:bg-neutral-100 rounded-lg transition-all"
-                        >
-                          Limpiar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Compact Table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr style={{ background: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
-                        <th className="text-left px-4 py-2.5 text-xs font-medium text-neutral-500 uppercase tracking-wider">Empresa</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-medium text-neutral-500 uppercase tracking-wider">Plan</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-medium text-neutral-500 uppercase tracking-wider">Estado</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-medium text-neutral-500 uppercase tracking-wider">Cobro</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-neutral-500 uppercase tracking-wider">MRR</th>
-                        <th className="text-center px-4 py-2.5 text-xs font-medium text-neutral-500 uppercase tracking-wider">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredCompanies.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-neutral-500 text-sm">
-                            No se encontraron empresas con los filtros aplicados
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredCompanies.map((company) => (
-                          <tr key={company.id} className="table-row group">
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2.5">
-                                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getCompanyGradient(company.name)} flex items-center justify-center text-white font-medium text-[10px]`}>
-                                  {getCompanyInitials(company.name)}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="font-medium text-neutral-900 text-sm truncate max-w-[180px]">{company.name}</p>
-                                  <div className="flex items-center gap-1.5 text-xs text-neutral-400">
-                                    <Icon.Users className="w-3 h-3" />
-                                    <span>{company.users}</span>
-                                    <span className="text-neutral-300">•</span>
-                                    <span className="truncate">{company.paymentMethod}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
-                                company.plan === 'enterprise' ? 'bg-purple-50 text-purple-700' :
-                                company.plan === 'growth' ? 'bg-blue-50 text-blue-700' :
-                                'bg-sky-50 text-sky-700'
-                              }`}>
-                                {company.plan === 'enterprise' && '⭐'}
-                                {company.plan.charAt(0).toUpperCase() + company.plan.slice(1)}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
-                                company.status === 'paid' ? 'bg-green-50 text-green-700' :
-                                company.status === 'pending' ? 'bg-amber-50 text-amber-700' :
-                                'bg-red-50 text-red-700'
-                              }`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${
-                                  company.status === 'paid' ? 'bg-green-500' :
-                                  company.status === 'pending' ? 'bg-amber-500' :
-                                  'bg-red-500'
-                                }`}></span>
-                                {company.status === "paid" ? "Pagado" : company.status === "pending" ? "Pendiente" : "Vencido"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`text-sm ${
-                                company.status === 'overdue' ? 'text-red-600 font-medium' : 'text-neutral-600'
-                              }`}>
-                                {formatDate(company.nextBilling)}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <span className="text-sm font-semibold text-neutral-900">{formatCurrency(company.amount)}</span>
-                              <p className="text-[10px] text-neutral-400">/mes</p>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center justify-center gap-1">
-                                <button 
-                                  onClick={() => setSelectedCompany(company)}
-                                  className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-all"
-                                  title="Ver detalles"
-                                >
-                                  <Icon.Eye className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-all"
-                                  title="Más opciones"
-                                >
-                                  <Icon.MoreVertical className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                
-                {/* Footer with Summary */}
-                <div className="px-4 py-3 border-t border-neutral-100 bg-neutral-50/50 flex items-center justify-between text-xs text-neutral-500">
-                  <span>
-                    Mostrando {filteredCompanies.length} empresa(s)
-                  </span>
-                  <span className="font-medium text-neutral-700">
-                    MRR Total: {formatCurrency(filteredCompanies.reduce((acc, c) => acc + c.amount, 0))}
-                  </span>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* INVOICES TAB */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === "invoices" && (
-            <div className="glass-card overflow-hidden">
-              <div className="p-5 border-b border-neutral-100 flex items-center justify-between">
-                <h2 className="font-semibold text-neutral-900">Historial de Facturas</h2>
-                <button className="btn-secondary flex items-center gap-2 text-sm py-2 px-4">
-                  <Icon.Download className="w-4 h-4" />
-                  Descargar Todo
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <th className="text-left px-5 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider">Factura</th>
-                      <th className="text-left px-5 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider">Empresa</th>
-                      <th className="text-left px-5 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider">Descripción</th>
-                      <th className="text-left px-5 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider">Fecha</th>
-                      <th className="text-left px-5 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider">Monto</th>
-                      <th className="text-left px-5 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider">Estado</th>
-                      <th className="text-right px-5 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wider"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoices.map((invoice) => (
-                      <tr key={invoice.id} className="table-row">
-                        <td className="px-5 py-4">
-                          <span className="text-sm font-medium text-neutral-900">{invoice.id}</span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="text-sm text-neutral-600">{invoice.companyName}</span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="text-sm text-neutral-500">{invoice.description}</span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="text-sm text-neutral-600">{formatDate(invoice.date)}</span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="text-sm font-medium text-neutral-900">{formatCurrency(invoice.amount)}</span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className={`badge badge-${invoice.status}`}>
-                            {invoice.status === "paid" ? "Pagada" : invoice.status === "pending" ? "Pendiente" : "Vencida"}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          <button className="text-neutral-600 hover:text-neutral-900 transition-all">
-                            <Icon.Download className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+        <main style={{ padding: "24px 32px", maxWidth: 1280, margin: "0 auto" }}>
+          {loading && (
+            <div style={{ textAlign: "center", padding: 60, color: "#9ca3af" }}>
+              <div style={{ fontSize: 14 }}>Cargando datos de facturación...</div>
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {/* PLANS TAB */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === "plans" && (
+          {error && (
+            <div style={{ textAlign: "center", padding: 40, color: "#dc2626", background: "#fef2f2", borderRadius: 12, marginBottom: 16 }}>
+              <p style={{ fontWeight: 500 }}>Error: {error}</p>
+              <button className="bill-btn bill-btn-secondary bill-btn-sm" onClick={loadBilling} style={{ marginTop: 8 }}>Reintentar</button>
+            </div>
+          )}
+
+          {!loading && !error && (
             <>
-              {/* Admin Notice */}
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-                <p className="text-sm text-blue-700">
-                  <strong>Vista de Administrador:</strong> Estos son los planes disponibles para asignar a tus clientes. Los precios están en USD.
-                </p>
-              </div>
-
-              <div className="text-center mb-10">
-                <h2 className="text-2xl font-semibold text-neutral-900 mb-2">Catálogo de Planes</h2>
-                <p className="text-neutral-500">Starter / Growth / Enterprise — Planes disponibles para asignar a cuentas de clientes</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                {plans.map((plan) => (
-                  <div key={plan.id} className={`plan-card ${plan.popular ? "popular" : ""}`}>
-                    <div className="mb-6">
-                      <h3 className="text-xl font-semibold text-neutral-900 mb-1">{plan.name}</h3>
-                      <p className="text-neutral-500 text-sm">{plan.description}</p>
-                    </div>
-
-                    <div className="mb-2">
-                      <span className="text-4xl font-bold text-neutral-900">
-                        {plan.price !== null ? formatCurrency(plan.price) : "Custom"}
-                      </span>
-                      <span className="text-neutral-500">{plan.period}</span>
-                    </div>
-                    <p className="text-xs text-neutral-400 mb-6">
-                      {plan.id === "starter" && "Anual: $3,200 USD (ahorra 11%)"}
-                      {plan.id === "growth" && "Anual: $9,600 USD (ahorra 11%)"}
-                      {plan.id === "enterprise" && "Desde $28,000 USD/año • Precio negociable"}
-                    </p>
-
-                    <div className="mb-6 pb-6 border-b border-neutral-100">
-                      <div className="flex items-center gap-2 text-sm text-neutral-600 mb-2">
-                        <Icon.Users className="w-4 h-4" />
-                        {plan.users}
+              {/* ══════════════════════════════════════ */}
+              {/* TAB: OVERVIEW                         */}
+              {/* ══════════════════════════════════════ */}
+              {activeTab === "overview" && (
+                <>
+                  {/* Stats Grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
+                    <div className="bill-stat">
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af" }}>MRR</span>
+                        <span style={{ color: "#16a34a", display: "flex", alignItems: "center", gap: 2, fontSize: 11, fontWeight: 600 }}>{Icons.trendUp}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-neutral-600">
-                        <Icon.CreditCard className="w-4 h-4" />
-                        {plan.programs}
+                      <p style={{ fontSize: 28, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>{stats ? fmtCurrency(stats.mrr) : "—"}</p>
+                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Ingresos mensuales recurrentes</p>
+                    </div>
+
+                    <div className="bill-stat">
+                      <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", display: "block", marginBottom: 8 }}>ARR</span>
+                      <p style={{ fontSize: 28, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>{stats ? fmtCurrency(stats.arr) : "—"}</p>
+                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Ingresos anuales recurrentes</p>
+                    </div>
+
+                    <div className="bill-stat">
+                      <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", display: "block", marginBottom: 8 }}>CLIENTES ACTIVOS</span>
+                      <p style={{ fontSize: 28, fontWeight: 600, color: "#16a34a", margin: 0 }}>{stats?.active ?? 0}</p>
+                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>de {stats?.total_clients ?? 0} totales</p>
+                    </div>
+
+                    <div className="bill-stat">
+                      <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", display: "block", marginBottom: 8 }}>EN TRIAL</span>
+                      <p style={{ fontSize: 28, fontWeight: 600, color: "#2563eb", margin: 0 }}>{stats?.trial ?? 0}</p>
+                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>cuentas en período de prueba</p>
+                    </div>
+
+                    <div className="bill-stat">
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af" }}>VENCIDAS</span>
+                        {(stats?.overdue ?? 0) > 0 && <span style={{ color: "#dc2626" }}>{Icons.alert}</span>}
+                      </div>
+                      <p style={{ fontSize: 28, fontWeight: 600, color: (stats?.overdue ?? 0) > 0 ? "#dc2626" : "#1a1a1a", margin: 0 }}>{stats?.overdue ?? 0}</p>
+                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>requieren atención</p>
+                    </div>
+
+                    <div className="bill-stat">
+                      <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", display: "block", marginBottom: 8 }}>USUARIOS TOTALES</span>
+                      <p style={{ fontSize: 28, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>{stats?.total_users ?? 0}</p>
+                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{stats?.total_programs ?? 0} programas activos</p>
+                    </div>
+                  </div>
+
+                  {/* Plan breakdown */}
+                  {stats?.by_plan && Object.keys(stats.by_plan).length > 0 && (
+                    <div className="bill-card" style={{ marginBottom: 24, padding: 20 }}>
+                      <p className="bill-section-title">Distribución por Plan</p>
+                      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                        {Object.entries(stats.by_plan).map(([plan, data]) => (
+                          <div key={plan} style={{ flex: 1, minWidth: 160, padding: 16, background: "#f9fafb", borderRadius: 10 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                              <span className={`bill-badge bill-badge-${plan === "trial" ? "trial-plan" : plan}`}>{planLabel[plan] || plan}</span>
+                            </div>
+                            <p style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>{data.count} <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 400 }}>cuentas</span></p>
+                            <p style={{ fontSize: 13, color: "#6b7280", margin: 0 }}>{fmtCurrency(data.revenue)}/mes</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Client Table */}
+                  <div className="bill-card">
+                    <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Suscripciones</h2>
+                        <span style={{ fontSize: 11, background: "#f3f4f6", color: "#6b7280", padding: "2px 8px", borderRadius: 10 }}>{filtered.length}</span>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                        <div style={{ position: "relative" }}>
+                          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }}>{Icons.search}</span>
+                          <input className="bill-input" placeholder="Buscar empresa..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 32, width: 200 }} />
+                        </div>
+                        <select className="bill-select" value={filterPlan} onChange={e => setFilterPlan(e.target.value)}>
+                          <option value="all">Todos los planes</option>
+                          <option value="trial">Trial</option>
+                          <option value="starter">Starter</option>
+                          <option value="growth">Growth</option>
+                          <option value="enterprise">Enterprise</option>
+                        </select>
+                        <select className="bill-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                          <option value="all">Todos los estados</option>
+                          <option value="active">Activas</option>
+                          <option value="trial">Trial</option>
+                          <option value="overdue">Vencidas</option>
+                          <option value="cancelled">Canceladas</option>
+                        </select>
+                        <select className="bill-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                          <option value="name">Nombre</option>
+                          <option value="amount">Monto</option>
+                          <option value="users">Usuarios</option>
+                          <option value="date">Fecha</option>
+                        </select>
                       </div>
                     </div>
 
-                    <ul className="space-y-3 mb-8">
-                      {plan.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm text-neutral-600">
-                          <Icon.Check className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr style={{ background: "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
+                            <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>Empresa</th>
+                            <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>Plan</th>
+                            <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>Estado</th>
+                            <th style={{ textAlign: "center", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>Usuarios</th>
+                            <th style={{ textAlign: "center", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>Programas</th>
+                            <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>MRR</th>
+                            <th style={{ textAlign: "center", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filtered.length === 0 ? (
+                            <tr><td colSpan={7} style={{ textAlign: "center", padding: "32px 16px", color: "#9ca3af", fontSize: 13 }}>No se encontraron cuentas</td></tr>
+                          ) : filtered.map(c => (
+                            <tr key={c.id} className="bill-row" onClick={() => setSelected(c)}>
+                              <td style={{ padding: "12px 16px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                  <div style={{ width: 34, height: 34, borderRadius: 8, background: gradient(c.name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
+                                    {initials(c.name)}
+                                  </div>
+                                  <div style={{ minWidth: 0 }}>
+                                    <p style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{c.name}</p>
+                                    <p style={{ fontSize: 11, color: "#9ca3af", margin: 0 }}>{c.contact_email || c.corp_id || "—"}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ padding: "12px 16px" }}>
+                                <span className={`bill-badge bill-badge-${c.plan === "trial" ? "trial-plan" : c.plan}`}>
+                                  {c.plan === "enterprise" && "⭐ "}{planLabel[c.plan] || c.plan}
+                                </span>
+                              </td>
+                              <td style={{ padding: "12px 16px" }}>
+                                <span className={`bill-badge bill-badge-${c.billing_status}`}>
+                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.billing_status === "active" ? "#16a34a" : c.billing_status === "trial" ? "#2563eb" : c.billing_status === "overdue" ? "#dc2626" : "#6b7280" }}></span>
+                                  {statusLabel[c.billing_status] || c.billing_status}
+                                </span>
+                              </td>
+                              <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                                <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{c.total_users}</span>
+                                <span style={{ fontSize: 11, color: "#9ca3af" }}>/{c.max_users}</span>
+                              </td>
+                              <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                                <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{c.total_programs}</span>
+                                <span style={{ fontSize: 11, color: "#9ca3af" }}>/{c.max_programs}</span>
+                              </td>
+                              <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                                <p style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>{fmtCurrency(c.amount)}</p>
+                                <p style={{ fontSize: 10, color: "#9ca3af", margin: 0 }}>/mes</p>
+                              </td>
+                              <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                                <div style={{ display: "flex", justifyContent: "center", gap: 4 }} onClick={e => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => setSelected(c)}
+                                    style={{ padding: 6, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", color: "#6b7280" }}
+                                    title="Ver detalle"
+                                  >
+                                    {Icons.eye}
+                                  </button>
+                                  <button
+                                    onClick={() => { setInvoiceTarget(c); setShowInvoiceModal(true); }}
+                                    style={{ padding: 6, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", color: "#6b7280" }}
+                                    title="Emitir factura"
+                                  >
+                                    {Icons.receipt}
+                                  </button>
+                                  <button
+                                    onClick={() => { setPaymentTarget(c); setShowPaymentModal(true); }}
+                                    style={{ padding: 6, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", color: "#6b7280" }}
+                                    title="Orden de pago"
+                                  >
+                                    {Icons.dollar}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
 
-                    <button className={plan.popular ? "btn-primary w-full" : "btn-secondary w-full"}>
-                      {plan.id === "enterprise" ? "Ver Detalles" : "Asignar a Cliente"}
+                    {/* Footer */}
+                    <div style={{ padding: "12px 20px", borderTop: "1px solid #f3f4f6", background: "#fafafa", display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b7280" }}>
+                      <span>{filtered.length} cuenta(s)</span>
+                      <span style={{ fontWeight: 500, color: "#374151" }}>MRR Total: {fmtCurrency(filtered.reduce((s, c) => s + c.amount, 0))}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* ══════════════════════════════════════ */}
+              {/* TAB: INVOICES                         */}
+              {/* ══════════════════════════════════════ */}
+              {activeTab === "invoices" && (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Facturas Emitidas</h2>
+                    <button className="bill-btn bill-btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => { setInvoiceTarget(clients[0] || null); setShowInvoiceModal(true); }}>
+                      {Icons.plus} Nueva Factura
                     </button>
                   </div>
-                ))}
-              </div>
 
-              {/* Feature Comparison Table */}
-              <div className="glass-card overflow-hidden mb-8">
-                <div className="p-5 border-b border-neutral-100">
-                  <h3 className="font-semibold text-neutral-900">Comparativa de Planes (Precios en USD)</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr style={{ background: '#fafafa' }}>
-                        <th className="text-left px-5 py-3 text-xs font-medium text-neutral-500 uppercase">Feature</th>
-                        <th className="text-center px-5 py-3 text-xs font-medium text-neutral-500 uppercase">Starter</th>
-                        <th className="text-center px-5 py-3 text-xs font-medium text-neutral-500 uppercase">Growth ⭐</th>
-                        <th className="text-center px-5 py-3 text-xs font-medium text-neutral-500 uppercase">Enterprise</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                      <tr>
-                        <td className="px-5 py-3 text-sm text-neutral-600">Precio/mes (USD)</td>
-                        <td className="px-5 py-3 text-center text-sm font-medium">$299</td>
-                        <td className="px-5 py-3 text-center text-sm font-medium text-blue-600">$899</td>
-                        <td className="px-5 py-3 text-center text-sm font-medium">Custom</td>
-                      </tr>
-                      <tr>
-                        <td className="px-5 py-3 text-sm text-neutral-600">Precio/año (USD)</td>
-                        <td className="px-5 py-3 text-center text-sm font-medium">$3,200</td>
-                        <td className="px-5 py-3 text-center text-sm font-medium text-blue-600">$9,600</td>
-                        <td className="px-5 py-3 text-center text-sm font-medium">$28,000+</td>
-                      </tr>
-                      <tr>
-                        <td className="px-5 py-3 text-sm text-neutral-600">Usuarios máx.</td>
-                        <td className="px-5 py-3 text-center text-sm">20</td>
-                        <td className="px-5 py-3 text-center text-sm">80</td>
-                        <td className="px-5 py-3 text-center text-sm">Ilimitado</td>
-                      </tr>
-                      <tr>
-                        <td className="px-5 py-3 text-sm text-neutral-600">Programas</td>
-                        <td className="px-5 py-3 text-center text-sm">1</td>
-                        <td className="px-5 py-3 text-center text-sm">3</td>
-                        <td className="px-5 py-3 text-center text-sm">Ilimitado</td>
-                      </tr>
-                      <tr>
-                        <td className="px-5 py-3 text-sm text-neutral-600">Matching IA</td>
-                        <td className="px-5 py-3 text-center"><span className="text-neutral-400 text-sm">Básico</span></td>
-                        <td className="px-5 py-3 text-center"><span className="text-green-600 text-sm">Avanzado</span></td>
-                        <td className="px-5 py-3 text-center"><span className="text-green-600 text-sm">+ Custom rules</span></td>
-                      </tr>
-                      <tr>
-                        <td className="px-5 py-3 text-sm text-neutral-600">API</td>
-                        <td className="px-5 py-3 text-center"><Icon.X className="w-4 h-4 text-neutral-300 mx-auto" /></td>
-                        <td className="px-5 py-3 text-center"><Icon.Check className="w-4 h-4 text-green-500 mx-auto" /></td>
-                        <td className="px-5 py-3 text-center"><span className="text-green-600 text-sm">+ Webhooks</span></td>
-                      </tr>
-                      <tr>
-                        <td className="px-5 py-3 text-sm text-neutral-600">SSO</td>
-                        <td className="px-5 py-3 text-center"><Icon.X className="w-4 h-4 text-neutral-300 mx-auto" /></td>
-                        <td className="px-5 py-3 text-center"><Icon.Check className="w-4 h-4 text-green-500 mx-auto" /></td>
-                        <td className="px-5 py-3 text-center"><span className="text-green-600 text-sm">+ SAML/SCIM</span></td>
-                      </tr>
-                      <tr>
-                        <td className="px-5 py-3 text-sm text-neutral-600">White-label</td>
-                        <td className="px-5 py-3 text-center"><Icon.X className="w-4 h-4 text-neutral-300 mx-auto" /></td>
-                        <td className="px-5 py-3 text-center"><span className="text-neutral-400 text-sm">Logo/color</span></td>
-                        <td className="px-5 py-3 text-center"><span className="text-green-600 text-sm">Completo</span></td>
-                      </tr>
-                      <tr>
-                        <td className="px-5 py-3 text-sm text-neutral-600">Soporte</td>
-                        <td className="px-5 py-3 text-center text-sm">Email 72hr</td>
-                        <td className="px-5 py-3 text-center text-sm">24hr + AM</td>
-                        <td className="px-5 py-3 text-center text-sm">24/7 + CSM</td>
-                      </tr>
-                      <tr>
-                        <td className="px-5 py-3 text-sm text-neutral-600">SLA</td>
-                        <td className="px-5 py-3 text-center"><Icon.X className="w-4 h-4 text-neutral-300 mx-auto" /></td>
-                        <td className="px-5 py-3 text-center"><Icon.X className="w-4 h-4 text-neutral-300 mx-auto" /></td>
-                        <td className="px-5 py-3 text-center"><span className="text-green-600 text-sm">99.9%</span></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                  {createdInvoices.length === 0 ? (
+                    <div className="bill-card" style={{ padding: 48, textAlign: "center" }}>
+                      <div style={{ fontSize: 40, marginBottom: 12 }}>📄</div>
+                      <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 4 }}>No hay facturas emitidas aún</p>
+                      <p style={{ fontSize: 12, color: "#9ca3af" }}>Emite tu primera factura desde la pestaña Resumen o con el botón &quot;Nueva Factura&quot;</p>
+                    </div>
+                  ) : (
+                    <div className="bill-card">
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <thead>
+                            <tr style={{ background: "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
+                              <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase" }}>N° Factura</th>
+                              <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase" }}>Empresa</th>
+                              <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase" }}>Descripción</th>
+                              <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase" }}>Vencimiento</th>
+                              <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase" }}>Monto</th>
+                              <th style={{ textAlign: "center", padding: "10px 16px", fontSize: 11, fontWeight: 500, color: "#6b7280", textTransform: "uppercase" }}>Estado</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {createdInvoices.map(inv => (
+                              <tr key={inv.invoice_id} className="bill-row">
+                                <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500 }}>{inv.invoice_id}</td>
+                                <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{inv.company_name}</td>
+                                <td style={{ padding: "12px 16px", fontSize: 13, color: "#6b7280" }}>{inv.description}</td>
+                                <td style={{ padding: "12px 16px", fontSize: 13, color: "#6b7280" }}>{fmtDate(inv.due_date)}</td>
+                                <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, textAlign: "right" }}>{fmtCurrency(inv.amount)}</td>
+                                <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                                  <span className={`bill-badge bill-badge-${inv.status}`}>
+                                    {inv.status === "paid" ? "Pagada" : inv.status === "pending" ? "Pendiente" : "Vencida"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
 
-              {/* Economics Info for Admin */}
-              <div className="glass-card p-6 mb-8">
-                <h3 className="font-semibold text-neutral-900 mb-4">📊 Métricas de Negocio (Vista Admin)</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="p-4 bg-neutral-50 rounded-xl">
-                    <p className="text-xs text-neutral-500 mb-1">LTV Starter (3 años)</p>
-                    <p className="text-xl font-semibold text-neutral-900">$10,560 USD</p>
-                    <p className="text-xs text-neutral-400">Renewal 85%</p>
-                  </div>
-                  <div className="p-4 bg-neutral-50 rounded-xl">
-                    <p className="text-xs text-neutral-500 mb-1">LTV Growth (4 años)</p>
-                    <p className="text-xl font-semibold text-neutral-900">$42,240 USD</p>
-                    <p className="text-xs text-neutral-400">Renewal 92%</p>
-                  </div>
-                  <div className="p-4 bg-neutral-50 rounded-xl">
-                    <p className="text-xs text-neutral-500 mb-1">LTV Enterprise (5 años)</p>
-                    <p className="text-xl font-semibold text-neutral-900">$168,000 USD</p>
-                    <p className="text-xs text-neutral-400">Renewal 95%</p>
+                  {/* Quick-invoice from client list */}
+                  <div style={{ marginTop: 24 }}>
+                    <p className="bill-section-title">Emitir factura rápida a cliente</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                      {clients.filter(c => c.amount > 0).map(c => (
+                        <div key={c.id} className="bill-card" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: 8, background: gradient(c.name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 10, fontWeight: 600 }}>
+                              {initials(c.name)}
+                            </div>
+                            <div>
+                              <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>{c.name}</p>
+                              <p style={{ fontSize: 11, color: "#9ca3af", margin: 0 }}>{planLabel[c.plan]} · {fmtCurrency(c.amount)}/mes</p>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <button className="bill-btn bill-btn-secondary bill-btn-sm" onClick={() => { setInvoiceTarget(c); setShowInvoiceModal(true); }}>Factura</button>
+                            <button className="bill-btn bill-btn-secondary bill-btn-sm" onClick={() => { setPaymentTarget(c); setShowPaymentModal(true); }}>O. Pago</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="glass-card p-6 text-center">
-                <p className="text-neutral-600 mb-2">
-                  <strong>¿Cliente requiere plan personalizado?</strong>
-                </p>
-                <p className="text-sm text-neutral-500 mb-4">
-                  Para clientes Enterprise con +1,000 usuarios o requerimientos especiales
-                </p>
-                <button className="btn-primary">
-                  Crear Propuesta Custom
-                </button>
-              </div>
+              {/* ══════════════════════════════════════ */}
+              {/* TAB: PLANS                            */}
+              {/* ══════════════════════════════════════ */}
+              {activeTab === "plans" && (
+                <>
+                  <div style={{ background: "#eff6ff", border: "1px solid #dbeafe", borderRadius: 12, padding: 16, marginBottom: 24 }}>
+                    <p style={{ fontSize: 13, color: "#1d4ed8", margin: 0 }}><strong>Vista de Administrador:</strong> Estos son los planes disponibles para asignar a tus clientes. Precios en USD.</p>
+                  </div>
+
+                  <div style={{ textAlign: "center", marginBottom: 32 }}>
+                    <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 6px" }}>Catálogo de Planes</h2>
+                    <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>Starter / Growth / Enterprise</p>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, marginBottom: 32 }}>
+                    {plans.map(p => (
+                      <div key={p.id} className={`bill-plan-card ${p.popular ? "popular" : ""}`}>
+                        <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>{p.name}</h3>
+                        <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>{p.description}</p>
+                        <div style={{ marginBottom: 4 }}>
+                          <span style={{ fontSize: 32, fontWeight: 700 }}>{p.price ? fmtCurrency(p.price) : "Custom"}</span>
+                          <span style={{ color: "#9ca3af" }}>{p.period}</span>
+                        </div>
+                        <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: 20 }}>Anual: {p.annual}</p>
+                        <div style={{ padding: "12px 0", borderTop: "1px solid #f3f4f6", borderBottom: "1px solid #f3f4f6", marginBottom: 16 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#374151", marginBottom: 4 }}>{Icons.users} {p.users}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#374151" }}>{Icons.program} {p.programs}</div>
+                        </div>
+                        <ul style={{ listStyle: "none", padding: 0, margin: "0 0 20px" }}>
+                          {p.features.map((f, i) => (
+                            <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 13, color: "#374151", padding: "4px 0" }}>
+                              <span style={{ color: "#10b981", flexShrink: 0, marginTop: 1 }}>{Icons.check}</span>
+                              {f}
+                            </li>
+                          ))}
+                        </ul>
+                        <button className={p.popular ? "bill-btn bill-btn-primary" : "bill-btn bill-btn-secondary"} style={{ width: "100%" }}>
+                          {p.id === "enterprise" ? "Ver Detalles" : "Asignar a Cliente"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Comparison table */}
+                  <div className="bill-card" style={{ marginBottom: 24 }}>
+                    <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
+                      <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Comparativa de Planes (USD)</h3>
+                    </div>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr style={{ background: "#fafafa" }}>
+                            <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, color: "#6b7280", fontWeight: 500 }}>Feature</th>
+                            <th style={{ textAlign: "center", padding: "10px 16px", fontSize: 11, color: "#6b7280", fontWeight: 500 }}>Starter</th>
+                            <th style={{ textAlign: "center", padding: "10px 16px", fontSize: 11, color: "#6b7280", fontWeight: 500 }}>Growth ⭐</th>
+                            <th style={{ textAlign: "center", padding: "10px 16px", fontSize: 11, color: "#6b7280", fontWeight: 500 }}>Enterprise</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[
+                            ["Precio/mes", "$299", "$899", "Custom"],
+                            ["Precio/año", "$3,200", "$9,600", "$28,000+"],
+                            ["Usuarios", "20", "80", "Ilimitado"],
+                            ["Programas", "1", "3", "Ilimitado"],
+                            ["Matching IA", "Básico", "Avanzado", "Custom"],
+                            ["API", "✕", "✓", "✓ + Webhooks"],
+                            ["SSO", "✕", "✓", "SAML/SCIM"],
+                            ["White-label", "✕", "Logo/color", "Completo"],
+                            ["Soporte", "Email 72hr", "24hr + AM", "24/7 + CSM"],
+                            ["SLA", "✕", "✕", "99.9%"],
+                          ].map(([feat, s, g, e], i) => (
+                            <tr key={i} style={{ borderBottom: "1px solid #f5f5f5" }}>
+                              <td style={{ padding: "10px 16px", fontSize: 13, color: "#374151" }}>{feat}</td>
+                              <td style={{ padding: "10px 16px", fontSize: 13, textAlign: "center", color: s === "✕" ? "#d1d5db" : "#374151" }}>{s}</td>
+                              <td style={{ padding: "10px 16px", fontSize: 13, textAlign: "center", color: g === "✕" ? "#d1d5db" : "#2563eb", fontWeight: 500 }}>{g}</td>
+                              <td style={{ padding: "10px 16px", fontSize: 13, textAlign: "center", color: "#374151" }}>{e}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
             </>
           )}
         </main>
 
-        {/* ══════════════════════════════════════════════════════════════ */}
-        {/* COMPANY DETAIL MODAL */}
-        {/* ══════════════════════════════════════════════════════════════ */}
-        {selectedCompany && (
-          <div className="modal-overlay" onClick={() => setSelectedCompany(null)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getCompanyGradient(selectedCompany.name)} flex items-center justify-center text-white font-medium text-sm`}>
-                    {getCompanyInitials(selectedCompany.name)}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* MODAL: Client Detail                                      */}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {selected && (
+          <div className="bill-modal-overlay" onClick={() => setSelected(null)}>
+            <div className="bill-modal" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div style={{ padding: "20px 24px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: gradient(selected.name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 600, fontSize: 13 }}>
+                    {initials(selected.name)}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-neutral-900">{selectedCompany.name}</h3>
-                    <span className={`badge badge-${selectedCompany.plan}`}>
-                      {selectedCompany.plan.charAt(0).toUpperCase() + selectedCompany.plan.slice(1)}
-                    </span>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>{selected.name}</h3>
+                    <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                      <span className={`bill-badge bill-badge-${selected.plan === "trial" ? "trial-plan" : selected.plan}`}>{planLabel[selected.plan]}</span>
+                      <span className={`bill-badge bill-badge-${selected.billing_status}`}>{statusLabel[selected.billing_status]}</span>
+                    </div>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setSelectedCompany(null)}
-                  className="p-2 hover:bg-neutral-100 rounded-lg transition-all"
-                >
-                  <Icon.X className="w-5 h-5 text-neutral-500" />
-                </button>
+                <button onClick={() => setSelected(null)} style={{ padding: 8, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: "#9ca3af" }}>{Icons.x}</button>
               </div>
 
-              <div className="p-6 space-y-6">
-                {/* Subscription Info */}
-                <div>
-                  <h4 className="section-title">Información de Suscripción</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-neutral-50 rounded-xl">
-                      <p className="text-xs text-neutral-500 mb-1">Plan Actual</p>
-                      <p className="font-medium text-neutral-900">{selectedCompany.plan.charAt(0).toUpperCase() + selectedCompany.plan.slice(1)}</p>
+              <div style={{ padding: 24 }}>
+                {/* Suscripción */}
+                <p className="bill-section-title">Suscripción & Contrato</p>
+                <div className="bill-detail-grid" style={{ marginBottom: 24 }}>
+                  <div className="bill-detail-item">
+                    <label>Plan Actual</label>
+                    <span>{planLabel[selected.plan] || selected.plan}</span>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>Monto Mensual</label>
+                    <span>{fmtCurrency(selected.amount)}</span>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>Fecha de Activación</label>
+                    <span>{fmtDate(selected.created_at)}</span>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>Inicio Contrato</label>
+                    <span>{fmtDate(selected.contract_start)}</span>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>Fin Contrato</label>
+                    <span>{fmtDate(selected.contract_end)}</span>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>ID Corporativo</label>
+                    <span>{selected.corp_id || "—"}</span>
+                  </div>
+                </div>
+
+                {/* Datos legales */}
+                <p className="bill-section-title">Datos de Facturación</p>
+                <div className="bill-detail-grid" style={{ marginBottom: 24 }}>
+                  <div className="bill-detail-item">
+                    <label>Razón Social</label>
+                    <span>{selected.legal_name || "—"}</span>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>RUT / Tax ID</label>
+                    <span>{selected.rut || "—"}</span>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>País</label>
+                    <span>{selected.country || "—"}</span>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>Ciudad</label>
+                    <span>{selected.city || "—"}</span>
+                  </div>
+                </div>
+
+                {/* Contacto */}
+                <p className="bill-section-title">Contacto Principal</p>
+                <div className="bill-detail-grid" style={{ marginBottom: 24 }}>
+                  <div className="bill-detail-item" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div>
+                      <label>Nombre</label>
+                      <span>{selected.contact_name || "—"}</span>
                     </div>
-                    <div className="p-4 bg-neutral-50 rounded-xl">
-                      <p className="text-xs text-neutral-500 mb-1">Monto Mensual</p>
-                      <p className="font-medium text-neutral-900">{formatCurrency(selectedCompany.amount)}</p>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>Cargo</label>
+                    <span>{selected.contact_position || "—"}</span>
+                  </div>
+                  <div className="bill-detail-item" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {Icons.mail}
+                    <div>
+                      <label>Email</label>
+                      <span>{selected.contact_email || "—"}</span>
                     </div>
-                    <div className="p-4 bg-neutral-50 rounded-xl">
-                      <p className="text-xs text-neutral-500 mb-1">Próximo Cobro</p>
-                      <p className="font-medium text-neutral-900">{formatDate(selectedCompany.nextBilling)}</p>
-                    </div>
-                    <div className="p-4 bg-neutral-50 rounded-xl">
-                      <p className="text-xs text-neutral-500 mb-1">Usuarios Activos</p>
-                      <p className="font-medium text-neutral-900">{selectedCompany.users}</p>
+                  </div>
+                  <div className="bill-detail-item" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {Icons.phone}
+                    <div>
+                      <label>Teléfono</label>
+                      <span>{selected.contact_phone || "—"}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Payment Method */}
-                <div>
-                  <h4 className="section-title">Método de Pago</h4>
-                  <div className="p-4 bg-neutral-50 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Icon.CreditCard className="w-5 h-5 text-neutral-400" />
-                      <span className="text-sm text-neutral-900">{selectedCompany.paymentMethod}</span>
-                    </div>
-                    <button className="text-sm text-neutral-600 hover:text-neutral-900">Cambiar</button>
-                  </div>
-                </div>
-
-                {/* Recent Invoices */}
-                <div>
-                  <h4 className="section-title">Facturas Recientes</h4>
-                  <div className="space-y-2">
-                    {invoices
-                      .filter(inv => inv.companyId === selectedCompany.id)
-                      .slice(0, 3)
-                      .map((invoice) => (
-                        <div key={invoice.id} className="p-3 bg-neutral-50 rounded-xl flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-neutral-900">{invoice.id}</p>
-                            <p className="text-xs text-neutral-500">{formatDate(invoice.date)}</p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-medium">{formatCurrency(invoice.amount)}</span>
-                            <span className={`badge badge-${invoice.status}`}>
-                              {invoice.status === "paid" ? "Pagada" : invoice.status === "pending" ? "Pendiente" : "Vencida"}
-                            </span>
-                          </div>
+                {/* Usuarios por rol */}
+                <p className="bill-section-title">Desglose de Usuarios ({selected.total_users}/{selected.max_users})</p>
+                <div style={{ background: "#f9fafb", borderRadius: 10, padding: 16, marginBottom: 24 }}>
+                  {Object.entries(selected.users_by_role).map(([role, count]) => {
+                    const pct = selected.max_users > 0 ? (count / selected.max_users) * 100 : 0;
+                    return (
+                      <div key={role} className="bill-role-bar">
+                        <span className="bill-role-dot" style={{ background: roleColors[role] || "#6b7280" }}></span>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: "#374151", flex: 1 }}>{roleLabels[role] || role}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", minWidth: 24, textAlign: "right" }}>{count}</span>
+                        <div style={{ width: 80, height: 6, borderRadius: 3, background: "#e5e7eb", overflow: "hidden", marginLeft: 8 }}>
+                          <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", borderRadius: 3, background: roleColors[role] || "#6b7280", transition: "width 0.3s ease" }}></div>
                         </div>
-                      ))}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Programas */}
+                <p className="bill-section-title">Programas ({selected.total_programs}/{selected.max_programs})</p>
+                {selected.programs.length === 0 ? (
+                  <div style={{ background: "#f9fafb", borderRadius: 10, padding: 20, textAlign: "center", marginBottom: 24 }}>
+                    <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>Sin programas activos</p>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gap: 8, marginBottom: 24 }}>
+                    {selected.programs.map(prog => (
+                      <div key={prog.id} style={{ background: "#f9fafb", borderRadius: 10, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>{prog.name}</p>
+                          <p style={{ fontSize: 11, color: "#9ca3af", margin: 0 }}>{prog.theme || "Sin temática"} · Creado {fmtDate(prog.created_at)}</p>
+                        </div>
+                        <span className={`bill-badge ${prog.status === "active" ? "bill-badge-active" : prog.status === "draft" ? "bill-badge-pending" : "bill-badge-cancelled"}`}>
+                          {prog.status === "active" ? "Activo" : prog.status === "draft" ? "Borrador" : prog.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Plan Limits & Features */}
+                <p className="bill-section-title">Límites del Plan</p>
+                <div className="bill-detail-grid" style={{ marginBottom: 24 }}>
+                  <div className="bill-detail-item">
+                    <label>Máx. Usuarios</label>
+                    <span>{selected.plan_limits?.max_users ?? "—"}</span>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>Máx. Programas</label>
+                    <span>{selected.plan_limits?.max_programs ?? "—"}</span>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>Máx. Participantes</label>
+                    <span>{selected.plan_limits?.max_participants ?? "—"}</span>
+                  </div>
+                  <div className="bill-detail-item">
+                    <label>Tipo de Cuenta</label>
+                    <span style={{ textTransform: "capitalize" }}>{selected.account_type}</span>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3">
-                  <button className="btn-secondary flex-1">Cambiar Plan</button>
-                  <button className="btn-primary flex-1">Ver Todas las Facturas</button>
+                <div style={{ display: "flex", gap: 8, paddingTop: 8 }}>
+                  <button className="bill-btn bill-btn-secondary" style={{ flex: 1 }} onClick={() => { setInvoiceTarget(selected); setShowInvoiceModal(true); }}>
+                    Emitir Factura
+                  </button>
+                  <button className="bill-btn bill-btn-primary" style={{ flex: 1 }} onClick={() => { setPaymentTarget(selected); setShowPaymentModal(true); }}>
+                    Orden de Pago
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* MODAL: New Invoice                                        */}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {showInvoiceModal && (
+          <div className="bill-modal-overlay" onClick={() => setShowInvoiceModal(false)}>
+            <div className="bill-modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: "20px 24px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Emitir Factura</h3>
+                <button onClick={() => setShowInvoiceModal(false)} style={{ padding: 6, border: "none", background: "transparent", cursor: "pointer", color: "#9ca3af" }}>{Icons.x}</button>
+              </div>
+              <div style={{ padding: 24 }}>
+                {/* Client selector */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>Cliente</label>
+                  <select className="bill-select" style={{ width: "100%" }} value={invoiceTarget?.id || ""} onChange={e => setInvoiceTarget(clients.find(c => c.id === e.target.value) || null)}>
+                    <option value="">Seleccionar cliente...</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name} — {planLabel[c.plan]} ({fmtCurrency(c.amount)}/mes)</option>)}
+                  </select>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>Monto (USD) — dejar vacío para usar precio del plan</label>
+                  <input className="bill-input" type="number" placeholder={invoiceTarget ? String(invoiceTarget.amount) : "0"} value={invoiceForm.amount} onChange={e => setInvoiceForm(p => ({ ...p, amount: e.target.value }))} />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>Descripción</label>
+                  <input className="bill-input" placeholder="Plan Growth - Marzo 2025" value={invoiceForm.description} onChange={e => setInvoiceForm(p => ({ ...p, description: e.target.value }))} />
+                </div>
+                <div style={{ marginBottom: 24 }}>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>Fecha de vencimiento</label>
+                  <input className="bill-input" type="date" value={invoiceForm.due_date} onChange={e => setInvoiceForm(p => ({ ...p, due_date: e.target.value }))} />
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="bill-btn bill-btn-secondary" style={{ flex: 1 }} onClick={() => setShowInvoiceModal(false)}>Cancelar</button>
+                  <button className="bill-btn bill-btn-primary" style={{ flex: 1 }} onClick={handleCreateInvoice} disabled={!invoiceTarget}>Emitir Factura</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* MODAL: Payment Order                                      */}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {showPaymentModal && (
+          <div className="bill-modal-overlay" onClick={() => setShowPaymentModal(false)}>
+            <div className="bill-modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: "20px 24px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Orden de Pago</h3>
+                <button onClick={() => setShowPaymentModal(false)} style={{ padding: 6, border: "none", background: "transparent", cursor: "pointer", color: "#9ca3af" }}>{Icons.x}</button>
+              </div>
+              <div style={{ padding: 24 }}>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>Cliente</label>
+                  <select className="bill-select" style={{ width: "100%" }} value={paymentTarget?.id || ""} onChange={e => setPaymentTarget(clients.find(c => c.id === e.target.value) || null)}>
+                    <option value="">Seleccionar cliente...</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name} — {planLabel[c.plan]}</option>)}
+                  </select>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>Monto (USD)</label>
+                  <input className="bill-input" type="number" placeholder={paymentTarget ? String(paymentTarget.amount) : "0"} value={paymentForm.amount} onChange={e => setPaymentForm(p => ({ ...p, amount: e.target.value }))} />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>Concepto</label>
+                  <input className="bill-input" placeholder="Suscripción Growth" value={paymentForm.concept} onChange={e => setPaymentForm(p => ({ ...p, concept: e.target.value }))} />
+                </div>
+                <div style={{ marginBottom: 24 }}>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>Fecha de vencimiento</label>
+                  <input className="bill-input" type="date" value={paymentForm.due_date} onChange={e => setPaymentForm(p => ({ ...p, due_date: e.target.value }))} />
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="bill-btn bill-btn-secondary" style={{ flex: 1 }} onClick={() => setShowPaymentModal(false)}>Cancelar</button>
+                  <button className="bill-btn bill-btn-primary" style={{ flex: 1 }} onClick={handleCreatePayment} disabled={!paymentTarget}>Crear Orden</button>
                 </div>
               </div>
             </div>

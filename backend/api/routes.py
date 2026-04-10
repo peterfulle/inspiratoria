@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import os
 from typing import Optional, List
 import django
+
+# Django setup MUST happen before importing any Django models/views
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mentorloop_clone.settings")
+django.setup()
 
 from django.db import IntegrityError
 from django.db import models as django_models
@@ -20,6 +25,7 @@ from api.schemas import (
     SentimentOut,
     NotificationIn,
     NotificationOut,
+    NotificationBroadcast,
     NotificationMarkRead,
     GoalIn,
     GoalOut,
@@ -36,6 +42,8 @@ from api.schemas import (
     UserOut,
     UserIn,
     UserUpdateIn,
+    ProgramTemplateIn,
+    ProgramTemplateOut,
 )
 from programs.models import Match, Participant, Program, Sentiment, Notification, Goal, KeyResult, GoalUpdate
 from programs.services.matching import create_match_with_score
@@ -46,14 +54,216 @@ from companies.views import router as companies_router
 # Import programs router
 from programs.views import router as programs_router
 
-django.setup()
-
 router = APIRouter()
 
 # Include companies/onboarding routes
 router.include_router(companies_router)
 # Include programs routes
 router.include_router(programs_router)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# PROGRAM TEMPLATES CRUD — shared across all users
+# ═══════════════════════════════════════════════════════════════════
+
+def _slugify(text: str) -> str:
+    import re
+    slug = text.lower().strip()
+    slug = re.sub(r'[áàäâ]', 'a', slug)
+    slug = re.sub(r'[éèëê]', 'e', slug)
+    slug = re.sub(r'[íìïî]', 'i', slug)
+    slug = re.sub(r'[óòöô]', 'o', slug)
+    slug = re.sub(r'[úùüû]', 'u', slug)
+    slug = re.sub(r'[ñ]', 'n', slug)
+    slug = re.sub(r'[^a-z0-9]+', '-', slug)
+    slug = slug.strip('-')
+    return slug or 'programa'
+
+
+@router.get("/program-templates", response_model=List[ProgramTemplateOut])
+def list_program_templates():
+    from programs.models import ProgramTemplate
+    templates = ProgramTemplate.objects.all()
+    return [
+        {
+            "id": str(t.id),
+            "slug": t.slug,
+            "name": t.name,
+            "description": t.description,
+            "category": t.category,
+            "duration": t.duration,
+            "status": t.status,
+            "modules": t.modules or [],
+            "milestones": t.milestones or [],
+            "tags": t.tags or [],
+            "mentorRequirements": t.mentor_requirements or {},
+            "menteeRequirements": t.mentee_requirements or {},
+            "matchingRules": t.matching_rules or {},
+            "sessionRules": t.session_rules or {},
+            "createdAt": t.created_at.strftime("%Y-%m-%d"),
+            "updatedAt": t.updated_at.strftime("%Y-%m-%d"),
+            "createdBy": t.created_by.email if t.created_by else None,
+        }
+        for t in templates
+    ]
+
+
+@router.post("/program-templates", response_model=ProgramTemplateOut, status_code=201)
+def create_program_template(data: ProgramTemplateIn):
+    from programs.models import ProgramTemplate
+    import time
+
+    slug = data.slug or _slugify(data.name)
+    # Ensure unique slug
+    base_slug = slug
+    counter = 1
+    while ProgramTemplate.objects.filter(slug=slug).exists():
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+
+    t = ProgramTemplate.objects.create(
+        slug=slug,
+        name=data.name,
+        description=data.description or "",
+        category=data.category or "leadership",
+        duration=data.duration or "",
+        status=data.status or "draft",
+        modules=data.modules or [],
+        milestones=data.milestones or [],
+        tags=data.tags or [],
+        mentor_requirements=data.mentorRequirements or {},
+        mentee_requirements=data.menteeRequirements or {},
+        matching_rules=data.matchingRules or {},
+        session_rules=data.sessionRules or {},
+    )
+    return {
+        "id": str(t.id),
+        "slug": t.slug,
+        "name": t.name,
+        "description": t.description,
+        "category": t.category,
+        "duration": t.duration,
+        "status": t.status,
+        "modules": t.modules or [],
+        "milestones": t.milestones or [],
+        "tags": t.tags or [],
+        "mentorRequirements": t.mentor_requirements or {},
+        "menteeRequirements": t.mentee_requirements or {},
+        "matchingRules": t.matching_rules or {},
+        "sessionRules": t.session_rules or {},
+        "createdAt": t.created_at.strftime("%Y-%m-%d"),
+        "updatedAt": t.updated_at.strftime("%Y-%m-%d"),
+        "createdBy": None,
+    }
+
+
+@router.put("/program-templates/{template_id}", response_model=ProgramTemplateOut)
+def update_program_template(template_id: str, data: ProgramTemplateIn):
+    from programs.models import ProgramTemplate
+    try:
+        t = ProgramTemplate.objects.get(id=template_id)
+    except ProgramTemplate.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Template no encontrado")
+
+    t.name = data.name
+    t.description = data.description or ""
+    t.category = data.category or t.category
+    t.duration = data.duration or ""
+    t.status = data.status or t.status
+    t.modules = data.modules or []
+    t.milestones = data.milestones or []
+    t.tags = data.tags or []
+    t.mentor_requirements = data.mentorRequirements or {}
+    t.mentee_requirements = data.menteeRequirements or {}
+    t.matching_rules = data.matchingRules or {}
+    t.session_rules = data.sessionRules or {}
+
+    if data.slug and data.slug != t.slug:
+        t.slug = data.slug
+
+    t.save()
+    return {
+        "id": str(t.id),
+        "slug": t.slug,
+        "name": t.name,
+        "description": t.description,
+        "category": t.category,
+        "duration": t.duration,
+        "status": t.status,
+        "modules": t.modules or [],
+        "milestones": t.milestones or [],
+        "tags": t.tags or [],
+        "mentorRequirements": t.mentor_requirements or {},
+        "menteeRequirements": t.mentee_requirements or {},
+        "matchingRules": t.matching_rules or {},
+        "sessionRules": t.session_rules or {},
+        "createdAt": t.created_at.strftime("%Y-%m-%d"),
+        "updatedAt": t.updated_at.strftime("%Y-%m-%d"),
+        "createdBy": t.created_by.email if t.created_by else None,
+    }
+
+
+@router.delete("/program-templates/{template_id}", status_code=204)
+def delete_program_template(template_id: str):
+    from programs.models import ProgramTemplate
+    try:
+        t = ProgramTemplate.objects.get(id=template_id)
+    except ProgramTemplate.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Template no encontrado")
+    t.delete()
+    return None
+
+
+@router.post("/program-templates/{template_id}/duplicate", response_model=ProgramTemplateOut, status_code=201)
+def duplicate_program_template(template_id: str):
+    from programs.models import ProgramTemplate
+    try:
+        t = ProgramTemplate.objects.get(id=template_id)
+    except ProgramTemplate.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Template no encontrado")
+
+    new_name = f"{t.name} (Copia)"
+    new_slug = _slugify(new_name)
+    base_slug = new_slug
+    counter = 1
+    while ProgramTemplate.objects.filter(slug=new_slug).exists():
+        new_slug = f"{base_slug}-{counter}"
+        counter += 1
+
+    dup = ProgramTemplate.objects.create(
+        slug=new_slug,
+        name=new_name,
+        description=t.description,
+        category=t.category,
+        duration=t.duration,
+        status="draft",
+        modules=t.modules,
+        milestones=t.milestones,
+        tags=t.tags,
+        mentor_requirements=t.mentor_requirements,
+        mentee_requirements=t.mentee_requirements,
+        matching_rules=t.matching_rules,
+        session_rules=t.session_rules,
+    )
+    return {
+        "id": str(dup.id),
+        "slug": dup.slug,
+        "name": dup.name,
+        "description": dup.description,
+        "category": dup.category,
+        "duration": dup.duration,
+        "status": dup.status,
+        "modules": dup.modules or [],
+        "milestones": dup.milestones or [],
+        "tags": dup.tags or [],
+        "mentorRequirements": dup.mentor_requirements or {},
+        "menteeRequirements": dup.mentee_requirements or {},
+        "matchingRules": dup.matching_rules or {},
+        "sessionRules": dup.session_rules or {},
+        "createdAt": dup.created_at.strftime("%Y-%m-%d"),
+        "updatedAt": dup.updated_at.strftime("%Y-%m-%d"),
+        "createdBy": None,
+    }
 
 
 @router.get("/health")
@@ -116,6 +326,55 @@ def list_programs(company_id: Optional[str] = None) -> List[dict]:
     return result
 
 
+# ═══════════════════════════════════════════════════════════════════
+# EMAIL NOTIFICATION HELPER
+# ═══════════════════════════════════════════════════════════════════
+
+def _send_program_assignment_email(company, program):
+    """Send email to company's contact when a program is assigned."""
+    from django.core.mail import send_mail
+    from django.conf import settings
+
+    # Find company email: contact_email > studio account email
+    recipient = getattr(company, 'contact_email', '') or ''
+    if not recipient:
+        # Try studio account generated_email
+        try:
+            from companies.models import StudioAccount
+            sa = StudioAccount.objects.filter(company=company).first()
+            if sa:
+                recipient = sa.generated_email
+        except Exception:
+            pass
+
+    if not recipient:
+        print(f"[EMAIL] No email found for company {company.name} — skipping notification")
+        return
+
+    subject = f"Nuevo programa asignado: {program.name}"
+    message = (
+        f"Hola {company.name},\n\n"
+        f"Se te ha asignado un nuevo programa de mentoría en Inspiratoria.\n\n"
+        f"📋 Programa: {program.name}\n"
+        f"📝 Descripción: {program.description or 'Sin descripción'}\n"
+        f"🏷️ Tema: {program.theme or 'General'}\n\n"
+        f"Ingresa a tu panel de control para ver los detalles y comenzar.\n\n"
+        f"— Equipo Inspiratoria"
+    )
+
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[recipient],
+            fail_silently=True,
+        )
+        print(f"[EMAIL] Notification sent to {recipient} for program '{program.name}'")
+    except Exception as e:
+        print(f"[EMAIL] Error sending email: {e}")
+
+
 @router.post("/programs", response_model=ProgramOut, status_code=201)
 def create_program(payload: ProgramIn) -> dict:
     from companies.models import Company
@@ -166,6 +425,10 @@ def create_program(payload: ProgramIn) -> dict:
     
     print(f"[DEBUG] Programa creado - ID: {program.id}, company_id: {program.company_id}")
     
+    # ─── SEND EMAIL NOTIFICATION ───
+    if company:
+        _send_program_assignment_email(company, program)
+    
     # Obtener actividades creadas
     activities = Activity.objects.filter(program=program)
     activities_data = [
@@ -200,7 +463,7 @@ def create_program(payload: ProgramIn) -> dict:
 
 @router.get("/programs/{program_id}", response_model=ProgramOut)
 def get_program(program_id: str) -> dict:
-    from programs.models import Activity, Content
+    from programs.models import Activity, Content, ProgramParticipant
     import uuid
     
     try:
@@ -219,9 +482,9 @@ def get_program(program_id: str) -> dict:
                     "title": m.title,
                     "description": m.description or "",
                     "order": m.order,
-                    "duration_minutes": 60,  # Default por ahora
-                    "requires_evaluation": False,  # Default por ahora
-                    "minimum_score": 70,  # Default por ahora
+                    "duration_minutes": 60,
+                    "requires_evaluation": False,
+                    "minimum_score": 70,
                     "is_published": m.is_published,
                     "materials_url": m.materials_url or "",
                 }
@@ -229,7 +492,7 @@ def get_program(program_id: str) -> dict:
             ]
             
             # Determinar categoría unificada
-            category = "mentoria"  # default
+            category = "mentoria"
             if a.activity_type == "training" and a.training_category:
                 category = a.training_category
             elif a.activity_type == "event" and a.event_category:
@@ -246,14 +509,22 @@ def get_program(program_id: str) -> dict:
                 "end_date": a.end_date.isoformat() if a.end_date else None,
                 "modality": a.modality or "online",
                 "target_role": a.target_role or "both",
-                "is_mandatory": a.has_modules,  # Usamos has_modules como proxy
+                "is_mandatory": a.has_modules,
                 "is_certificate_issued": a.provides_certification or a.provides_participation_certificate,
                 "meeting_url": a.meeting_url or "",
                 "location_address": a.location_address or "",
                 "capacity": None,
                 "modules": modules_data,
+                "confirmed_count": a.confirmed_count,
+                "attendance_count": a.attendance_count,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
             }
             activities_data.append(activity_data)
+        
+        # Count participants
+        participants_count = ProgramParticipant.objects.filter(
+            program=program, deleted_at__isnull=True
+        ).count()
         
         return {
             "id": str(program.id),
@@ -268,6 +539,10 @@ def get_program(program_id: str) -> dict:
             "status": program.status,
             "activities": activities_data,
             "activities_count": len(activities_data),
+            "participants_count": participants_count,
+            "requires_certification": program.requires_certification,
+            "created_at": program.created_at.isoformat() if program.created_at else None,
+            "updated_at": program.updated_at.isoformat() if program.updated_at else None,
         }
     except Program.DoesNotExist as exc:
         raise HTTPException(status_code=404, detail="Program not found") from exc
@@ -865,8 +1140,8 @@ def get_all_sentiments() -> List[Sentiment]:
 
 # ============= NOTIFICATIONS ENDPOINTS =============
 
-@router.get("/notifications/user/{user_id}", response_model=List[NotificationOut])
-def get_user_notifications(user_id: str, unread_only: bool = False) -> List[Notification]:
+@router.get("/notifications/user/{user_id}")
+def get_user_notifications(user_id: str, unread_only: bool = False) -> list:
     """Obtener notificaciones de un usuario"""
     import uuid
     from companies.models import User
@@ -875,7 +1150,6 @@ def get_user_notifications(user_id: str, unread_only: bool = False) -> List[Noti
     try:
         recipient_uuid = uuid.UUID(user_id)
     except ValueError:
-        # If not a UUID, try to find user by numeric ID (for compatibility)
         try:
             user = User.objects.get(id=user_id)
             recipient_uuid = user.id
@@ -885,7 +1159,25 @@ def get_user_notifications(user_id: str, unread_only: bool = False) -> List[Noti
     query = Notification.objects.filter(recipient_id=recipient_uuid)
     if unread_only:
         query = query.filter(is_read=False)
-    return list(query.select_related("match", "milestone")[:50])  # Últimas 50
+    notifications = list(query.select_related("sender", "match", "milestone")[:50])
+    
+    result = []
+    for n in notifications:
+        result.append({
+            "id": n.id,
+            "recipient_id": str(n.recipient_id),
+            "sender_id": str(n.sender_id) if n.sender_id else None,
+            "sender_name": (n.sender.full_name or n.sender.email) if n.sender else None,
+            "notification_type": n.notification_type,
+            "title": n.title,
+            "message": n.message,
+            "link": n.link,
+            "is_read": n.is_read,
+            "created_at": n.created_at.isoformat(),
+            "match_id": n.match_id,
+            "milestone_id": n.milestone_id,
+        })
+    return result
 
 
 @router.post("/notifications", response_model=NotificationOut, status_code=201)
@@ -903,6 +1195,30 @@ def create_notification(payload: NotificationIn) -> Notification:
     return notification
 
 
+@router.post("/notifications/broadcast", status_code=201)
+def broadcast_notification(payload: NotificationBroadcast) -> dict:
+    """Enviar notificación a todos los usuarios internos de Inspiratoria"""
+    from companies.models import User
+
+    INTERNAL_ROLES = [
+        "superadmin", "admin_root", "inspiratoria_admin", "admin",
+        "coordinator", "facilitator_internal", "facilitator_inspiratoria",
+    ]
+    internal_users = User.objects.filter(role__in=INTERNAL_ROLES, is_active=True)
+    created = []
+    for user in internal_users:
+        n = Notification.objects.create(
+            recipient_id=user.id,
+            sender_id=payload.sender_id,
+            notification_type=payload.notification_type,
+            title=payload.title,
+            message=payload.message,
+            link=payload.link,
+        )
+        created.append(n.id)
+    return {"status": "sent", "recipients": len(created), "notification_ids": created}
+
+
 @router.post("/notifications/mark-read")
 def mark_notifications_read(payload: NotificationMarkRead) -> dict[str, str]:
     """Marcar notificaciones como leídas"""
@@ -911,7 +1227,7 @@ def mark_notifications_read(payload: NotificationMarkRead) -> dict[str, str]:
 
 
 @router.get("/notifications/unread-count/{user_id}")
-def get_unread_count(user_id: int) -> dict[str, int]:
+def get_unread_count(user_id: str) -> dict[str, int]:
     """Obtener cantidad de notificaciones no leídas"""
     count = Notification.objects.filter(recipient_id=user_id, is_read=False).count()
     return {"unread_count": count}
@@ -2820,14 +3136,17 @@ def list_users():
             "id": str(user.id),
             "username": user.username,
             "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
+            "nombre": user.first_name or user.full_name.split(' ')[0] if user.full_name else user.first_name,
+            "apellidos": user.last_name or (' '.join(user.full_name.split(' ')[1:]) if user.full_name else user.last_name),
+            "telefono": getattr(user, 'phone', '') or '',
             "role": user.role,
             "is_active": user.is_active,
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
             "date_joined": user.date_joined.isoformat(),
             "last_login": user.last_login.isoformat() if user.last_login else None,
+            "company": user.company.name if user.company else None,
+            "is_onboarded": user.is_onboarded,
             "can_manage_clients": user.can_manage_clients,
             "can_manage_programs": user.can_manage_programs,
             "can_manage_users": user.can_manage_users,
@@ -2929,9 +3248,9 @@ def create_user(user_data: UserIn):
             username=user_data.username,
             email=user_data.email,
             password=user_data.password,
-            first_name=user_data.first_name,
-            last_name=user_data.last_name,
-            full_name=f"{user_data.first_name} {user_data.last_name}",
+            first_name=user_data.nombre,
+            last_name=user_data.apellidos,
+            full_name=f"{user_data.nombre} {user_data.apellidos}",
             role=user_data.role,
             is_staff=permissions["is_staff"],
             is_superuser=permissions["is_superuser"],
@@ -2948,14 +3267,17 @@ def create_user(user_data: UserIn):
             "id": str(user.id),
             "username": user.username,
             "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
+            "nombre": user.first_name,
+            "apellidos": user.last_name,
+            "telefono": getattr(user, 'phone', '') or '',
             "role": user.role,
             "is_active": user.is_active,
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
             "date_joined": user.date_joined.isoformat(),
             "last_login": user.last_login.isoformat() if user.last_login else None,
+            "company": user.company.name if user.company else None,
+            "is_onboarded": user.is_onboarded,
             "can_manage_clients": user.can_manage_clients,
             "can_manage_programs": user.can_manage_programs,
             "can_manage_users": user.can_manage_users,
@@ -2979,10 +3301,12 @@ def update_user(user_id: str, user_data: UserUpdateIn):
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     # Actualizar campos básicos
-    if user_data.first_name is not None:
-        user.first_name = user_data.first_name
-    if user_data.last_name is not None:
-        user.last_name = user_data.last_name
+    if user_data.nombre is not None:
+        user.first_name = user_data.nombre
+    if user_data.apellidos is not None:
+        user.last_name = user_data.apellidos
+    if user_data.telefono is not None:
+        user.phone = user_data.telefono
     if user_data.email is not None:
         # Verificar que el email no esté en uso por otro usuario
         if User.objects.filter(email=user_data.email).exclude(id=user_id).exists():
@@ -3075,14 +3399,17 @@ def update_user(user_id: str, user_data: UserUpdateIn):
         "id": str(user.id),
         "username": user.username,
         "email": user.email,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
+        "nombre": user.first_name,
+        "apellidos": user.last_name,
+        "telefono": getattr(user, 'phone', '') or '',
         "role": user.role,
         "is_active": user.is_active,
         "is_staff": user.is_staff,
         "is_superuser": user.is_superuser,
         "date_joined": user.date_joined.isoformat(),
         "last_login": user.last_login.isoformat() if user.last_login else None,
+        "company": user.company.name if user.company else None,
+        "is_onboarded": user.is_onboarded,
         "can_manage_clients": user.can_manage_clients,
         "can_manage_programs": user.can_manage_programs,
         "can_manage_users": user.can_manage_users,
@@ -3120,5 +3447,16 @@ def delete_user(user_id: str):
 from invitations.views import router as invitations_router
 
 api_app = FastAPI(title="Mentoring Platform API", version="0.1.0")
+
+from starlette.middleware.cors import CORSMiddleware
+api_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount all routers (Starlette already mounts this app at /api)
 api_app.include_router(router)
 api_app.include_router(invitations_router)

@@ -280,6 +280,7 @@ class UserUpdateRequest(BaseModel):
     phone: Optional[str] = None
     avatar_url: Optional[str] = None
     is_onboarded: Optional[bool] = None
+    view_permissions: Optional[List[str]] = None
 
 
 class UserListResponse(BaseModel):
@@ -344,3 +345,91 @@ class AssignProgramRequest(BaseModel):
     """Request para asignar un programa a una empresa"""
     program_id: uuid.UUID
     company_id: uuid.UUID
+
+
+# ============ ADMIN USER MANAGEMENT WITH OTP ============
+
+class AdminCreateUserRequest(BaseModel):
+    """Admin crea usuario con envío de OTP por email"""
+    email: EmailStr
+    full_name: str = Field(..., min_length=2, max_length=200)
+    role: str
+    company_id: Optional[uuid.UUID] = None
+    position: Optional[str] = None
+    department: Optional[str] = None
+    phone: Optional[str] = None
+    view_permissions: Optional[List[str]] = None
+
+    @validator('role')
+    def validate_role(cls, v):
+        valid_roles = [
+            'client', 'admin', 'facilitator_internal',
+            'facilitator_inspiratoria', 'mentor', 'mentee',
+            'inspiratoria_admin', 'participant', 'coordinator',
+        ]
+        if v not in valid_roles:
+            raise ValueError(f'Rol inválido. Debe ser uno de: {", ".join(valid_roles)}')
+        return v
+
+
+class VerifyOTPRequest(BaseModel):
+    """Verificar OTP y establecer contraseña"""
+    email: str
+    otp: str = Field(..., min_length=4, max_length=4)
+    password: str = Field(..., min_length=8)
+    full_name: Optional[str] = None
+
+
+class RequestLoginOTPRequest(BaseModel):
+    """Solicitar OTP para login"""
+    email: EmailStr
+
+
+class LoginOTPRequest(BaseModel):
+    """Login con OTP"""
+    email: EmailStr
+    otp: str = Field(..., min_length=4, max_length=4)
+    remember: bool = False  # Sesión persistente 72h
+
+
+class TOTPSetupRequest(BaseModel):
+    """Solicitar configuración TOTP (Authenticator app)"""
+    pass  # Se autentica vía Header token
+
+
+class TOTPVerifyRequest(BaseModel):
+    """Verificar código TOTP para activar 2FA"""
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class TOTPLoginRequest(BaseModel):
+    """Login con código TOTP de app autenticadora"""
+    email: EmailStr
+    totp_code: str = Field(..., min_length=6, max_length=6)
+    remember: bool = False
+
+
+class TOTPCheckRequest(BaseModel):
+    """Verificar si un email tiene TOTP habilitado"""
+    email: EmailStr
+
+
+class AdminUserResponse(BaseModel):
+    """Respuesta con datos de usuario creado por admin"""
+    id: uuid.UUID
+    username: str
+    email: str
+    full_name: str
+    role: str
+    company_id: Optional[uuid.UUID]
+    position: Optional[str]
+    department: Optional[str]
+    phone: Optional[str]
+    is_active: bool
+    is_account_activated: bool
+    is_onboarded: bool
+    view_permissions: Optional[List[str]] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

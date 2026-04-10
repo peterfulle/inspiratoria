@@ -3,65 +3,1521 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
-// ─── SVG Icons ───
-const IconBolt = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-  </svg>
-);
-const IconSparkles = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9.937 15.5A2 2 0 008.5 14.063l-6.135-1.582a.5.5 0 010-.962L8.5 9.936A2 2 0 009.937 8.5l1.582-6.135a.5.5 0 01.962 0L14.063 8.5A2 2 0 0015.5 9.937l6.135 1.582a.5.5 0 010 .962L15.5 14.063a2 2 0 00-1.437 1.437l-1.582 6.135a.5.5 0 01-.962 0z" />
-  </svg>
-);
-const IconInbox = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
-    <path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" />
-  </svg>
-);
-const IconArrow = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-  </svg>
-);
-const IconUsers = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
-    <path d="M22 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
-  </svg>
-);
-const IconBuilding = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-    <rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01M16 6h.01M12 6h.01M8 10h.01M16 10h.01M12 10h.01M8 14h.01M16 14h.01M12 14h.01" />
-  </svg>
-);
-const IconSearch = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
-const IconCalendar = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-  </svg>
-);
-const IconMail = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7" />
-  </svg>
-);
-const IconChevronRight = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="9 18 15 12 9 6" />
-  </svg>
-);
-const IconPlus = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-  </svg>
-);
+// ============================================================================
+// ICONS (same style as dashboard)
+// ============================================================================
+const Icons = {
+  search: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  ),
+  grid: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+    </svg>
+  ),
+  list: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  ),
+  building: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  ),
+  users: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  ),
+  program: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+    </svg>
+  ),
+  arrow: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
+    </svg>
+  ),
+  check: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+  ),
+  clock: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  pause: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  plus: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+    </svg>
+  ),
+  eye: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  ),
+  edit: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+    </svg>
+  ),
+  activity: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+    </svg>
+  ),
+  inbox: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" />
+    </svg>
+  ),
+  mail: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <rect x="2" y="4" width="20" height="16" rx="2" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7" />
+    </svg>
+  ),
+};
 
+// ============================================================================
+// STYLES (matching dashboard UX exactly)
+// ============================================================================
+const styles = `
+  .acc-container {
+    min-height: 100vh;
+    background: #fafafa;
+    padding: 2rem;
+  }
+
+  .acc-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+  }
+
+  .acc-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 0.25rem;
+  }
+
+  .acc-subtitle {
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+
+  .acc-title-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    background: #f3f4f6;
+    color: #6b7280;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 9999px;
+    margin-left: 0.75rem;
+  }
+
+  /* Stats Cards - same as dashboard */
+  .acc-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .acc-stat-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+  }
+
+  .acc-stat-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+
+  .acc-stat-value {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  .acc-stat-sub {
+    font-size: 0.75rem;
+    color: #10b981;
+    margin-top: 0.25rem;
+  }
+
+  /* Solicitudes Banner */
+  .acc-solicitudes {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    margin-bottom: 1.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .acc-solicitudes:hover {
+    border-color: #1a1a1a;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  .acc-solicitudes-icon {
+    position: relative;
+    width: 2.5rem;
+    height: 2.5rem;
+    background: #1a1a1a;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .acc-solicitudes-badge {
+    position: absolute;
+    top: -0.375rem;
+    right: -0.375rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    background: #ef4444;
+    color: white;
+    font-size: 0.625rem;
+    font-weight: 700;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .acc-solicitudes-info {
+    flex: 1;
+  }
+
+  .acc-solicitudes-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  .acc-solicitudes-desc {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.125rem;
+  }
+
+  .acc-solicitudes-arrow {
+    color: #9ca3af;
+    transition: color 0.15s ease;
+  }
+
+  .acc-solicitudes:hover .acc-solicitudes-arrow {
+    color: #1a1a1a;
+  }
+
+  /* Glass Card - Toolbar */
+  .acc-toolbar {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .acc-toolbar-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .acc-search-container {
+    position: relative;
+    flex: 1;
+    max-width: 320px;
+  }
+
+  .acc-search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+  }
+
+  .acc-search-input {
+    width: 100%;
+    padding: 0.5rem 3.5rem 0.5rem 2.25rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    background: #fafafa;
+    transition: all 0.15s ease;
+  }
+
+  .acc-search-input:focus {
+    outline: none;
+    border-color: #1a1a1a;
+    background: white;
+  }
+
+  .acc-kbd {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0.125rem 0.375rem;
+    background: #f3f4f6;
+    color: #9ca3af;
+    font-size: 0.625rem;
+    font-family: monospace;
+    border-radius: 0.25rem;
+  }
+
+  .acc-filter-tabs {
+    display: flex;
+    gap: 0.25rem;
+    background: #f3f4f6;
+    padding: 0.25rem;
+    border-radius: 0.5rem;
+  }
+
+  .acc-filter-tab {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #6b7280;
+    background: transparent;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .acc-filter-tab:hover {
+    color: #1a1a1a;
+  }
+
+  .acc-filter-tab.active {
+    background: white;
+    color: #1a1a1a;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .acc-sort-select {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+    background: #fafafa;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .acc-sort-select:focus {
+    outline: none;
+    border-color: #1a1a1a;
+  }
+
+  .acc-view-toggle {
+    display: flex;
+    gap: 0.25rem;
+    background: #f3f4f6;
+    padding: 0.25rem;
+    border-radius: 0.5rem;
+  }
+
+  .acc-view-btn {
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 0.375rem;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .acc-view-btn:hover {
+    color: #1a1a1a;
+  }
+
+  .acc-view-btn.active {
+    background: white;
+    color: #1a1a1a;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .acc-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #1a1a1a;
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .acc-btn-primary:hover {
+    background: #2d2d2d;
+  }
+
+  .acc-solicitudes-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+    background: transparent;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .acc-solicitudes-link:hover {
+    border-color: #1a1a1a;
+    color: #1a1a1a;
+  }
+
+  /* Results count */
+  .acc-results {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Company List - same as dashboard */
+  .acc-company-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .acc-company-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .acc-company-row:hover {
+    border-color: #d1d5db;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  .acc-company-avatar {
+    width: 2.5rem;
+    height: 2.5rem;
+    background: #f3f4f6;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #1a1a1a;
+    flex-shrink: 0;
+  }
+
+  .acc-company-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .acc-company-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .acc-company-meta {
+    font-size: 0.75rem;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.125rem;
+  }
+
+  .acc-company-meta-icon {
+    display: inline-flex;
+    align-items: center;
+    color: #9ca3af;
+  }
+
+  .acc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.625rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    border-radius: 9999px;
+  }
+
+  .acc-badge-type-studio {
+    background: #ede9fe;
+    color: #5b21b6;
+  }
+
+  .acc-badge-type-core {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .acc-badge-plan {
+    background: #ede9fe;
+    color: #5b21b6;
+  }
+
+  .acc-badge-active {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .acc-badge-trial {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .acc-badge-inactive {
+    background: #f3f4f6;
+    color: #6b7280;
+  }
+
+  .acc-company-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+    min-width: 70px;
+  }
+
+  .acc-company-date {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    min-width: 80px;
+    text-align: right;
+  }
+
+  .acc-pm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 90px;
+    justify-content: center;
+  }
+
+  .acc-pm-badge.assigned {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .acc-pm-badge.assigned:hover {
+    background: #bfdbfe;
+  }
+
+  .acc-pm-badge.unassigned {
+    background: #f3f4f6;
+    color: #9ca3af;
+    cursor: default;
+  }
+
+  .acc-pm-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .acc-pm-dot.on { background: #3b82f6; }
+  .acc-pm-dot.off { background: #d1d5db; }
+
+  /* PM Modal */
+  .pm-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pmFadeIn 0.15s ease;
+  }
+
+  @keyframes pmFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .pm-modal {
+    background: white;
+    border-radius: 1rem;
+    width: 560px;
+    max-width: 95vw;
+    max-height: 85vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+    animation: pmSlideUp 0.2s ease;
+  }
+
+  @keyframes pmSlideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .pm-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .pm-modal-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  .pm-modal-close {
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f3f4f6;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    font-size: 1rem;
+    transition: all 0.15s ease;
+  }
+
+  .pm-modal-close:hover {
+    background: #e5e7eb;
+    color: #1a1a1a;
+  }
+
+  .pm-modal-profile {
+    display: flex;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .pm-modal-avatar {
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 0.75rem;
+    background: #1a1a1a;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1.125rem;
+    flex-shrink: 0;
+  }
+
+  .pm-modal-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pm-modal-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  .pm-modal-role {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.125rem;
+  }
+
+  .pm-modal-contact {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .pm-modal-contact-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+  }
+
+  .pm-modal-tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .pm-modal-tab {
+    padding: 0.75rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #6b7280;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s ease;
+  }
+
+  .pm-modal-tab:hover {
+    color: #1a1a1a;
+  }
+
+  .pm-modal-tab.active {
+    color: #1a1a1a;
+    border-bottom-color: #1a1a1a;
+  }
+
+  .pm-modal-body {
+    padding: 1.25rem 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+    max-height: 400px;
+  }
+
+  .pm-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .pm-stat-card {
+    background: #fafafa;
+    border: 1px solid #f3f4f6;
+    border-radius: 0.625rem;
+    padding: 0.875rem;
+    text-align: center;
+  }
+
+  .pm-stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  .pm-stat-label {
+    font-size: 0.6875rem;
+    color: #6b7280;
+    margin-top: 0.125rem;
+  }
+
+  .pm-section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+  }
+
+  .pm-account-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .pm-account-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 0.875rem;
+    background: #fafafa;
+    border: 1px solid #f3f4f6;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .pm-account-item:hover {
+    background: #f3f4f6;
+    border-color: #e5e7eb;
+  }
+
+  .pm-account-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #1a1a1a;
+  }
+
+  .pm-account-plan {
+    font-size: 0.625rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    background: #ede9fe;
+    color: #5b21b6;
+  }
+
+  .pm-action-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .pm-action-item {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid #f9fafb;
+  }
+
+  .pm-action-item:last-child {
+    border-bottom: none;
+  }
+
+  .pm-action-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #d1d5db;
+    margin-top: 0.375rem;
+    flex-shrink: 0;
+  }
+
+  .pm-action-dot.pm_assign { background: #3b82f6; }
+  .pm-action-dot.status_change { background: #10b981; }
+  .pm-action-dot.plan_change { background: #8b5cf6; }
+  .pm-action-dot.info_update { background: #f59e0b; }
+  .pm-action-dot.account_created { background: #06b6d4; }
+  .pm-action-dot.account_approved { background: #10b981; }
+  .pm-action-dot.contract_update { background: #ec4899; }
+
+  .pm-action-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pm-action-desc {
+    font-size: 0.8125rem;
+    color: #1a1a1a;
+  }
+
+  .pm-action-meta {
+    font-size: 0.6875rem;
+    color: #9ca3af;
+    margin-top: 0.125rem;
+  }
+
+  .pm-empty {
+    text-align: center;
+    padding: 2rem;
+    color: #9ca3af;
+    font-size: 0.8125rem;
+  }
+
+  .pm-loading {
+    text-align: center;
+    padding: 2rem;
+    color: #9ca3af;
+    font-size: 0.8125rem;
+  }
+
+  .acc-company-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .acc-company-row:hover .acc-company-actions {
+    opacity: 1;
+  }
+
+  .acc-action-btn {
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f3f4f6;
+    border: none;
+    border-radius: 0.375rem;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .acc-action-btn:hover {
+    background: #e5e7eb;
+    color: #1a1a1a;
+  }
+
+  /* Grid View - same as dashboard */
+  .acc-company-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  .acc-company-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .acc-company-card:hover {
+    border-color: #d1d5db;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  .acc-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .acc-card-badges {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .acc-card-stats {
+    display: flex;
+    gap: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .acc-card-stat {
+    font-size: 0.75rem;
+    color: #6b7280;
+  }
+
+  .acc-card-stat strong {
+    color: #1a1a1a;
+  }
+
+  /* Summary Section - same as dashboard */
+  .acc-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+
+  .acc-summary-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+  }
+
+  .acc-summary-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .acc-summary-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .acc-summary-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: #fafafa;
+    border-radius: 0.5rem;
+  }
+
+  .acc-summary-item-label {
+    font-size: 0.875rem;
+    color: #374151;
+  }
+
+  .acc-summary-item-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  .acc-activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #fafafa;
+    border-radius: 0.5rem;
+  }
+
+  .acc-activity-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    background: #1a1a1a;
+    border-radius: 50%;
+    margin-top: 0.375rem;
+    flex-shrink: 0;
+  }
+
+  .acc-activity-content {
+    flex: 1;
+  }
+
+  .acc-activity-text {
+    font-size: 0.875rem;
+    color: #374151;
+  }
+
+  .acc-activity-time {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 0.125rem;
+  }
+
+  /* Empty State */
+  .acc-empty {
+    text-align: center;
+    padding: 3rem;
+    color: #6b7280;
+  }
+
+  .acc-empty-icon {
+    width: 3rem;
+    height: 3rem;
+    margin: 0 auto 1rem;
+    color: #d1d5db;
+  }
+
+  /* Loading */
+  .acc-loading {
+    min-height: 100vh;
+    background: #fafafa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .acc-spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 2px solid #e5e7eb;
+    border-top-color: #1a1a1a;
+    border-radius: 50%;
+    animation: acc-spin 0.6s linear infinite;
+  }
+
+  @keyframes acc-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .acc-loading-text {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-top: 0.75rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .acc-stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .acc-company-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .acc-summary-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .acc-stats-grid {
+      grid-template-columns: 1fr;
+    }
+    .acc-company-grid {
+      grid-template-columns: 1fr;
+    }
+    .acc-toolbar-inner {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .acc-search-container {
+      max-width: 100%;
+    }
+    .acc-modal-body {
+      width: 95%;
+      max-height: 90vh;
+    }
+  }
+
+  /* Modal */
+  .acc-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: acc-fade-in 0.2s ease;
+  }
+
+  @keyframes acc-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .acc-modal-body {
+    background: white;
+    border-radius: 1rem;
+    width: 540px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.15);
+    animation: acc-slide-up 0.25s ease;
+  }
+
+  @keyframes acc-slide-up {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .acc-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .acc-modal-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .acc-modal-badge {
+    display: inline-flex;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: 9999px;
+  }
+
+  .acc-modal-close {
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f3f4f6;
+    border: none;
+    border-radius: 0.5rem;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .acc-modal-close:hover {
+    background: #e5e7eb;
+    color: #1a1a1a;
+  }
+
+  .acc-modal-content {
+    padding: 1.5rem;
+  }
+
+  .acc-modal-progress {
+    display: flex;
+    gap: 0.375rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .acc-modal-progress-bar {
+    flex: 1;
+    height: 0.25rem;
+    border-radius: 9999px;
+    background: #e5e7eb;
+    transition: background 0.3s ease;
+  }
+
+  .acc-modal-progress-bar.active {
+    background: #1a1a1a;
+  }
+
+  .acc-modal-subtitle {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 1.25rem;
+  }
+
+  .acc-modal-field {
+    margin-bottom: 1rem;
+  }
+
+  .acc-modal-label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.375rem;
+  }
+
+  .acc-modal-input {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    background: #fafafa;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+  }
+
+  .acc-modal-input:focus {
+    outline: none;
+    border-color: #1a1a1a;
+    background: white;
+  }
+
+  .acc-modal-input.error {
+    border-color: #fca5a5;
+  }
+
+  .acc-modal-input.valid {
+    border-color: #86efac;
+  }
+
+  .acc-modal-textarea {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    background: #fafafa;
+    resize: none;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+    line-height: 1.6;
+  }
+
+  .acc-modal-textarea:focus {
+    outline: none;
+    border-color: #1a1a1a;
+    background: white;
+  }
+
+  .acc-modal-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .acc-modal-email-hint {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .acc-modal-email-hint.err {
+    color: #ef4444;
+  }
+
+  .acc-modal-email-hint.ok {
+    color: #16a34a;
+  }
+
+  .acc-modal-country-btn {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    background: #fafafa;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.15s ease;
+  }
+
+  .acc-modal-country-btn:hover {
+    border-color: #d1d5db;
+  }
+
+  .acc-modal-country-list {
+    position: absolute;
+    z-index: 50;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 0.25rem;
+    max-height: 200px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  }
+
+  .acc-modal-country-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: transparent;
+    font-size: 0.8125rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    color: #1a1a1a;
+  }
+
+  .acc-modal-country-option:hover {
+    background: #f3f4f6;
+  }
+
+  .acc-modal-country-option.selected {
+    background: #fef3c7;
+  }
+
+  .acc-modal-country-dial {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: #9ca3af;
+  }
+
+  .acc-modal-whatsapp-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .acc-modal-dial-display {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #f3f4f6;
+    font-size: 0.8125rem;
+    color: #6b7280;
+    font-weight: 500;
+    min-width: 85px;
+    justify-content: center;
+  }
+
+  .acc-modal-btn {
+    width: 100%;
+    padding: 0.625rem 1rem;
+    background: #1a1a1a;
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-top: 0.5rem;
+  }
+
+  .acc-modal-btn:hover {
+    background: #2d2d2d;
+  }
+
+  .acc-modal-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .acc-modal-btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    color: #9ca3af;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    margin-bottom: 1rem;
+    transition: color 0.15s ease;
+    padding: 0;
+  }
+
+  .acc-modal-btn-back:hover {
+    color: #1a1a1a;
+  }
+
+  .acc-modal-error {
+    padding: 0.625rem 0.875rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 0.5rem;
+    font-size: 0.8125rem;
+    color: #dc2626;
+    margin-bottom: 1rem;
+  }
+
+  .acc-modal-summary {
+    background: #fafafa;
+    border: 1px solid #f3f4f6;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .acc-modal-summary-title {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    margin-bottom: 0.75rem;
+  }
+
+  .acc-modal-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem 1.5rem;
+  }
+
+  .acc-modal-summary-label {
+    font-size: 0.6875rem;
+    color: #9ca3af;
+  }
+
+  .acc-modal-summary-value {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #1a1a1a;
+  }
+
+  .acc-modal-hint {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 0.75rem;
+  }
+
+  .acc-modal-success {
+    text-align: center;
+    padding: 1rem 0;
+  }
+
+  .acc-modal-success-icon {
+    width: 3.5rem;
+    height: 3.5rem;
+    margin: 0 auto 1rem;
+    background: #d1fae5;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #059669;
+  }
+
+  .acc-modal-success h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 0.375rem;
+  }
+
+  .acc-modal-success p {
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+`;
+
+// ============================================================================
+// TYPES
+// ============================================================================
 interface Stats {
   total_companies: number;
   core: number;
@@ -79,21 +1535,136 @@ interface CompanyItem {
   contact_name: string;
   contact_email: string;
   created_at: string;
+  user_count?: number;
+  program_count?: number;
+  assigned_pm_id?: string | null;
+  assigned_pm_name?: string | null;
 }
 
+// ============================================================================
+// COMPONENT
+// ============================================================================
 export default function AccountsPage() {
   const router = useRouter();
+  const searchRef = useRef<HTMLInputElement>(null);
+
   const [stats, setStats] = useState<Stats>({ total_companies: 0, core: 0, studio: 0, pending: 0, total_users: 0 });
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'core' | 'studio'>('all');
+  const [filter, setFilter] = useState<'all' | 'active' | 'trial'>('all');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'status'>('date');
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+
+  // ── Modal state ──
+  const [showModal, setShowModal] = useState(false);
+  const [modalStep, setModalStep] = useState(1); // 1=datos personales, 2=empresa/contacto, 3=tu idea, 4=confirmación
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState('');
+  const [modalEmailError, setModalEmailError] = useState('');
+  const [modalForm, setModalForm] = useState({ nombre: '', apellido: '', cargo: '', empresa: '', email: '', pais: '', whatsapp: '', idea: '' });
+  const [modalCountry, setModalCountry] = useState<{ code: string; name: string; dial: string; phonePlaceholder: string } | null>(null);
+  const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
+  const countryDropdownRef = useRef<HTMLDivElement>(null);
+
+  // ── PM Modal state ──
+  const [pmModalOpen, setPmModalOpen] = useState(false);
+  const [pmModalData, setPmModalData] = useState<any>(null);
+  const [pmModalLoading, setPmModalLoading] = useState(false);
+  const [pmModalTab, setPmModalTab] = useState<'resumen' | 'cuentas' | 'actividad'>('resumen');
 
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 
+  // ── Countries & email validation ──
+  const COUNTRIES = [
+    { code: 'CL', name: 'Chile', dial: '+56', phonePlaceholder: '9 1234 5678' },
+    { code: 'MX', name: 'México', dial: '+52', phonePlaceholder: '55 1234 5678' },
+    { code: 'CO', name: 'Colombia', dial: '+57', phonePlaceholder: '300 123 4567' },
+    { code: 'AR', name: 'Argentina', dial: '+54', phonePlaceholder: '11 1234 5678' },
+    { code: 'PE', name: 'Perú', dial: '+51', phonePlaceholder: '912 345 678' },
+    { code: 'EC', name: 'Ecuador', dial: '+593', phonePlaceholder: '99 123 4567' },
+    { code: 'BR', name: 'Brasil', dial: '+55', phonePlaceholder: '11 91234 5678' },
+    { code: 'UY', name: 'Uruguay', dial: '+598', phonePlaceholder: '91 234 567' },
+    { code: 'ES', name: 'España', dial: '+34', phonePlaceholder: '612 345 678' },
+    { code: 'US', name: 'Estados Unidos', dial: '+1', phonePlaceholder: '(555) 123-4567' },
+  ];
+  const BLOCKED_DOMAINS = ['gmail.com','hotmail.com','hotmail.es','outlook.com','outlook.es','yahoo.com','yahoo.es','live.com','icloud.com','me.com','mac.com','protonmail.com','proton.me','mail.com','zoho.com','aol.com'];
+
+  const validateCorporateEmail = (email: string) => {
+    if (!email.includes('@')) return false;
+    const domain = email.split('@')[1]?.toLowerCase();
+    return domain ? !BLOCKED_DOMAINS.includes(domain) : false;
+  };
+
+  const handleModalEmailChange = (email: string) => {
+    setModalForm({ ...modalForm, email });
+    if (email && email.includes('@')) {
+      const domain = email.split('@')[1]?.toLowerCase();
+      if (domain && BLOCKED_DOMAINS.includes(domain)) {
+        setModalEmailError('Ingresa un email corporativo. No se aceptan correos personales.');
+      } else {
+        setModalEmailError('');
+      }
+    } else {
+      setModalEmailError('');
+    }
+  };
+
+  const handleModalSubmit = async () => {
+    setModalError('');
+    setModalLoading(true);
+    try {
+      const fullWhatsapp = modalCountry ? `${modalCountry.dial} ${modalForm.whatsapp}` : modalForm.whatsapp;
+      const submitData = { ...modalForm, whatsapp: fullWhatsapp };
+
+      // Register in backend
+      try {
+        await fetch(`${API}/api/companies/auth/register-studio`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(submitData),
+        });
+      } catch { /* don't block */ }
+
+      // Send notification email
+      try {
+        await fetch('/api/studio-inquiry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(submitData),
+        });
+      } catch { /* don't block */ }
+
+      setModalStep(4);
+      // Refresh companies list
+      try {
+        const res = await fetch(`${API}/api/companies/`);
+        if (res.ok) {
+          const all = await res.json();
+          setCompanies(all.filter((c: CompanyItem) => c.status !== 'pending' && c.account_type === 'studio'));
+        }
+        const sRes = await fetch(`${API}/api/companies/stats`);
+        if (sRes.ok) setStats(await sRes.json());
+      } catch { /* ignore */ }
+    } catch {
+      setModalError('Error de conexión. Intenta nuevamente.');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  // Close country dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target as Node)) {
+        setCountryDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // ── Fetch data ──
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -104,7 +1675,7 @@ export default function AccountsPage() {
         if (statsRes.ok) setStats(await statsRes.json());
         if (companiesRes.ok) {
           const all = await companiesRes.json();
-          setCompanies(all.filter((c: CompanyItem) => c.status !== 'pending'));
+          setCompanies(all.filter((c: CompanyItem) => c.status !== 'pending' && c.account_type === 'studio'));
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -115,7 +1686,7 @@ export default function AccountsPage() {
     fetchData();
   }, []);
 
-  // Keyboard shortcut: Cmd+K to focus search
+  // ── Keyboard shortcut: Cmd+K to focus search ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -127,10 +1698,11 @@ export default function AccountsPage() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // ── Filtering & Sorting ──
   const filteredCompanies = companies
     .filter(c => {
       if (filter === 'all') return true;
-      return c.account_type === filter;
+      return c.status === filter;
     })
     .filter(c => {
       if (!search) return true;
@@ -143,14 +1715,25 @@ export default function AccountsPage() {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
-  const statusConfig = (s: string) => {
-    const map: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-      active: { label: 'Activa', bg: 'bg-gray-50', text: 'text-gray-600', dot: 'bg-gray-900' },
-      trial: { label: 'Trial', bg: 'bg-gray-50', text: 'text-gray-500', dot: 'bg-gray-400' },
-      suspended: { label: 'Suspendida', bg: 'bg-gray-50', text: 'text-gray-400', dot: 'bg-gray-300' },
-      cancelled: { label: 'Cancelada', bg: 'bg-gray-50', text: 'text-gray-400', dot: 'bg-gray-200' },
-    };
-    return map[s] || { label: s, bg: 'bg-gray-50', text: 'text-gray-400', dot: 'bg-gray-300' };
+  // ── Helpers ──
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <span className="acc-badge acc-badge-active">{Icons.check} Activa</span>;
+      case 'trial':
+        return <span className="acc-badge acc-badge-trial">{Icons.clock} Trial</span>;
+      default:
+        return <span className="acc-badge acc-badge-inactive">{Icons.pause} Inactiva</span>;
+    }
+  };
+
+  const getTypeBadge = (type: string) => {
+    const isStudio = type === 'studio';
+    return (
+      <span className={`acc-badge ${isStudio ? 'acc-badge-type-studio' : 'acc-badge-type-core'}`}>
+        {isStudio ? 'Studio' : 'Core'}
+      </span>
+    );
   };
 
   const planLabel = (p: string) => {
@@ -171,343 +1754,712 @@ export default function AccountsPage() {
     return `hace ${Math.floor(diffDays / 365)} años`;
   };
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  const getInitials = (name: string) => name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+
+  // ── PM modal handler ──
+  const openPmModal = async (pmId: string) => {
+    setPmModalOpen(true);
+    setPmModalLoading(true);
+    setPmModalTab('resumen');
+    try {
+      const res = await fetch(`${API}/api/companies/pm/${pmId}/activity`);
+      if (res.ok) {
+        setPmModalData(await res.json());
+      }
+    } catch { /* ignore */ }
+    setPmModalLoading(false);
   };
 
+  const pmTimeAgo = (dateStr: string | null) => {
+    if (!dateStr) return 'Nunca';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Justo ahora';
+    if (diffMins < 60) return `hace ${diffMins} min`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `hace ${diffHours}h`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return 'Ayer';
+    if (diffDays < 7) return `hace ${diffDays} días`;
+    if (diffDays < 30) return `hace ${Math.floor(diffDays / 7)} sem`;
+    return `hace ${Math.floor(diffDays / 30)} meses`;
+  };
+
+  const changeTypeLabel: Record<string, string> = {
+    status_change: 'Cambio de Estado',
+    plan_change: 'Cambio de Plan',
+    pm_assign: 'Asignación PM',
+    info_update: 'Datos Actualizados',
+    account_created: 'Cuenta Creada',
+    account_approved: 'Solicitud Aprobada',
+    contract_update: 'Contrato',
+  };
+
+  // Plan summary for summary card
+  const planSummary = [
+    { label: 'Enterprise', count: companies.filter(c => c.plan === 'enterprise').length },
+    { label: 'Growth', count: companies.filter(c => c.plan === 'growth').length },
+    { label: 'Starter', count: companies.filter(c => c.plan === 'starter').length },
+    { label: 'Trial', count: companies.filter(c => c.plan === 'trial').length },
+  ];
+
+  // Recent activity from last companies
+  const recentActivity = companies.slice(0, 5).map(c => ({
+    text: `${c.name} — cuenta ${c.status === 'active' ? 'activa' : c.status}`,
+    time: c.created_at ? new Date(c.created_at).toLocaleDateString('es-CL') : 'Reciente',
+  }));
+
+  // ── Loading state ──
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-900 rounded-full animate-spin" />
-          <p className="text-sm text-gray-400">Cargando cuentas...</p>
+      <>
+        <style>{styles}</style>
+        <div className="acc-loading">
+          <div style={{ textAlign: 'center' }}>
+            <div className="acc-spinner" />
+            <p className="acc-loading-text">Cargando cuentas...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
+  // ── Render ──
   return (
-    <div className="min-h-screen bg-[#fafafa]">
-      <div className="max-w-7xl mx-auto px-6 sm:px-10 py-8 sm:py-12">
-
+    <>
+      <style>{styles}</style>
+      <div className="acc-container">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+        <div className="acc-header">
           <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-[28px] sm:text-[32px] font-semibold text-gray-900 tracking-[-0.02em]">
-                Cuentas
-              </h1>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 tabular-nums">
-                {stats.total_companies}
-              </span>
-            </div>
-            <p className="text-[14px] text-gray-400 font-light">
-              Gestión de clientes y suscripciones
-            </p>
+            <h1 className="acc-title">
+              Cuentas Studio
+              <span className="acc-title-badge">{stats.studio}</span>
+            </h1>
+            <p className="acc-subtitle">Gestión de clientes y suscripciones</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.push('/register')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white text-[13px] font-medium rounded-xl hover:bg-gray-800 transition-colors"
-            >
-              <IconPlus className="w-4 h-4" />
-              Nueva cuenta
-            </button>
-          </div>
+          <button className="acc-btn-primary" onClick={() => { setShowModal(true); setModalStep(1); setModalError(''); setModalForm({ nombre: '', apellido: '', cargo: '', empresa: '', email: '', pais: '', whatsapp: '', idea: '' }); setModalCountry(null); setModalEmailError(''); }}>
+            {Icons.plus}
+            Nueva Cuenta
+          </button>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-          {[
-            { icon: IconBuilding, label: 'Total Cuentas', value: stats.total_companies, sub: 'activas' },
-            { icon: IconBolt, label: 'Core', value: stats.core, sub: 'autogestión' },
-            { icon: IconSparkles, label: 'Studio', value: stats.studio, sub: 'full service' },
-            { icon: IconUsers, label: 'Usuarios', value: stats.total_users, sub: 'registrados' },
-          ].map((kpi, idx) => (
-            <div key={idx} className="group relative bg-white rounded-2xl border border-gray-100 p-5 hover:border-gray-200 hover:shadow-sm transition-all overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center">
-                  <kpi.icon className="w-[17px] h-[17px] text-gray-500" />
-                </div>
-                <span className="text-[11px] text-gray-400 uppercase tracking-wider font-medium">{kpi.label}</span>
-              </div>
-              <p className="text-[36px] font-extralight text-gray-900 leading-none tabular-nums tracking-tight">{kpi.value}</p>
-              <p className="text-[12px] text-gray-300 mt-1.5 font-light">{kpi.sub}</p>
-            </div>
-          ))}
+        {/* Stats */}
+        <div className="acc-stats-grid">
+          <div className="acc-stat-card">
+            <div className="acc-stat-label">Cuentas Studio</div>
+            <div className="acc-stat-value">{stats.studio}</div>
+            <div className="acc-stat-sub">full service</div>
+          </div>
+          <div className="acc-stat-card">
+            <div className="acc-stat-label">Activas</div>
+            <div className="acc-stat-value">{companies.filter(c => c.status === 'active').length}</div>
+            <div className="acc-stat-sub">operativas</div>
+          </div>
+          <div className="acc-stat-card">
+            <div className="acc-stat-label">En Prueba</div>
+            <div className="acc-stat-value">{companies.filter(c => c.status === 'trial').length}</div>
+            <div className="acc-stat-sub">trial activo</div>
+          </div>
+          <div className="acc-stat-card">
+            <div className="acc-stat-label">Usuarios</div>
+            <div className="acc-stat-value">{stats.total_users}</div>
+            <div className="acc-stat-sub">registrados</div>
+          </div>
         </div>
 
         {/* Solicitudes Banner */}
         {stats.pending > 0 && (
-          <button
-            onClick={() => router.push('/dashboard/accounts/solicitudes')}
-            className="group w-full bg-white border border-gray-200 rounded-2xl p-5 flex items-center gap-4 hover:shadow-sm hover:border-gray-300 transition-all duration-200 mb-6"
-          >
-            <div className="relative">
-              <div className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center text-white shrink-0">
-                <IconInbox className="w-[18px] h-[18px]" />
-              </div>
-              <div className="absolute -top-1 -right-1 w-5 h-5 bg-gray-900 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
-                {stats.pending}
-              </div>
+          <div className="acc-solicitudes" onClick={() => router.push('/dashboard/accounts/solicitudes')}>
+            <div className="acc-solicitudes-icon">
+              {Icons.inbox}
+              <span className="acc-solicitudes-badge">{stats.pending}</span>
             </div>
-            <div className="flex-1 text-left min-w-0">
-              <h3 className="text-[14px] font-medium text-gray-900">
+            <div className="acc-solicitudes-info">
+              <div className="acc-solicitudes-title">
                 {stats.pending} {stats.pending === 1 ? 'solicitud pendiente' : 'solicitudes pendientes'}
-              </h3>
-              <p className="text-[13px] text-gray-400">
-                Nuevas solicitudes Studio requieren tu aprobación
-              </p>
+              </div>
+              <div className="acc-solicitudes-desc">Nuevas solicitudes Studio requieren tu aprobación</div>
             </div>
-            <div className="flex items-center gap-1 text-gray-400 group-hover:text-gray-600 transition-colors">
-              <span className="text-[13px] font-medium hidden sm:inline">Revisar</span>
-              <IconArrow className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-          </button>
+            <div className="acc-solicitudes-arrow">{Icons.arrow}</div>
+          </div>
         )}
 
-        {/* Toolbar: Search + Filters + View Toggle */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5">
-          {/* Search */}
-          <div className="relative flex-1 max-w-md">
-            <IconSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-            <input
-              ref={searchRef}
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar empresa, contacto..."
-              className="w-full pl-10 pr-16 py-2.5 bg-white border border-gray-200 rounded-xl text-[13px] text-gray-900 placeholder-gray-300 focus:outline-none focus:border-gray-300 focus:ring-2 focus:ring-gray-100 transition-all"
-            />
-            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center px-1.5 py-0.5 bg-gray-100 text-gray-400 text-[10px] rounded font-mono">
-              ⌘K
-            </kbd>
-          </div>
+        {/* Toolbar */}
+        <div className="acc-toolbar">
+          <div className="acc-toolbar-inner">
+            <div className="acc-search-container">
+              <span className="acc-search-icon">{Icons.search}</span>
+              <input
+                ref={searchRef}
+                type="text"
+                className="acc-search-input"
+                placeholder="Buscar empresa, contacto..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <span className="acc-kbd">⌘K</span>
+            </div>
 
-          {/* Filter Tabs */}
-          <div className="flex items-center gap-1 bg-white border border-gray-100 rounded-xl p-1">
-            {[
-              { key: 'all' as const, label: 'Todas' },
-              { key: 'core' as const, label: 'Core' },
-              { key: 'studio' as const, label: 'Studio' },
-            ].map(tab => (
+            <div className="acc-filter-tabs">
+              {([
+                { key: 'all' as const, label: 'Todas' },
+                { key: 'active' as const, label: 'Activas' },
+                { key: 'trial' as const, label: 'Trial' },
+              ]).map(tab => (
+                <button
+                  key={tab.key}
+                  className={`acc-filter-tab ${filter === tab.key ? 'active' : ''}`}
+                  onClick={() => setFilter(tab.key)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <select
+              className="acc-sort-select"
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as 'name' | 'date' | 'status')}
+            >
+              <option value="date">Más recientes</option>
+              <option value="name">Nombre A-Z</option>
+              <option value="status">Estado</option>
+            </select>
+
+            <div className="acc-view-toggle">
               <button
-                key={tab.key}
-                onClick={() => setFilter(tab.key)}
-                className={`px-3.5 py-1.5 text-[12px] font-medium rounded-lg transition-all ${
-                  filter === tab.key
-                    ? 'bg-gray-900 text-white shadow-sm'
-                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
-                }`}
+                className={`acc-view-btn ${viewMode === 'list' ? 'active' : ''}`}
+                onClick={() => setViewMode('list')}
+                title="Vista lista"
               >
-                {tab.label}
+                {Icons.list}
               </button>
-            ))}
+              <button
+                className={`acc-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                onClick={() => setViewMode('grid')}
+                title="Vista grid"
+              >
+                {Icons.grid}
+              </button>
+            </div>
+
+            {stats.pending === 0 && (
+              <button className="acc-solicitudes-link" onClick={() => router.push('/dashboard/accounts/solicitudes')}>
+                {Icons.inbox}
+                Solicitudes
+              </button>
+            )}
           </div>
-
-          {/* Sort */}
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value as 'name' | 'date' | 'status')}
-            className="px-3 py-2.5 bg-white border border-gray-100 rounded-xl text-[12px] text-gray-500 focus:outline-none cursor-pointer"
-          >
-            <option value="date">Más recientes</option>
-            <option value="name">Nombre A-Z</option>
-            <option value="status">Estado</option>
-          </select>
-
-          {/* View Toggle */}
-          <div className="flex items-center gap-1 bg-white border border-gray-100 rounded-xl p-1">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded-lg transition-all ${viewMode === 'table' ? 'bg-gray-100 text-gray-700' : 'text-gray-300 hover:text-gray-500'}`}
-              title="Vista tabla"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
-            </button>
-            <button
-              onClick={() => setViewMode('cards')}
-              className={`p-1.5 rounded-lg transition-all ${viewMode === 'cards' ? 'bg-gray-100 text-gray-700' : 'text-gray-300 hover:text-gray-500'}`}
-              title="Vista tarjetas"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}><rect x="3" y="3" width="18" height="7" rx="1" /><rect x="3" y="14" width="18" height="7" rx="1" /></svg>
-            </button>
-          </div>
-
-          {/* Solicitudes link when no pending */}
-          {stats.pending === 0 && (
-            <button
-              onClick={() => router.push('/dashboard/accounts/solicitudes')}
-              className="inline-flex items-center gap-1.5 px-3 py-2.5 text-[12px] text-gray-400 hover:text-gray-600 border border-gray-100 rounded-xl bg-white hover:bg-gray-50 transition-all"
-            >
-              <IconInbox className="w-3.5 h-3.5" />
-              Solicitudes
-            </button>
-          )}
         </div>
 
         {/* Results count */}
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[12px] text-gray-400">
-            {filteredCompanies.length} {filteredCompanies.length === 1 ? 'resultado' : 'resultados'}
-            {search && <span> para &ldquo;{search}&rdquo;</span>}
-          </p>
+        <div className="acc-results">
+          {filteredCompanies.length} {filteredCompanies.length === 1 ? 'resultado' : 'resultados'}
+          {search && <span> para &ldquo;{search}&rdquo;</span>}
         </div>
 
-        {/* ─── TABLE VIEW ─── */}
-        {viewMode === 'table' && (
-          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-            {/* Table Header */}
-            <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-gray-100 text-[11px] text-gray-400 uppercase tracking-wider font-medium bg-gray-50/50">
-              <div className="col-span-4 sm:col-span-4">Empresa</div>
-              <div className="col-span-2 hidden sm:block">Tipo</div>
-              <div className="col-span-2 hidden sm:block">Plan</div>
-              <div className="col-span-2">Estado</div>
-              <div className="col-span-2 text-right">Fecha</div>
+        {/* Company List View */}
+        {viewMode === 'list' ? (
+          <div className="acc-company-list">
+            {filteredCompanies.map(company => (
+              <div
+                key={company.id}
+                className="acc-company-row"
+                onClick={() => router.push(`/dashboard/accounts/${company.id}`)}
+              >
+                <div className="acc-company-avatar">
+                  {getInitials(company.name)}
+                </div>
+                <div className="acc-company-info">
+                  <div className="acc-company-name">{company.name}</div>
+                  <div className="acc-company-meta">
+                    {company.contact_email && (
+                      <>
+                        <span className="acc-company-meta-icon">{Icons.mail}</span>
+                        <span>{company.contact_email}</span>
+                      </>
+                    )}
+                    {!company.contact_email && company.contact_name && (
+                      <span>{company.contact_name}</span>
+                    )}
+                  </div>
+                </div>
+                <span className="acc-badge acc-badge-plan">{planLabel(company.plan)}</span>
+                {getStatusBadge(company.status)}
+                {company.assigned_pm_name ? (
+                  <span
+                    className="acc-pm-badge assigned"
+                    title={`PM: ${company.assigned_pm_name}`}
+                    onClick={(e) => { e.stopPropagation(); openPmModal(company.assigned_pm_id!); }}
+                  >
+                    <span className="acc-pm-dot on" />
+                    {company.assigned_pm_name.split(' ')[0]}
+                  </span>
+                ) : (
+                  <span className="acc-pm-badge unassigned">
+                    <span className="acc-pm-dot off" />
+                    Sin PM
+                  </span>
+                )}
+                <div className="acc-company-date" title={new Date(company.created_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}>
+                  {timeAgo(company.created_at)}
+                </div>
+                <div className="acc-company-actions">
+                  <button className="acc-action-btn" title="Ver detalles" onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/accounts/${company.id}`); }}>
+                    {Icons.eye}
+                  </button>
+                  <button className="acc-action-btn" title="Editar" onClick={(e) => { e.stopPropagation(); }}>
+                    {Icons.edit}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Company Grid View */
+          <div className="acc-company-grid">
+            {filteredCompanies.map(company => (
+              <div
+                key={company.id}
+                className="acc-company-card"
+                onClick={() => router.push(`/dashboard/accounts/${company.id}`)}
+              >
+                <div className="acc-card-header">
+                  <div className="acc-company-avatar">
+                    {getInitials(company.name)}
+                  </div>
+                  <div className="acc-company-info">
+                    <div className="acc-company-name">{company.name}</div>
+                    <div className="acc-company-meta">
+                      <span>{timeAgo(company.created_at)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="acc-card-badges">
+                  <span className="acc-badge acc-badge-plan">{planLabel(company.plan)}</span>
+                  {getStatusBadge(company.status)}
+                  {company.assigned_pm_name ? (
+                    <span
+                      className="acc-pm-badge assigned"
+                      onClick={(e) => { e.stopPropagation(); openPmModal(company.assigned_pm_id!); }}
+                    >
+                      <span className="acc-pm-dot on" />
+                      {company.assigned_pm_name.split(' ')[0]}
+                    </span>
+                  ) : (
+                    <span className="acc-pm-badge unassigned">
+                      <span className="acc-pm-dot off" />
+                      Sin PM
+                    </span>
+                  )}
+                </div>
+                <div className="acc-card-stats">
+                  <div className="acc-card-stat">
+                    <strong>{company.contact_email || '—'}</strong>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {filteredCompanies.length === 0 && (
+          <div className="acc-empty">
+            <div className="acc-empty-icon">{Icons.building}</div>
+            <p>No se encontraron cuentas</p>
+            {search && <p style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Intenta con otro término de búsqueda</p>}
+          </div>
+        )}
+
+        {/* Summary Section */}
+        <div className="acc-summary-grid">
+          <div className="acc-summary-card">
+            <div className="acc-summary-title">
+              {Icons.program}
+              Por Plan
+            </div>
+            <div className="acc-summary-list">
+              {planSummary.map(plan => (
+                <div key={plan.label} className="acc-summary-item">
+                  <span className="acc-summary-item-label">{plan.label}</span>
+                  <span className="acc-summary-item-value">{plan.count} cuentas</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="acc-summary-card">
+            <div className="acc-summary-title">
+              {Icons.activity}
+              Actividad Reciente
+            </div>
+            <div className="acc-summary-list">
+              {recentActivity.map((activity, index) => (
+                <div key={index} className="acc-activity-item">
+                  <div className="acc-activity-dot" />
+                  <div className="acc-activity-content">
+                    <div className="acc-activity-text">{activity.text}</div>
+                    <div className="acc-activity-time">{activity.time}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ MODAL: Nueva Cuenta Studio ═══ */}
+      {showModal && (
+        <div className="acc-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
+          <div className="acc-modal-body">
+            {/* Header */}
+            <div className="acc-modal-header">
+              <div className="acc-modal-title">
+                Nueva Cuenta Studio
+                <span className="acc-modal-badge">Studio</span>
+              </div>
+              <button className="acc-modal-close" onClick={() => setShowModal(false)}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
 
-            {/* Table Rows */}
-            {filteredCompanies.length === 0 ? (
-              <div className="px-6 py-20 text-center">
-                <div className="mx-auto w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-                  <IconSearch className="w-5 h-5 text-gray-300" />
+            <div className="acc-modal-content">
+              {/* Progress */}
+              {modalStep < 4 && (
+                <div className="acc-modal-progress">
+                  <div className={`acc-modal-progress-bar ${modalStep >= 1 ? 'active' : ''}`} />
+                  <div className={`acc-modal-progress-bar ${modalStep >= 2 ? 'active' : ''}`} />
+                  <div className={`acc-modal-progress-bar ${modalStep >= 3 ? 'active' : ''}`} />
                 </div>
-                <p className="text-[14px] text-gray-400 font-medium mb-1">Sin resultados</p>
-                <p className="text-[13px] text-gray-300">
-                  {search ? 'Intenta con otro término de búsqueda' : 'No hay cuentas en esta categoría'}
-                </p>
-              </div>
-            ) : (
-              filteredCompanies.map((c, idx) => {
-                const st = statusConfig(c.status);
-                const isStudio = c.account_type === 'studio';
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => router.push(`/dashboard/accounts/${c.id}`)}
-                    className={`w-full grid grid-cols-12 gap-4 px-6 py-4 items-center border-b border-gray-50 last:border-0 hover:bg-gray-50/70 transition-all text-left group ${
-                      idx % 2 === 0 ? '' : 'bg-gray-50/20'
-                    }`}
-                  >
-                    {/* Company */}
-                    <div className="col-span-4 sm:col-span-4 flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-[13px] font-semibold bg-gray-100 text-gray-600">
-                        {getInitials(c.name)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[14px] font-medium text-gray-900 truncate group-hover:text-gray-700 transition-colors">{c.name}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          {c.contact_email && <IconMail className="w-3 h-3 text-gray-300 shrink-0" />}
-                          <p className="text-[12px] text-gray-400 truncate">{c.contact_email || c.contact_name || '—'}</p>
-                        </div>
-                      </div>
-                    </div>
+              )}
 
-                    {/* Type */}
-                    <div className="col-span-2 hidden sm:flex items-center">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wider rounded-lg bg-gray-100 text-gray-500">
-                        {isStudio ? 'Studio' : 'Core'}
-                      </span>
-                    </div>
+              {/* Error */}
+              {modalError && <div className="acc-modal-error">{modalError}</div>}
 
-                    {/* Plan */}
-                    <div className="col-span-2 hidden sm:block">
-                      <span className="text-[13px] text-gray-500">{planLabel(c.plan)}</span>
+              {/* ── Step 1: Datos Personales ── */}
+              {modalStep === 1 && (
+                <div>
+                  <div className="acc-modal-subtitle">Datos del contacto principal</div>
+                  <div className="acc-modal-row">
+                    <div className="acc-modal-field">
+                      <label className="acc-modal-label">Nombre</label>
+                      <input className="acc-modal-input" placeholder="Nombre" value={modalForm.nombre} onChange={e => setModalForm({ ...modalForm, nombre: e.target.value })} />
                     </div>
-
-                    {/* Status */}
-                    <div className="col-span-2">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg bg-gray-50 text-gray-500">
-                        <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
-                        {st.label}
-                      </span>
+                    <div className="acc-modal-field">
+                      <label className="acc-modal-label">Apellido</label>
+                      <input className="acc-modal-input" placeholder="Apellido" value={modalForm.apellido} onChange={e => setModalForm({ ...modalForm, apellido: e.target.value })} />
                     </div>
-
-                    {/* Date */}
-                    <div className="col-span-2 flex items-center justify-end gap-2">
-                      <span className="text-[12px] text-gray-400" title={new Date(c.created_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}>
-                        {timeAgo(c.created_at)}
-                      </span>
-                      <IconChevronRight className="w-4 h-4 text-gray-200 group-hover:text-gray-400 group-hover:translate-x-0.5 transition-all" />
-                    </div>
+                  </div>
+                  <div className="acc-modal-field">
+                    <label className="acc-modal-label">Cargo</label>
+                    <input className="acc-modal-input" placeholder="Ej: Gerente de RRHH" value={modalForm.cargo} onChange={e => setModalForm({ ...modalForm, cargo: e.target.value })} />
+                  </div>
+                  <button className="acc-modal-btn" disabled={!modalForm.nombre || !modalForm.apellido || !modalForm.cargo} onClick={() => setModalStep(2)}>
+                    Continuar
                   </button>
-                );
-              })
-            )}
-          </div>
-        )}
-
-        {/* ─── CARDS VIEW ─── */}
-        {viewMode === 'cards' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredCompanies.length === 0 ? (
-              <div className="sm:col-span-2 lg:col-span-3 px-6 py-20 text-center bg-white rounded-2xl border border-gray-100">
-                <div className="mx-auto w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-                  <IconSearch className="w-5 h-5 text-gray-300" />
                 </div>
-                <p className="text-[14px] text-gray-400 font-medium mb-1">Sin resultados</p>
-                <p className="text-[13px] text-gray-300">
-                  {search ? 'Intenta con otro término de búsqueda' : 'No hay cuentas en esta categoría'}
-                </p>
-              </div>
-            ) : (
-              filteredCompanies.map((c) => {
-                const st = statusConfig(c.status);
-                const isStudio = c.account_type === 'studio';
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => router.push(`/dashboard/accounts/${c.id}`)}
-                    className="group bg-white rounded-2xl border border-gray-100 p-5 text-left hover:border-gray-200 hover:shadow-md transition-all duration-200"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center text-[14px] font-semibold bg-gray-100 text-gray-600">
-                        {getInitials(c.name)}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-md bg-gray-100 text-gray-500">
-                          {isStudio ? 'Studio' : 'Core'}
-                        </span>
-                        <IconChevronRight className="w-4 h-4 text-gray-200 group-hover:text-gray-400 group-hover:translate-x-0.5 transition-all" />
-                      </div>
-                    </div>
+              )}
 
-                    <h3 className="text-[15px] font-semibold text-gray-900 mb-1 truncate group-hover:text-gray-700">{c.name}</h3>
+              {/* ── Step 2: Empresa y Contacto ── */}
+              {modalStep === 2 && (
+                <div>
+                  <button className="acc-modal-btn-back" onClick={() => setModalStep(1)}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    Volver
+                  </button>
+                  <div className="acc-modal-subtitle">Datos de la empresa</div>
 
-                    {c.contact_email && (
-                      <div className="flex items-center gap-1.5 mb-4">
-                        <IconMail className="w-3.5 h-3.5 text-gray-300 shrink-0" />
-                        <p className="text-[12px] text-gray-400 truncate">{c.contact_email}</p>
+                  <div className="acc-modal-field">
+                    <label className="acc-modal-label">Empresa</label>
+                    <input className="acc-modal-input" placeholder="Mi Empresa S.A." value={modalForm.empresa} onChange={e => setModalForm({ ...modalForm, empresa: e.target.value })} />
+                  </div>
+
+                  <div className="acc-modal-field">
+                    <label className="acc-modal-label">Email corporativo</label>
+                    <input
+                      className={`acc-modal-input ${modalEmailError ? 'error' : modalForm.email && !modalEmailError && modalForm.email.includes('@') && modalForm.email.split('@')[1]?.length > 2 ? 'valid' : ''}`}
+                      placeholder="tu@empresa.com"
+                      type="email"
+                      value={modalForm.email}
+                      onChange={e => handleModalEmailChange(e.target.value)}
+                    />
+                    {modalEmailError && <div className="acc-modal-email-hint err">{modalEmailError}</div>}
+                    {!modalEmailError && modalForm.email && modalForm.email.includes('@') && modalForm.email.split('@')[1]?.length > 2 && (
+                      <div className="acc-modal-email-hint ok">{Icons.check} Email corporativo válido</div>
+                    )}
+                  </div>
+
+                  {/* País */}
+                  <div className="acc-modal-field" ref={countryDropdownRef} style={{ position: 'relative' }}>
+                    <label className="acc-modal-label">País</label>
+                    <button className="acc-modal-country-btn" type="button" onClick={() => setCountryDropdownOpen(!countryDropdownOpen)}>
+                      <span>{modalCountry ? modalCountry.name : 'Selecciona tu país'}</span>
+                      <svg className="w-4 h-4" style={{ color: '#9ca3af', transform: countryDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {countryDropdownOpen && (
+                      <div className="acc-modal-country-list">
+                        {COUNTRIES.map(c => (
+                          <button
+                            key={c.code}
+                            className={`acc-modal-country-option ${modalCountry?.code === c.code ? 'selected' : ''}`}
+                            onClick={() => { setModalCountry(c); setModalForm({ ...modalForm, pais: c.name, whatsapp: '' }); setCountryDropdownOpen(false); }}
+                          >
+                            {c.name}
+                            <span className="acc-modal-country-dial">{c.dial}</span>
+                          </button>
+                        ))}
                       </div>
                     )}
+                  </div>
 
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-medium rounded-md bg-gray-50 text-gray-500">
-                        <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
-                        {st.label}
-                      </span>
-                      <div className="flex items-center gap-1.5 text-gray-300">
-                        <IconCalendar className="w-3 h-3" />
-                        <span className="text-[11px]">{timeAgo(c.created_at)}</span>
+                  {/* WhatsApp */}
+                  <div className="acc-modal-field">
+                    <label className="acc-modal-label">WhatsApp</label>
+                    <div className="acc-modal-whatsapp-row">
+                      <div className="acc-modal-dial-display">
+                        {modalCountry ? modalCountry.dial : '+--'}
                       </div>
+                      <input
+                        className="acc-modal-input"
+                        placeholder={modalCountry?.phonePlaceholder || 'Selecciona un país primero'}
+                        value={modalForm.whatsapp}
+                        onChange={e => setModalForm({ ...modalForm, whatsapp: e.target.value.replace(/[^0-9\s]/g, '') })}
+                        disabled={!modalCountry}
+                      />
                     </div>
+                  </div>
+
+                  <button
+                    className="acc-modal-btn"
+                    disabled={!modalForm.empresa || !modalForm.email || !modalCountry || !modalForm.whatsapp || !!modalEmailError || !validateCorporateEmail(modalForm.email)}
+                    onClick={() => setModalStep(3)}
+                  >
+                    Continuar
                   </button>
-                );
-              })
+                </div>
+              )}
+
+              {/* ── Step 3: Tu idea ── */}
+              {modalStep === 3 && (
+                <div>
+                  <button className="acc-modal-btn-back" onClick={() => setModalStep(2)}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    Volver
+                  </button>
+                  <div className="acc-modal-subtitle">¿Qué programa necesita?</div>
+
+                  <div className="acc-modal-field">
+                    <label className="acc-modal-label">Descripción del proyecto</label>
+                    <textarea
+                      className="acc-modal-textarea"
+                      rows={4}
+                      placeholder="Ej: Queremos implementar un programa de mentoría para nuestros líderes..."
+                      value={modalForm.idea}
+                      onChange={e => setModalForm({ ...modalForm, idea: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Summary */}
+                  <div className="acc-modal-summary">
+                    <div className="acc-modal-summary-title">Resumen de la solicitud</div>
+                    <div className="acc-modal-summary-grid">
+                      <div><div className="acc-modal-summary-label">Nombre</div><div className="acc-modal-summary-value">{modalForm.nombre} {modalForm.apellido}</div></div>
+                      <div><div className="acc-modal-summary-label">Cargo</div><div className="acc-modal-summary-value">{modalForm.cargo}</div></div>
+                      <div><div className="acc-modal-summary-label">Empresa</div><div className="acc-modal-summary-value">{modalForm.empresa}</div></div>
+                      <div><div className="acc-modal-summary-label">Email</div><div className="acc-modal-summary-value">{modalForm.email}</div></div>
+                      <div><div className="acc-modal-summary-label">País</div><div className="acc-modal-summary-value">{modalForm.pais}</div></div>
+                      <div><div className="acc-modal-summary-label">WhatsApp</div><div className="acc-modal-summary-value">{modalCountry?.dial} {modalForm.whatsapp}</div></div>
+                    </div>
+                  </div>
+
+                  <button
+                    className="acc-modal-btn"
+                    disabled={modalLoading || !modalForm.idea}
+                    onClick={handleModalSubmit}
+                  >
+                    {modalLoading ? 'Enviando...' : 'Crear Cuenta Studio'}
+                  </button>
+                  <div className="acc-modal-hint">Un ejecutivo PM contactará al cliente en menos de 24 horas</div>
+                </div>
+              )}
+
+              {/* ── Step 4: Confirmación ── */}
+              {modalStep === 4 && (
+                <div className="acc-modal-success">
+                  <div className="acc-modal-success-icon">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3>¡Solicitud enviada!</h3>
+                  <p>Se notificará al ejecutivo PM para contactar a {modalForm.empresa}</p>
+
+                  <div className="acc-modal-summary" style={{ textAlign: 'left', marginTop: '1.25rem' }}>
+                    <div className="acc-modal-summary-title">Datos enviados</div>
+                    <div className="acc-modal-summary-grid">
+                      <div><div className="acc-modal-summary-label">Contacto</div><div className="acc-modal-summary-value">{modalForm.nombre} {modalForm.apellido}</div></div>
+                      <div><div className="acc-modal-summary-label">Empresa</div><div className="acc-modal-summary-value">{modalForm.empresa}</div></div>
+                      <div><div className="acc-modal-summary-label">Email</div><div className="acc-modal-summary-value">{modalForm.email}</div></div>
+                      <div><div className="acc-modal-summary-label">WhatsApp</div><div className="acc-modal-summary-value">{modalCountry?.dial} {modalForm.whatsapp}</div></div>
+                    </div>
+                  </div>
+
+                  <button className="acc-modal-btn" onClick={() => setShowModal(false)} style={{ marginTop: '1rem' }}>
+                    Cerrar
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: PM Detail ═══ */}
+      {pmModalOpen && (
+        <div className="pm-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setPmModalOpen(false); setPmModalData(null); } }}>
+          <div className="pm-modal">
+            <div className="pm-modal-header">
+              <div className="pm-modal-title">Project Manager</div>
+              <button className="pm-modal-close" onClick={() => { setPmModalOpen(false); setPmModalData(null); }}>✕</button>
+            </div>
+
+            {pmModalLoading ? (
+              <div className="pm-loading">Cargando información del PM...</div>
+            ) : pmModalData ? (
+              <>
+                {/* Profile Card */}
+                <div className="pm-modal-profile">
+                  <div className="pm-modal-avatar">
+                    {pmModalData.profile.full_name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+                  </div>
+                  <div className="pm-modal-info">
+                    <div className="pm-modal-name">{pmModalData.profile.full_name}</div>
+                    <div className="pm-modal-role">{pmModalData.profile.position || pmModalData.profile.role}</div>
+                    <div className="pm-modal-contact">
+                      {pmModalData.profile.email && (
+                        <span className="pm-modal-contact-item">
+                          {Icons.mail}
+                          {pmModalData.profile.email}
+                        </span>
+                      )}
+                      {pmModalData.profile.phone && (
+                        <span className="pm-modal-contact-item">
+                          📞 {pmModalData.profile.phone}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="pm-modal-tabs">
+                  <button className={`pm-modal-tab ${pmModalTab === 'resumen' ? 'active' : ''}`} onClick={() => setPmModalTab('resumen')}>Resumen</button>
+                  <button className={`pm-modal-tab ${pmModalTab === 'cuentas' ? 'active' : ''}`} onClick={() => setPmModalTab('cuentas')}>Cuentas ({pmModalData.total_managed})</button>
+                  <button className={`pm-modal-tab ${pmModalTab === 'actividad' ? 'active' : ''}`} onClick={() => setPmModalTab('actividad')}>Actividad ({pmModalData.total_actions})</button>
+                </div>
+
+                {/* Tab Content */}
+                <div className="pm-modal-body">
+                  {pmModalTab === 'resumen' && (
+                    <>
+                      <div className="pm-stats-grid">
+                        <div className="pm-stat-card">
+                          <div className="pm-stat-value">{pmModalData.total_managed}</div>
+                          <div className="pm-stat-label">Cuentas</div>
+                        </div>
+                        <div className="pm-stat-card">
+                          <div className="pm-stat-value">{pmModalData.total_actions}</div>
+                          <div className="pm-stat-label">Acciones</div>
+                        </div>
+                        <div className="pm-stat-card">
+                          <div className="pm-stat-value" style={{ fontSize: '0.875rem' }}>{pmTimeAgo(pmModalData.profile.last_login_at)}</div>
+                          <div className="pm-stat-label">Último acceso</div>
+                        </div>
+                      </div>
+
+                      <div className="pm-section-title">Información</div>
+                      <div className="pm-account-list">
+                        <div className="pm-account-item" style={{ cursor: 'default' }}>
+                          <span className="pm-account-name">Departamento</span>
+                          <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{pmModalData.profile.department || '—'}</span>
+                        </div>
+                        <div className="pm-account-item" style={{ cursor: 'default' }}>
+                          <span className="pm-account-name">Rol</span>
+                          <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{pmModalData.profile.role}</span>
+                        </div>
+                        <div className="pm-account-item" style={{ cursor: 'default' }}>
+                          <span className="pm-account-name">Se unió</span>
+                          <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{pmModalData.profile.date_joined ? new Date(pmModalData.profile.date_joined).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</span>
+                        </div>
+                        <div className="pm-account-item" style={{ cursor: 'default' }}>
+                          <span className="pm-account-name">Último login</span>
+                          <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{pmModalData.profile.last_login_at ? new Date(pmModalData.profile.last_login_at).toLocaleString('es-CL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Nunca'}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {pmModalTab === 'cuentas' && (
+                    <>
+                      {pmModalData.managed_accounts.length > 0 ? (
+                        <div className="pm-account-list">
+                          {pmModalData.managed_accounts.map((acc: any) => (
+                            <div
+                              key={acc.id}
+                              className="pm-account-item"
+                              onClick={() => { setPmModalOpen(false); setPmModalData(null); router.push(`/dashboard/accounts/${acc.id}`); }}
+                            >
+                              <span className="pm-account-name">{acc.name}</span>
+                              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                <span className="pm-account-plan">{acc.plan}</span>
+                                <span className={`acc-badge ${acc.status === 'active' ? 'acc-badge-active' : acc.status === 'trial' ? 'acc-badge-trial' : 'acc-badge-inactive'}`} style={{ fontSize: '0.5625rem' }}>
+                                  {acc.status === 'active' ? 'Activa' : acc.status === 'trial' ? 'Trial' : acc.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="pm-empty">Sin cuentas asignadas</div>
+                      )}
+                    </>
+                  )}
+
+                  {pmModalTab === 'actividad' && (
+                    <>
+                      {pmModalData.actions.length > 0 ? (
+                        <div className="pm-action-list">
+                          {pmModalData.actions.map((action: any) => (
+                            <div key={action.id} className="pm-action-item">
+                              <div className={`pm-action-dot ${action.change_type}`} />
+                              <div className="pm-action-content">
+                                <div className="pm-action-desc">{action.description}</div>
+                                <div className="pm-action-meta">
+                                  {changeTypeLabel[action.change_type] || action.change_type} · {action.company_name} · {pmTimeAgo(action.created_at)}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="pm-empty">Sin actividad registrada</div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="pm-empty">No se pudo cargar la información del PM</div>
             )}
           </div>
-        )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-center gap-2 mt-12">
-          <div className="h-px w-8 bg-gray-200" />
-          <p className="text-[11px] text-gray-300 tracking-wide">
-            Inspiratoria · Panel de administración
-          </p>
-          <div className="h-px w-8 bg-gray-200" />
         </div>
-
-      </div>
-    </div>
+      )}
+    </>
   );
 }

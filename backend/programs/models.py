@@ -137,6 +137,7 @@ class Notification(models.Model):
     ]
     
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="sent_notifications")
     notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
     title = models.CharField(max_length=200)
     message = models.TextField()
@@ -636,3 +637,53 @@ class AuditLog(models.Model):
     
     def __str__(self) -> str:
         return f"{self.action} - {self.admin_user.username} - {self.created_at}"
+
+
+class ProgramTemplate(models.Model):
+    """
+    Plantillas de programa compartidas entre todos los usuarios.
+    Toda la estructura rica (módulos, recursos, hitos, reglas) se guarda como JSON.
+    """
+    CATEGORY_CHOICES = [
+        ("leadership", "Leadership"),
+        ("tech", "Tech"),
+        ("sales", "Sales"),
+        ("diversity", "Diversity"),
+        ("operations", "Operations"),
+    ]
+    STATUS_CHOICES = [
+        ("draft", "Borrador"),
+        ("published", "Publicada"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    slug = models.SlugField(max_length=200, unique=True)
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default="leadership")
+    duration = models.CharField(max_length=100, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+
+    # Rich structured data as JSON
+    modules = models.JSONField(default=list, blank=True)
+    milestones = models.JSONField(default=list, blank=True)
+    tags = models.JSONField(default=list, blank=True)
+    mentor_requirements = models.JSONField(default=dict, blank=True)
+    mentee_requirements = models.JSONField(default=dict, blank=True)
+    matching_rules = models.JSONField(default=dict, blank=True)
+    session_rules = models.JSONField(default=dict, blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="program_templates"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.category})"

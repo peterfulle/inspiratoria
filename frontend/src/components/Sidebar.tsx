@@ -89,6 +89,18 @@ const IconBilling = ({ className = "w-5 h-5", active = false }: { className?: st
   </svg>
 );
 
+const IconProfile = ({ className = "w-5 h-5", active = false }: { className?: string; active?: boolean }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={active ? 2.5 : 2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+);
+
+const IconNotification = ({ className = "w-5 h-5", active = false }: { className?: string; active?: boolean }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={active ? 2.5 : 2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+  </svg>
+);
+
 // Menu item definition
 interface MenuItem {
   id: string;
@@ -140,6 +152,9 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true); // Inicialmente colapsado
   const [isHovered, setIsHovered] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
+  const [viewPerms, setViewPerms] = useState<string[] | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   
@@ -149,6 +164,7 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
     if (pathname?.includes('/dashboard/users')) return 'users';
     if (pathname?.includes('/dashboard/analytics')) return 'analytics';
     if (pathname?.includes('/dashboard/configuration')) return 'configuration';
+    if (pathname?.includes('/dashboard/profile')) return 'profile';
     if (pathname?.includes('/dashboard/chat')) return 'chat';
     if (pathname?.includes('/dashboard/goals')) return 'goals';
     if (pathname?.includes('/investors')) return 'investors';
@@ -164,6 +180,86 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
     }
     // Siempre iniciar colapsado
     setIsCollapsed(true);
+
+    // Load avatar from localStorage
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        if (user.avatar_url) setAvatarUrl(user.avatar_url);
+      }
+    } catch {}
+
+    // Load view_permissions from localStorage first (instant), then fetch fresh from API
+    const loadPerms = () => {
+      try {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          if (user.view_permissions && user.view_permissions.length > 0) {
+            setViewPerms(user.view_permissions);
+          } else {
+            setViewPerms(null);
+          }
+        }
+      } catch {}
+    };
+    loadPerms();
+    setMounted(true);
+
+    // Listen for avatar updates from profile page
+    const handleAvatarUpdate = () => {
+      try {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setAvatarUrl(user.avatar_url || null);
+        }
+      } catch {}
+    };
+    window.addEventListener("avatarUpdated", handleAvatarUpdate);
+
+    // Listen for theme toggle from header
+    const handleThemeToggle = () => {
+      const theme = localStorage.getItem("theme");
+      setDarkMode(theme === "dark");
+    };
+    window.addEventListener("themeToggle", handleThemeToggle);
+
+    // Fetch fresh permissions from API to catch changes made by superadmin
+    const fetchFreshPerms = async () => {
+      try {
+        const token = localStorage.getItem("auth_token");
+        if (!token) return;
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+        const res = await fetch(`${API_URL}/api/companies/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const freshUser = await res.json();
+        // Update localStorage with fresh data
+        const stored = JSON.parse(localStorage.getItem("user") || "{}");
+        stored.view_permissions = freshUser.view_permissions;
+        localStorage.setItem("user", JSON.stringify(stored));
+        // Update state
+        if (freshUser.view_permissions && freshUser.view_permissions.length > 0) {
+          setViewPerms(freshUser.view_permissions);
+        } else {
+          setViewPerms(null);
+        }
+      } catch {}
+    };
+    fetchFreshPerms();
+
+    // Listen for permission updates from the users page (same-tab instant update)
+    const onPermsUpdated = () => loadPerms();
+    window.addEventListener("viewPermissionsUpdated", onPermsUpdated);
+
+    return () => {
+      window.removeEventListener("avatarUpdated", handleAvatarUpdate);
+      window.removeEventListener("themeToggle", handleThemeToggle);
+      window.removeEventListener("viewPermissionsUpdated", onPermsUpdated);
+    };
   }, []);
 
   // Manejar expansión/contracción automática con hover
@@ -185,6 +281,7 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
     const newMode = !darkMode;
     setDarkMode(newMode);
     localStorage.setItem("theme", newMode ? "dark" : "light");
+    window.dispatchEvent(new Event("themeToggle"));
   };
 
   const handleLogout = () => {
@@ -216,7 +313,7 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
         items: [
           { 
             id: "accounts", 
-            label: "Cuentas", 
+            label: "Cuentas Studio", 
             icon: IconAccounts, 
             path: "/dashboard/accounts",
             subItems: [
@@ -224,8 +321,8 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
               { id: "accounts-subscription", label: "Cuentas Suscripción", path: "/dashboard/accounts/subscription" },
             ]
           },
+          { id: "programs", label: "Programas Studio", icon: IconPrograms, path: "/dashboard/programs" },
           { id: "billing", label: "Facturación", icon: IconBilling, path: "/dashboard/billing" },
-          { id: "programs", label: "Programas", icon: IconPrograms, path: "/dashboard/programs" },
           { id: "users", label: "Usuarios", icon: IconUsers, path: "/dashboard/users" },
           { id: "analytics", label: "Analytics", icon: IconAnalytics, path: "/dashboard/analytics", comingSoon: true },
           { id: "ecosystem", label: "Ecosistema", icon: IconEcosystem, path: "/dashboard/ecosystem" },
@@ -252,14 +349,36 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
         roles: ["superadmin", "inspiratoria_admin", "admin", "admin_root"],
         items: [
           { id: "configuration", label: "Configuración", icon: IconSettings, path: "/dashboard/configuration" },
+          { id: "notifications", label: "Notificaciones", icon: IconNotification, path: "/dashboard/notifications" },
         ],
       });
     }
     
+    // Profile section - visible to ALL roles
+    sections.push({
+      title: "Perfil",
+      roles: ["superadmin", "inspiratoria_admin", "client", "admin", "admin_root", "coordinator", "facilitator_internal", "facilitator_inspiratoria", "mentor", "mentee"],
+      items: [
+        { id: "profile", label: "Mi Configuración", icon: IconProfile, path: "/dashboard/profile" },
+      ],
+    });
+    
     return sections.filter(section => section.roles.includes(role as UserRole));
   };
 
-  const menuSections = getMenuSections();
+  // Derive menuSections: only apply view_permissions after mount to avoid hydration mismatch
+  // The "Perfil" section is always visible regardless of view_permissions
+  const allSections = getMenuSections();
+  const menuSections = (mounted && viewPerms)
+    ? allSections
+        .map((section) => ({
+          ...section,
+          items: (section.title === "Perfil" || section.title === "Sistema")
+            ? section.items
+            : section.items.filter((item) => viewPerms.includes(item.id)),
+        }))
+        .filter((section) => section.items.length > 0)
+    : allSections;
 
   // Toggle submenu expansion
   const toggleSubmenu = (itemId: string) => {
@@ -435,9 +554,13 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
               <div className="flex items-center gap-3">
                 {/* Avatar with gradient border */}
                 <div className="relative">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-primary-500/25">
-                    {getInitials(username)}
-                  </div>
+                  {avatarUrl ? (
+                    <img src={avatarUrl.startsWith('http') ? avatarUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}${avatarUrl}`} alt="Avatar" className="w-10 h-10 rounded-full object-cover shadow-lg shadow-primary-500/25" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-primary-500/25">
+                      {getInitials(username)}
+                    </div>
+                  )}
                   {/* Online indicator */}
                   <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
                 </div>
@@ -458,9 +581,15 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
           {isCollapsed && (
             <div className="flex justify-center">
               <div className="relative group">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-primary-500/25 cursor-pointer">
-                  {getInitials(username)}
-                </div>
+                {avatarUrl ? (
+                  <div className="w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full overflow-hidden shadow-lg shadow-primary-500/25 cursor-pointer">
+                    <img src={avatarUrl.startsWith('http') ? avatarUrl : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}${avatarUrl}`} alt="Avatar" className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-primary-500/25 cursor-pointer">
+                    {getInitials(username)}
+                  </div>
+                )}
                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
                 
                 {/* Tooltip */}
@@ -592,93 +721,8 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
           ))}
         </nav>
 
-        {/* Bottom Section */}
-        <div className={`p-4 border-t space-y-3 ${darkMode ? 'border-gray-800/50' : 'border-gray-100'}`}>
-          {/* Theme Toggle */}
-          {!isCollapsed ? (
-            <div className={`flex items-center justify-between p-3 rounded-xl transition-all duration-300 ${
-              darkMode ? "bg-white/5" : "bg-gray-50"
-            }`}>
-              <div className="flex items-center gap-2">
-                <div className={`p-1.5 rounded-lg ${darkMode ? "bg-yellow-500/20" : "bg-blue-500/20"}`}>
-                  {darkMode ? (
-                    <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-                <span className={`text-xs font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  Modo {darkMode ? "oscuro" : "claro"}
-                </span>
-              </div>
-              
-              <button
-                onClick={toggleTheme}
-                className={`relative h-6 w-11 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500/50 ${
-                  darkMode ? "bg-primary-500" : "bg-gray-300"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all duration-300 shadow-md ${
-                    darkMode ? "left-[22px]" : "left-0.5"
-                  }`}
-                />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={toggleTheme}
-              className={`w-full flex justify-center p-2 rounded-xl transition-all duration-300 group relative ${
-                darkMode ? "bg-white/5 hover:bg-white/10" : "bg-gray-50 hover:bg-gray-100"
-              }`}
-            >
-              {darkMode ? (
-                <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                </svg>
-              )}
-              
-              {/* Tooltip */}
-              <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-xl">
-                Cambiar tema
-                <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
-              </div>
-            </button>
-          )}
-
-          {/* Logout Button */}
-          <button
-            onClick={handleLogout}
-            className={`group w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
-              isCollapsed ? 'justify-center' : 'justify-center'
-            } ${
-              darkMode
-                ? "text-gray-400 hover:bg-red-500/10 hover:text-red-400"
-                : "text-gray-500 hover:bg-red-50 hover:text-red-600"
-            } relative`}
-          >
-            <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            {!isCollapsed && <span>Cerrar sesión</span>}
-            
-            {/* Tooltip cuando está colapsado */}
-            {isCollapsed && (
-              <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-xl">
-                Cerrar sesión
-                <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
-              </div>
-            )}
-          </button>
-        </div>
+        {/* Bottom spacer */}
+        <div className="p-4" />
       </aside>
     </>
   );
