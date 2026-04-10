@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 
@@ -14,7 +14,7 @@ const VIDEOS = [
 
 type Step = "email" | "otp";
 
-export default function AdminLoginPage() {
+function AdminLoginContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -583,5 +583,13 @@ export default function AdminLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#000" }}><div style={{ color: "#FFD902", fontSize: "1.25rem" }}>Cargando...</div></div>}>
+      <AdminLoginContent />
+    </Suspense>
   );
 }
