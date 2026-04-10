@@ -130,11 +130,12 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white scroll-smooth">
       {/* ═══════════════ HEADER ═══════════════ */}
-      <header className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
-        scrolled
-          ? "bg-black shadow-[0_2px_20px_rgba(0,0,0,0.5)]"
-          : "bg-transparent"
-      }`}>
+      <header
+        style={{ backgroundColor: scrolled ? '#000000' : 'transparent' }}
+        className={`fixed top-0 left-0 right-0 z-[9999] transition-all duration-500 ${
+          scrolled ? "shadow-[0_2px_20px_rgba(0,0,0,0.6)]" : ""
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="flex items-center justify-between h-16 lg:h-20">
             <Link href="/" className="flex items-center">
