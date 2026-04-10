@@ -131,10 +131,8 @@ export default function HomePage() {
     <div className="min-h-screen bg-white scroll-smooth">
       {/* ═══════════════ HEADER ═══════════════ */}
       <header
-        style={{ backgroundColor: scrolled ? '#000000' : 'transparent' }}
-        className={`fixed top-0 left-0 right-0 z-[9999] transition-all duration-500 ${
-          scrolled ? "shadow-[0_2px_20px_rgba(0,0,0,0.6)]" : ""
-        }`}
+        style={{ backgroundColor: '#000000', opacity: 1 }}
+        className="fixed top-0 left-0 right-0 z-[9999] shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="flex items-center justify-between h-16 lg:h-20">
@@ -155,11 +153,7 @@ export default function HomePage() {
                   key={link.href}
                   href={link.href}
                   onClick={(e) => handleNavClick(e, link.href)}
-                  className={`px-4 py-2 text-[13px] font-medium rounded-full transition-all duration-200 ${
-                    scrolled
-                      ? "text-white/70 hover:text-white hover:bg-white/10"
-                      : "text-white/70 hover:text-white hover:bg-white/10"
-                  }`}
+                  className="px-4 py-2 text-[13px] font-medium rounded-full transition-all duration-200 text-white/70 hover:text-white hover:bg-white/10"
                 >
                   {link.label}
                 </a>
@@ -169,11 +163,7 @@ export default function HomePage() {
             <div className="hidden lg:flex items-center gap-3">
               <Link
                 href="/login"
-                className={`px-5 py-2 text-[13px] font-medium rounded-full transition-all duration-200 ${
-                  scrolled
-                    ? "text-white/80 hover:text-white hover:bg-white/10"
-                    : "text-white/80 hover:text-white hover:bg-white/10"
-                }`}
+                className="px-5 py-2 text-[13px] font-medium rounded-full transition-all duration-200 text-white/80 hover:text-white hover:bg-white/10"
               >
                 Iniciar Sesión
               </Link>
@@ -187,7 +177,7 @@ export default function HomePage() {
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className={`lg:hidden p-2 rounded-xl transition-colors ${scrolled ? "text-white hover:bg-white/10" : "text-white hover:bg-white/10"}`}
+              className="lg:hidden p-2 rounded-xl transition-colors text-white hover:bg-white/10"
             >
               {mobileMenuOpen ? (
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
