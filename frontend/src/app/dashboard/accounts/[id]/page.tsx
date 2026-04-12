@@ -1119,7 +1119,7 @@ export default function AccountDetailPage() {
                           </div>
                           <button
                             onClick={() => {
-                              const slug = prog.company?.slug || 'studio';
+                              const slug = detail.slug || 'studio';
                               window.open(`/studio/${slug}?program=${prog.id}`, '_blank');
                             }}
                             className="shrink-0 px-4 py-2 text-[13px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-colors"
