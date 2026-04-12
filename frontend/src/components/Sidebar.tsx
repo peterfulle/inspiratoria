@@ -161,6 +161,7 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
   // Extract active view from pathname
   const getActiveView = () => {
     if (pathname === '/dashboard') return 'dashboard';
+    if (pathname?.includes('/dashboard/manage-programs')) return 'manage-programs';
     if (pathname?.includes('/dashboard/users')) return 'users';
     if (pathname?.includes('/dashboard/analytics')) return 'analytics';
     if (pathname?.includes('/dashboard/configuration')) return 'configuration';
@@ -322,6 +323,7 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
             ]
           },
           { id: "programs", label: "Programas Studio", icon: IconPrograms, path: "/dashboard/programs" },
+          { id: "manage-programs", label: "Gestionar Programas", icon: IconGoals, path: "/dashboard/manage-programs" },
           { id: "billing", label: "Facturación", icon: IconBilling, path: "/dashboard/billing" },
           { id: "users", label: "Usuarios", icon: IconUsers, path: "/dashboard/users" },
           { id: "analytics", label: "Analytics", icon: IconAnalytics, path: "/dashboard/analytics", comingSoon: true },

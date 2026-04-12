@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 // ============================================================================
 // TYPES
@@ -665,6 +666,30 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 // COMPONENT
 // ============================================================================
 export default function DashboardPage() {
+  const router = useRouter();
+
+  // Redirect participants away from admin dashboard
+  useEffect(() => {
+    const PARTICIPANT_ROLES = ['facilitator', 'mentor', 'mentee', 'participant_cell', 'participant', 'facilitator_internal'];
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        if (PARTICIPANT_ROLES.includes(user?.role)) {
+          const portalCode = user?.portal_code;
+          if (portalCode) { router.replace(`/p/${portalCode}`); return; }
+          const pp = localStorage.getItem('program_participant');
+          if (pp) {
+            const ppData = JSON.parse(pp);
+            if (ppData?.company_slug) { router.replace(`/studio/${ppData.company_slug}`); return; }
+          }
+          router.replace('/login/admin');
+          return;
+        }
+      }
+    } catch {}
+  }, [router]);
+
   const [companies, setCompanies] = useState<Company[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'trial' | 'inactive'>('all');

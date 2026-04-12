@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 
 // ─── SVG Icons ───
@@ -84,6 +84,21 @@ const IconShield = ({ className = "w-4 h-4" }: { className?: string }) => (
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
   </svg>
 );
+const IconSettings = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+  </svg>
+);
+const IconCamera = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" />
+  </svg>
+);
+const IconEdit = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+);
 
 // Types
 interface AccountDetail {
@@ -159,6 +174,18 @@ interface PM {
   avatar_url: string;
 }
 
+interface CompanyProgram {
+  id: string;
+  name: string;
+  description: string;
+  theme: string;
+  status: string;
+  activities_count: number;
+  participants_count: number;
+  activities: { id: string; type: string; name: string; description: string; status: string; start_date: string | null; modality: string; meeting_url: string | null; location_address: string | null }[];
+  stats?: { total: number; active: number; pending: number; by_role: Record<string, number> };
+}
+
 // Note type config
 const NOTE_TYPES: Record<string, { label: string; color: string }> = {
   general: { label: 'Nota', color: 'bg-gray-100 text-gray-600' },
@@ -194,25 +221,60 @@ export default function AccountDetailPage() {
   const [pms, setPms] = useState<PM[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'bitacora' | 'changelog'>('overview');
+  const [programs, setPrograms] = useState<CompanyProgram[]>([]);
+
+  const [activeTab, setActiveTab] = useState<'overview' | 'bitacora' | 'changelog' | 'programas' | 'ajustes'>('overview');
   const [newNote, setNewNote] = useState('');
   const [newNoteType, setNewNoteType] = useState('general');
   const [noteSubmitting, setNoteSubmitting] = useState(false);
   const [pmDropdownOpen, setPmDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const [deletedName, setDeletedName] = useState('');
+
+  // ─── Ajustes (Settings) state ───
+  const [editingName, setEditingName] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [editFields, setEditFields] = useState({
+    industry: '', company_size: '', website: '', legal_name: '', rut: '',
+    city: '', region: '', country: '', description: '',
+  });
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAll = useCallback(async () => {
     try {
-      const [detailRes, notesRes, changelogRes, pmsRes] = await Promise.all([
+      const [detailRes, notesRes, changelogRes, pmsRes, programsRes] = await Promise.all([
         fetch(`${API}/api/companies/account/${companyId}/detail`),
         fetch(`${API}/api/companies/account/${companyId}/bitacora`),
         fetch(`${API}/api/companies/account/${companyId}/changelog`),
         fetch(`${API}/api/companies/pms`),
+        fetch(`${API}/api/programs?company_id=${companyId}`),
       ]);
       if (detailRes.ok) setDetail(await detailRes.json());
       if (notesRes.ok) setNotes(await notesRes.json());
       if (changelogRes.ok) setChangelog(await changelogRes.json());
       if (pmsRes.ok) setPms(await pmsRes.json());
+      if (programsRes.ok) {
+        const progs: CompanyProgram[] = await programsRes.json();
+        // Fetch participant stats for each program in parallel
+        const withStats = await Promise.all(
+          progs.map(async (p) => {
+            try {
+              const statsRes = await fetch(`${API}/api/programs/${p.id}/participants/stats`);
+              if (statsRes.ok) p.stats = await statsRes.json();
+            } catch {}
+            return p;
+          })
+        );
+        setPrograms(withStats);
+      }
     } catch (e) {
       console.error('Error loading account:', e);
     } finally {
@@ -281,7 +343,126 @@ export default function AccountDetailPage() {
     }
   };
 
+  const deleteCompany = async () => {
+    setDeleting(true);
+    try {
+      // Get current user info
+      let deletedByName = 'Desconocido';
+      let deletedByEmail = '';
+      try {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          deletedByName = user.full_name || user.email || 'Desconocido';
+          deletedByEmail = user.email || '';
+        }
+      } catch {}
+
+      // Get client IP
+      let clientIp = '';
+      try {
+        const ipRes = await fetch('https://api.ipify.org?format=json');
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          clientIp = ipData.ip || '';
+        }
+      } catch {}
+
+      const res = await fetch(`${API}/api/companies/${companyId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deleted_by_name: deletedByName,
+          deleted_by_email: deletedByEmail,
+          client_ip: clientIp,
+        }),
+      });
+      if (res.ok || res.status === 204) {
+        setDeletedName(detail?.name || '');
+        setShowDeleteModal(false);
+        setDeleted(true);
+      } else {
+        alert('Error al eliminar la cuenta');
+      }
+    } catch {
+      alert('Error de conexión');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // ─── Settings Actions ───
+  const saveCompanyName = async () => {
+    if (!editName.trim() || editName.trim() === detail?.name) { setEditingName(false); return; }
+    setSavingName(true);
+    try {
+      const res = await fetch(`${API}/api/companies/${companyId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editName.trim() }),
+      });
+      if (res.ok) { await fetchAll(); setEditingName(false); }
+      else alert('Error al guardar');
+    } catch { alert('Error de conexión'); }
+    finally { setSavingName(false); }
+  };
+
+  const startEditInfo = () => {
+    if (!detail) return;
+    setEditFields({
+      industry: detail.industry || '', company_size: detail.company_size || '',
+      website: detail.website || '', legal_name: detail.legal_name || '',
+      rut: detail.rut || '', city: detail.city || '', region: detail.region || '',
+      country: detail.country || '', description: detail.description || '',
+    });
+    setEditingInfo(true);
+  };
+
+  const saveCompanyInfo = async () => {
+    setSavingInfo(true);
+    try {
+      const res = await fetch(`${API}/api/companies/${companyId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editFields),
+      });
+      if (res.ok) { await fetchAll(); setEditingInfo(false); }
+      else alert('Error al guardar');
+    } catch { alert('Error de conexión'); }
+    finally { setSavingInfo(false); }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+      const res = await fetch(`${API}/api/companies/${companyId}/logo`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) await fetchAll();
+      else { const err = await res.json().catch(() => null); alert(err?.detail || 'Error al subir logo'); }
+    } catch { alert('Error de conexión'); }
+    finally { setLogoUploading(false); if (logoInputRef.current) logoInputRef.current.value = ''; }
+  };
+
+  const deleteLogo = async () => {
+    try {
+      const res = await fetch(`${API}/api/companies/${companyId}/logo`, { method: 'DELETE' });
+      if (res.ok) await fetchAll();
+    } catch { alert('Error de conexión'); }
+  };
+
   // ─── Helpers ───
+  const avatarSrc = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('data:') || url.startsWith('http')) return url;
+    return `${API}${url}`;
+  };
+
   const formatDate = (d: string) => {
     if (!d) return '—';
     return new Date(d).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -324,6 +505,31 @@ export default function AccountDetailPage() {
     );
   }
 
+  if (deleted) {
+    return (
+      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 max-w-md w-full mx-4 text-center">
+          <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-5">
+            <svg className="w-8 h-8 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          </div>
+          <h2 className="text-[22px] font-semibold text-gray-900 mb-2">Cuenta eliminada</h2>
+          <p className="text-[14px] text-gray-500 mb-1">
+            La cuenta <span className="font-semibold text-gray-700">{deletedName}</span> ha sido eliminada exitosamente.
+          </p>
+          <p className="text-[13px] text-gray-400 mb-8">
+            Todos los datos asociados fueron removidos permanentemente.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard/accounts')}
+            className="w-full px-6 py-3 bg-gray-900 text-white text-[14px] font-medium rounded-xl hover:bg-gray-800 transition-colors"
+          >
+            Continuar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const st = statusConfig[detail.status] || statusConfig.active;
   const isStudio = detail.account_type === 'studio';
   const pinnedNotes = notes.filter(n => n.is_pinned);
@@ -347,9 +553,13 @@ export default function AccountDetailPage() {
           <div className="flex flex-col sm:flex-row sm:items-start gap-5">
             {/* Icon + Name */}
             <div className="flex items-center gap-4 flex-1 min-w-0">
-              <div className="w-14 h-14 rounded-2xl bg-gray-900 flex items-center justify-center text-[#FFD902] shrink-0">
-                {isStudio ? <IconSparkles className="w-7 h-7" /> : <IconBolt className="w-7 h-7" />}
-              </div>
+              {detail.logo_url ? (
+                <img src={detail.logo_url} alt={detail.name} className="w-14 h-14 rounded-2xl object-cover border border-gray-100 shrink-0" />
+              ) : (
+                <div className="w-14 h-14 rounded-2xl bg-gray-900 flex items-center justify-center text-[#FFD902] shrink-0">
+                  {isStudio ? <IconSparkles className="w-7 h-7" /> : <IconBolt className="w-7 h-7" />}
+                </div>
+              )}
               <div className="min-w-0">
                 <div className="flex items-center gap-3 mb-1">
                   <h1 className="text-[24px] sm:text-[28px] font-semibold text-gray-900 tracking-[-0.02em] truncate">
@@ -397,6 +607,14 @@ export default function AccountDetailPage() {
                           {cfg.label}
                         </button>
                       ))}
+                      <div className="border-t border-gray-100 my-1" />
+                      <button
+                        onClick={() => { setStatusDropdownOpen(false); setShowDeleteModal(true); }}
+                        className="w-full px-4 py-2.5 text-left text-[13px] flex items-center gap-2 hover:bg-red-50 text-red-600 transition-colors"
+                      >
+                        <IconTrash className="w-3.5 h-3.5" />
+                        Eliminar cuenta
+                      </button>
                     </div>
                   </>
                 )}
@@ -442,7 +660,9 @@ export default function AccountDetailPage() {
           {[
             { key: 'overview' as const, label: 'Información', count: null },
             { key: 'bitacora' as const, label: 'Bitácora', count: notes.length },
+            { key: 'programas' as const, label: 'Programas', count: programs.length },
             { key: 'changelog' as const, label: 'Historial', count: changelog.length },
+            { key: 'ajustes' as const, label: 'Ajustes', count: null },
           ].map(tab => (
             <button
               key={tab.key}
@@ -553,9 +773,13 @@ export default function AccountDetailPage() {
 
                 {detail.assigned_pm ? (
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl mb-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center text-[#FFD902] text-[13px] font-bold shrink-0">
-                      {detail.assigned_pm.full_name.split(' ').map(w => w[0]).join('').slice(0, 2)}
-                    </div>
+                    {detail.assigned_pm.avatar_url ? (
+                      <img src={avatarSrc(detail.assigned_pm.avatar_url)} alt={detail.assigned_pm.full_name} className="w-10 h-10 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center text-[#FFD902] text-[13px] font-bold shrink-0">
+                        {detail.assigned_pm.full_name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <p className="text-[14px] font-medium text-gray-900 truncate">{detail.assigned_pm.full_name}</p>
                       <p className="text-[12px] text-gray-400 truncate">{detail.assigned_pm.email}</p>
@@ -594,9 +818,13 @@ export default function AccountDetailPage() {
                               detail.assigned_pm?.id === pm.id ? 'bg-gray-50' : ''
                             }`}
                           >
-                            <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center text-[#FFD902] text-[11px] font-bold shrink-0">
-                              {pm.full_name.split(' ').map(w => w[0]).join('').slice(0, 2)}
-                            </div>
+                            {pm.avatar_url ? (
+                              <img src={avatarSrc(pm.avatar_url)} alt={pm.full_name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center text-[#FFD902] text-[11px] font-bold shrink-0">
+                                {pm.full_name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                              </div>
+                            )}
                             <div>
                               <p className="text-[13px] font-medium text-gray-900">{pm.full_name}</p>
                               <p className="text-[11px] text-gray-400">{pm.email}</p>
@@ -821,7 +1049,551 @@ export default function AccountDetailPage() {
           </div>
         )}
 
+        {/* ═══════════ TAB: Programas ═══════════ */}
+        {activeTab === 'programas' && (
+          <div className="space-y-6">
+            {programs.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                  <IconBriefcase className="w-6 h-6 text-gray-300" />
+                </div>
+                <p className="text-[15px] font-medium text-gray-400 mb-1">Sin programas asignados</p>
+                <p className="text-[13px] text-gray-300">Esta empresa aún no tiene programas vinculados.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {programs.map(prog => {
+                  const statusMap: Record<string, { label: string; color: string; bg: string; dot: string; border: string }> = {
+                    designed: { label: 'Diseñado', color: 'text-amber-700', bg: 'bg-amber-50', dot: 'bg-amber-400', border: 'border-amber-200' },
+                    ready_for_execution: { label: 'Listo para Ejecución', color: 'text-blue-700', bg: 'bg-blue-50', dot: 'bg-blue-400', border: 'border-blue-200' },
+                    in_execution: { label: 'En Ejecución', color: 'text-emerald-700', bg: 'bg-emerald-50', dot: 'bg-emerald-400', border: 'border-emerald-200' },
+                    under_review: { label: 'Revisión', color: 'text-purple-700', bg: 'bg-purple-50', dot: 'bg-purple-400', border: 'border-purple-200' },
+                    closed: { label: 'Cerrado', color: 'text-gray-600', bg: 'bg-gray-100', dot: 'bg-gray-400', border: 'border-gray-200' },
+                    draft: { label: 'Borrador', color: 'text-gray-600', bg: 'bg-gray-100', dot: 'bg-gray-400', border: 'border-gray-200' },
+                    active: { label: 'Activo', color: 'text-emerald-700', bg: 'bg-emerald-50', dot: 'bg-emerald-400', border: 'border-emerald-200' },
+                    paused: { label: 'Pausado', color: 'text-orange-700', bg: 'bg-orange-50', dot: 'bg-orange-400', border: 'border-orange-200' },
+                    completed: { label: 'Completado', color: 'text-sky-700', bg: 'bg-sky-50', dot: 'bg-sky-400', border: 'border-sky-200' },
+                  };
+                  const themeMap: Record<string, string> = {
+                    leadership: 'Liderazgo', inclusion: 'Inclusión', innovation: 'Innovación',
+                    wellbeing: 'Bienestar', development: 'Desarrollo', onboarding: 'Onboarding',
+                  };
+                  const actStatusMap: Record<string, { label: string; color: string; bg: string }> = {
+                    created: { label: 'Creada', color: 'text-gray-500', bg: 'bg-gray-50' },
+                    scheduled: { label: 'Programada', color: 'text-blue-700', bg: 'bg-blue-50' },
+                    rescheduled: { label: 'Reprogramada', color: 'text-orange-700', bg: 'bg-orange-50' },
+                    completed: { label: 'Completada', color: 'text-emerald-700', bg: 'bg-emerald-50' },
+                    closed: { label: 'Cerrada', color: 'text-gray-500', bg: 'bg-gray-50' },
+                  };
+                  const modalityMap: Record<string, string> = {
+                    online: 'Online', in_person: 'Presencial', hybrid: 'Híbrido',
+                  };
+                  const roleLabels: Record<string, string> = {
+                    administrator: 'Admins', instructor: 'Instructores',
+                    participant: 'Participantes', observer: 'Observadores',
+                    mentor: 'Mentores', mentee: 'Mentees', facilitator: 'Facilitadores',
+                    client: 'Clientes',
+                  };
+                  const st = statusMap[prog.status] || { label: prog.status, color: 'text-gray-600', bg: 'bg-gray-100', dot: 'bg-gray-400', border: 'border-gray-200' };
+                  const stats = prog.stats;
+                  const completedActs = prog.activities.filter(a => a.status === 'completed').length;
+                  const progressPct = prog.activities_count > 0 ? Math.round((completedActs / prog.activities_count) * 100) : 0;
+
+                  return (
+                    <div key={prog.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+
+                      {/* ── Header: nombre + estado + acción ── */}
+                      <div className="px-6 pt-6 pb-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-3 mb-1">
+                              <h3 className="text-[17px] font-bold text-gray-900 truncate">{prog.name}</h3>
+                              <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-full border ${st.bg} ${st.color} ${st.border}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+                                {st.label}
+                              </span>
+                            </div>
+                            {prog.description && (
+                              <p className="text-[13px] text-gray-400 leading-relaxed">{prog.description}</p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => {
+                              const slug = prog.company?.slug || 'studio';
+                              window.open(`/studio/${slug}?program=${prog.id}`, '_blank');
+                            }}
+                            className="shrink-0 px-4 py-2 text-[13px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-colors"
+                          >
+                            Ver en Studio
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* ── Resumen rápido: línea de metadata ── */}
+                      <div className="px-6 pb-4">
+                        <div className="flex items-center gap-5 text-[12px] text-gray-400">
+                          <span className="flex items-center gap-1.5">
+                            <IconSparkles className="w-3.5 h-3.5" />
+                            {themeMap[prog.theme] || prog.theme}
+                          </span>
+                          <span className="w-px h-3 bg-gray-200" />
+                          <span>{prog.activities_count} {prog.activities_count === 1 ? 'actividad' : 'actividades'}</span>
+                          <span className="w-px h-3 bg-gray-200" />
+                          <span>{stats?.total ?? prog.participants_count} participantes</span>
+                          {completedActs > 0 && (
+                            <>
+                              <span className="w-px h-3 bg-gray-200" />
+                              <span className="text-emerald-600 font-medium">{completedActs}/{prog.activities_count} completadas</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ── Barra de progreso ── */}
+                      <div className="mx-6 mb-5">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Progreso general</span>
+                          <span className="text-[12px] font-bold text-gray-700">{progressPct}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-full transition-all duration-500"
+                            style={{ width: `${progressPct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* ── KPIs en grid ── */}
+                      <div className="mx-6 mb-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {/* Participantes */}
+                        <div className="bg-gray-50/80 rounded-xl px-4 py-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+                            </svg>
+                            <span className="text-[11px] text-gray-400 uppercase tracking-wider">Participantes</span>
+                          </div>
+                          <p className="text-[22px] font-bold text-gray-900">{stats?.total ?? prog.participants_count}</p>
+                        </div>
+                        {/* Activos */}
+                        <div className="bg-gray-50/80 rounded-xl px-4 py-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                            <span className="text-[11px] text-gray-400 uppercase tracking-wider">Activos</span>
+                          </div>
+                          <p className="text-[22px] font-bold text-emerald-600">{stats?.active ?? 0}</p>
+                        </div>
+                        {/* Pendientes */}
+                        <div className="bg-gray-50/80 rounded-xl px-4 py-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                            <span className="text-[11px] text-gray-400 uppercase tracking-wider">Pendientes</span>
+                          </div>
+                          <p className="text-[22px] font-bold text-amber-600">{stats?.pending ?? 0}</p>
+                        </div>
+                        {/* Actividades */}
+                        <div className="bg-gray-50/80 rounded-xl px-4 py-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                            </svg>
+                            <span className="text-[11px] text-gray-400 uppercase tracking-wider">Actividades</span>
+                          </div>
+                          <p className="text-[22px] font-bold text-indigo-600">{prog.activities_count}</p>
+                        </div>
+                      </div>
+
+                      {/* ── Distribución por rol ── */}
+                      {stats && Object.keys(stats.by_role).length > 0 && (
+                        <div className="mx-6 mb-5">
+                          <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-2.5">Equipo por rol</p>
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(stats.by_role).map(([role, count]) => (
+                              <span key={role} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-[12px] text-gray-600 shadow-sm">
+                                <IconUser className="w-3 h-3 text-gray-400" />
+                                <span className="font-medium text-gray-800">{count}</span>
+                                {roleLabels[role] || role}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── Tabla de actividades ── */}
+                      {prog.activities.length > 0 && (
+                        <div className="border-t border-gray-100">
+                          <div className="px-6 py-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <p className="text-[13px] font-semibold text-gray-700">Actividades del Programa</p>
+                              <span className="text-[11px] text-gray-400">{prog.activities.length} {prog.activities.length === 1 ? 'actividad' : 'actividades'}</span>
+                            </div>
+                            <div className="overflow-x-auto -mx-6">
+                              <table className="w-full min-w-[600px]">
+                                <thead>
+                                  <tr className="bg-gray-50/60">
+                                    <th className="text-left pl-6 pr-3 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Actividad</th>
+                                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-28">Tipo</th>
+                                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-28">Modalidad</th>
+                                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-32">Fecha</th>
+                                    <th className="text-left px-3 pr-6 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-28">Estado</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {prog.activities.map((act, idx) => {
+                                    const as2 = actStatusMap[act.status] || { label: act.status, color: 'text-gray-500', bg: 'bg-gray-50' };
+                                    const typeLabel: Record<string, string> = {
+                                      training: 'Capacitación', event: 'Evento', exercise: 'Ejercicio',
+                                      workshop: 'Taller', talk: 'Charla', meeting: 'Reunión',
+                                    };
+                                    return (
+                                      <tr key={act.id} className="border-t border-gray-50 hover:bg-gray-50/40 transition-colors">
+                                        <td className="pl-6 pr-3 py-3.5">
+                                          <span className="text-[12px] font-mono text-gray-300">{String(idx + 1).padStart(2, '0')}</span>
+                                        </td>
+                                        <td className="px-3 py-3.5">
+                                          <p className="text-[13px] font-medium text-gray-800 leading-tight">{act.name}</p>
+                                          {act.description && <p className="text-[11px] text-gray-400 mt-0.5 leading-tight line-clamp-1">{act.description}</p>}
+                                        </td>
+                                        <td className="px-3 py-3.5">
+                                          <span className="text-[12px] text-gray-500">{typeLabel[act.type] || act.type}</span>
+                                        </td>
+                                        <td className="px-3 py-3.5">
+                                          <span className="text-[12px] text-gray-500">{modalityMap[act.modality] || act.modality || '—'}</span>
+                                        </td>
+                                        <td className="px-3 py-3.5">
+                                          <span className="text-[12px] text-gray-500">
+                                            {act.start_date ? new Date(act.start_date).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : <span className="text-gray-300">Sin programar</span>}
+                                          </span>
+                                        </td>
+                                        <td className="px-3 pr-6 py-3.5">
+                                          <span className={`inline-flex items-center px-2.5 py-1 text-[11px] font-medium rounded-md ${as2.bg} ${as2.color}`}>{as2.label}</span>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════ TAB: Ajustes ═══════════ */}
+        {activeTab === 'ajustes' && (
+          <div className="max-w-3xl space-y-6">
+
+            {/* ── Logo ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h3 className="text-[15px] font-semibold text-gray-900 mb-5 flex items-center gap-2">
+                <IconCamera className="w-4 h-4 text-gray-400" />
+                Logo de la Empresa
+              </h3>
+              <div className="flex items-center gap-6">
+                <div className="relative group">
+                  {detail.logo_url ? (
+                    <img
+                      src={detail.logo_url}
+                      alt="Logo"
+                      className="w-24 h-24 rounded-2xl object-cover border border-gray-100"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-2xl bg-gray-100 flex items-center justify-center">
+                      <IconBuilding className="w-8 h-8 text-gray-300" />
+                    </div>
+                  )}
+                  {logoUploading && (
+                    <div className="absolute inset-0 bg-white/80 rounded-2xl flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-900 rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={logoUploading}
+                    className="px-4 py-2 text-[13px] font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-40"
+                  >
+                    {detail.logo_url ? 'Cambiar logo' : 'Subir logo'}
+                  </button>
+                  {detail.logo_url && (
+                    <button
+                      onClick={deleteLogo}
+                      className="block text-[12px] text-red-500 hover:text-red-600 transition-colors"
+                    >
+                      Eliminar logo
+                    </button>
+                  )}
+                  <p className="text-[11px] text-gray-400">JPG, PNG o WebP. Máx 3 MB. Se recomienda formato cuadrado.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Nombre de la empresa ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[15px] font-semibold text-gray-900 flex items-center gap-2">
+                  <IconBuilding className="w-4 h-4 text-gray-400" />
+                  Nombre de la Empresa
+                </h3>
+                {!editingName && (
+                  <button
+                    onClick={() => { setEditName(detail.name); setEditingName(true); }}
+                    className="inline-flex items-center gap-1.5 text-[12px] text-gray-400 hover:text-gray-700 transition-colors"
+                  >
+                    <IconEdit className="w-3.5 h-3.5" />
+                    Editar
+                  </button>
+                )}
+              </div>
+              {editingName ? (
+                <div className="flex items-center gap-3">
+                  <input
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    className="flex-1 px-4 py-2.5 bg-gray-50 rounded-xl text-[14px] text-gray-700 border border-gray-200 focus:ring-2 focus:ring-gray-900/10 outline-none"
+                  />
+                  <button
+                    onClick={saveCompanyName}
+                    disabled={savingName || !editName.trim()}
+                    className="px-4 py-2.5 bg-gray-900 text-white text-[13px] font-medium rounded-xl hover:bg-gray-800 disabled:opacity-40 transition-colors"
+                  >
+                    {savingName ? 'Guardando...' : 'Guardar'}
+                  </button>
+                  <button
+                    onClick={() => setEditingName(false)}
+                    className="px-4 py-2.5 text-[13px] text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <p className="text-[16px] text-gray-900 font-medium">{detail.name}</p>
+              )}
+            </div>
+
+            {/* ── Admin Root / Administrador de Cuenta ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h3 className="text-[15px] font-semibold text-gray-900 mb-5 flex items-center gap-2">
+                <IconShield className="w-4 h-4 text-gray-400" />
+                Administrador de Cuenta
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <InfoRow icon={<IconUser className="w-4 h-4" />} label="Contacto" value={detail.contact_name} />
+                <InfoRow icon={<IconMail className="w-4 h-4" />} label="Email" value={detail.contact_email} />
+                <InfoRow icon={<IconPhone className="w-4 h-4" />} label="Teléfono" value={detail.contact_phone} />
+                <InfoRow icon={<IconBriefcase className="w-4 h-4" />} label="Cargo" value={detail.contact_position} />
+              </div>
+            </div>
+
+            {/* ── Información de la empresa (editable) ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-[15px] font-semibold text-gray-900 flex items-center gap-2">
+                  <IconFileText className="w-4 h-4 text-gray-400" />
+                  Información de la Empresa
+                </h3>
+                {!editingInfo && (
+                  <button
+                    onClick={startEditInfo}
+                    className="inline-flex items-center gap-1.5 text-[12px] text-gray-400 hover:text-gray-700 transition-colors"
+                  >
+                    <IconEdit className="w-3.5 h-3.5" />
+                    Editar
+                  </button>
+                )}
+              </div>
+              {editingInfo ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {([
+                      { key: 'industry', label: 'Industria' },
+                      { key: 'company_size', label: 'Tamaño' },
+                      { key: 'website', label: 'Sitio Web' },
+                      { key: 'legal_name', label: 'Razón Social' },
+                      { key: 'rut', label: 'RUT' },
+                      { key: 'city', label: 'Ciudad' },
+                      { key: 'region', label: 'Región' },
+                      { key: 'country', label: 'País' },
+                    ] as { key: keyof typeof editFields; label: string }[]).map(f => (
+                      <div key={f.key}>
+                        <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5">{f.label}</label>
+                        <input
+                          value={editFields[f.key]}
+                          onChange={e => setEditFields(prev => ({ ...prev, [f.key]: e.target.value }))}
+                          className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-[13px] text-gray-700 border border-gray-200 focus:ring-2 focus:ring-gray-900/10 outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-400 uppercase tracking-wider mb-1.5">Descripción</label>
+                    <textarea
+                      value={editFields.description}
+                      onChange={e => setEditFields(prev => ({ ...prev, description: e.target.value }))}
+                      rows={3}
+                      className="w-full px-3 py-2.5 bg-gray-50 rounded-xl text-[13px] text-gray-700 border border-gray-200 focus:ring-2 focus:ring-gray-900/10 outline-none resize-none"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      onClick={saveCompanyInfo}
+                      disabled={savingInfo}
+                      className="px-5 py-2.5 bg-gray-900 text-white text-[13px] font-medium rounded-xl hover:bg-gray-800 disabled:opacity-40 transition-colors"
+                    >
+                      {savingInfo ? 'Guardando...' : 'Guardar cambios'}
+                    </button>
+                    <button
+                      onClick={() => setEditingInfo(false)}
+                      className="px-4 py-2.5 text-[13px] text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <InfoRow icon={<IconBuilding className="w-4 h-4" />} label="Industria" value={detail.industry} />
+                  <InfoRow icon={<IconUser className="w-4 h-4" />} label="Tamaño" value={detail.company_size} />
+                  <InfoRow icon={<IconGlobe className="w-4 h-4" />} label="Sitio Web" value={detail.website} isLink />
+                  <InfoRow icon={<IconShield className="w-4 h-4" />} label="Razón Social" value={detail.legal_name} />
+                  <InfoRow icon={<IconFileText className="w-4 h-4" />} label="RUT" value={detail.rut} />
+                  <InfoRow icon={<IconBuilding className="w-4 h-4" />} label="Ciudad" value={detail.city} />
+                  <InfoRow icon={<IconBuilding className="w-4 h-4" />} label="Región" value={detail.region} />
+                  <InfoRow icon={<IconGlobe className="w-4 h-4" />} label="País" value={detail.country} />
+                  {detail.description && (
+                    <div className="sm:col-span-2 pt-3 border-t border-gray-50">
+                      <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-2">Descripción</p>
+                      <p className="text-[13px] text-gray-600 leading-relaxed">{detail.description}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Contrato y Suscripción ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h3 className="text-[15px] font-semibold text-gray-900 mb-5 flex items-center gap-2">
+                <IconCalendar className="w-4 h-4 text-gray-400" />
+                Contrato y Suscripción
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <InfoRow icon={<IconCalendar className="w-4 h-4" />} label="Inicio de Contrato" value={detail.contract_start ? formatDate(detail.contract_start) : ''} />
+                <InfoRow icon={<IconCalendar className="w-4 h-4" />} label="Fin de Contrato" value={detail.contract_end ? formatDate(detail.contract_end) : ''} />
+                <InfoRow icon={<IconShield className="w-4 h-4" />} label="Plan" value={planConfig[detail.plan] || detail.plan} />
+                <InfoRow
+                  icon={<IconShield className="w-4 h-4" />}
+                  label="Estado de Suscripción"
+                  value={detail.is_enabled ? 'Activa' : 'Inactiva'}
+                  valueColor={detail.is_enabled ? 'text-emerald-600' : 'text-red-500'}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-gray-50">
+                <div className="text-center p-3 bg-gray-50 rounded-xl">
+                  <p className="text-[22px] font-light text-gray-900">{detail.max_users}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Máx Usuarios</p>
+                </div>
+                <div className="text-center p-3 bg-gray-50 rounded-xl">
+                  <p className="text-[22px] font-light text-gray-900">{detail.max_programs}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Máx Programas</p>
+                </div>
+                <div className="text-center p-3 bg-gray-50 rounded-xl">
+                  <p className="text-[22px] font-light text-gray-900">{detail.max_participants}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Máx Participantes</p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Generación de Contrato ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h3 className="text-[15px] font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <IconFileText className="w-4 h-4 text-gray-400" />
+                Generación de Contrato
+              </h3>
+              <div className="p-4 bg-gray-50 rounded-xl">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <IconClock className="w-4 h-4 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium text-gray-700">Estado: Pendiente</p>
+                    <p className="text-[11px] text-gray-400">No se ha generado un contrato aún</p>
+                  </div>
+                </div>
+                <button
+                  disabled
+                  className="w-full px-4 py-2.5 text-[13px] font-medium text-gray-400 bg-gray-200 rounded-xl cursor-not-allowed"
+                >
+                  Generar contrato (próximamente)
+                </button>
+              </div>
+            </div>
+
+          </div>
+        )}
+
       </div>
+
+      {/* ═══ Delete Confirmation Modal ═══ */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+                <IconTrash className="w-5 h-5 text-red-600" />
+              </div>
+              <h3 className="text-[17px] font-semibold text-gray-900">Eliminar cuenta</h3>
+            </div>
+            <p className="text-[14px] text-gray-600 mb-2">
+              Esta acción es <span className="font-semibold text-red-600">irreversible</span>. Se eliminarán permanentemente todos los datos de la empresa, incluyendo usuarios, programas y toda la información asociada.
+            </p>
+            <p className="text-[13px] text-gray-500 mb-4">
+              Para confirmar, escribe el nombre de la empresa: <span className="font-semibold text-gray-900">{detail.name}</span>
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmName}
+              onChange={e => setDeleteConfirmName(e.target.value)}
+              placeholder={detail.name}
+              className="w-full px-4 py-3 bg-gray-50 rounded-xl text-[14px] text-gray-700 placeholder:text-gray-300 border border-gray-200 focus:ring-2 focus:ring-red-500/20 focus:border-red-300 outline-none mb-5"
+            />
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setShowDeleteModal(false); setDeleteConfirmName(''); }}
+                className="flex-1 px-4 py-2.5 text-[13px] font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={deleteCompany}
+                disabled={deleteConfirmName !== detail.name || deleting}
+                className="flex-1 px-4 py-2.5 text-[13px] font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-colors"
+              >
+                {deleting ? 'Eliminando...' : 'Eliminar definitivamente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -50,6 +50,7 @@ const VIEW_PERMISSIONS_OPTIONS = [
   { key: "dashboard", label: "Vista General" },
   { key: "accounts", label: "Cuentas Studio" },
   { key: "programs", label: "Programas Studio" },
+  { key: "manage-programs", label: "Gestionar Programas" },
   { key: "billing", label: "Facturación" },
   { key: "users", label: "Usuarios" },
   { key: "analytics", label: "Analytics (Pronto)" },

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status, Header, UploadFile, File as FastAPIFile
 from typing import List, Optional
 from pydantic import BaseModel, Field
 import uuid
@@ -2244,16 +2244,37 @@ async def activate_confirm_totp(payload: ActivationTOTPVerifyRequest):
     session_hours = 8
     expires_at = (timezone.now() + timedelta(hours=session_hours)).isoformat()
 
-    def _get_company_data():
+    def _get_company_and_program_data():
+        company_data = None
         if user.company_id:
             try:
                 company = Company.objects.get(id=user.company_id)
-                return {"id": str(company.id), "name": company.name}
+                company_data = {"id": str(company.id), "name": company.name, "slug": company.slug}
             except Company.DoesNotExist:
                 pass
-        return None
 
-    company_data = await sync_to_async(_get_company_data)()
+        # Check if user is a program participant → return program info for redirect
+        program_participant = None
+        try:
+            from programs.models import ProgramParticipant
+            pp = ProgramParticipant.objects.select_related('program', 'program__company').filter(
+                user=user, deleted_at__isnull=True
+            ).order_by('-created_at').first()
+            if pp and pp.program:
+                slug = pp.program.company.slug if pp.program.company else None
+                program_participant = {
+                    "participant_id": str(pp.id),
+                    "program_id": str(pp.program.id),
+                    "program_name": pp.program.name,
+                    "role": pp.role,
+                    "company_slug": slug,
+                }
+        except Exception:
+            pass
+
+        return company_data, program_participant
+
+    company_data, program_participant = await sync_to_async(_get_company_and_program_data)()
 
     return {
         "success": True,
@@ -2274,8 +2295,10 @@ async def activate_confirm_totp(payload: ActivationTOTPVerifyRequest):
             "is_account_activated": True,
             "totp_enabled": True,
             "view_permissions": user.view_permissions or [],
+            "portal_code": user.portal_code or "",
         },
         "company": company_data,
+        "program_participant": program_participant,
     }
 
 
@@ -2368,6 +2391,10 @@ class ProfileUpdateRequest(BaseModel):
     phone: Optional[str] = None
     position: Optional[str] = None
     department: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    bio: Optional[str] = None
+    headline: Optional[str] = None
+    skills: Optional[list] = None
 
 
 @router.get("/auth/profile")
@@ -2411,6 +2438,21 @@ async def update_profile(payload: ProfileUpdateRequest, authorization: Optional[
     if payload.department is not None:
         user.department = payload.department.strip()[:200]
         update_fields.append('department')
+    if payload.linkedin_url is not None:
+        url = payload.linkedin_url.strip()[:300]
+        if url and not url.startswith(('https://www.linkedin.com/', 'https://linkedin.com/', 'http://www.linkedin.com/', 'http://linkedin.com/')):
+            url = ''
+        user.linkedin_url = url
+        update_fields.append('linkedin_url')
+    if payload.bio is not None:
+        user.bio = payload.bio.strip()[:1000]
+        update_fields.append('bio')
+    if payload.headline is not None:
+        user.headline = payload.headline.strip()[:200]
+        update_fields.append('headline')
+    if payload.skills is not None:
+        user.skills = [str(s).strip()[:50] for s in payload.skills[:20] if str(s).strip()]
+        update_fields.append('skills')
 
     if update_fields:
         await sync_to_async(user.save)(update_fields=update_fields)
@@ -2420,6 +2462,10 @@ async def update_profile(payload: ProfileUpdateRequest, authorization: Optional[
         "phone": getattr(user, 'phone', '') or "",
         "position": user.position or "",
         "department": user.department or "",
+        "linkedin_url": getattr(user, 'linkedin_url', '') or "",
+        "bio": getattr(user, 'bio', '') or "",
+        "headline": getattr(user, 'headline', '') or "",
+        "skills": getattr(user, 'skills', []) or [],
     }
 
 
@@ -2463,6 +2509,45 @@ async def delete_avatar(authorization: Optional[str] = Header(None)):
         user.avatar_url = ""
         await sync_to_async(user.save)(update_fields=['avatar_url'])
 
+    return {"success": True}
+
+
+@router.post("/{company_id}/logo")
+async def upload_company_logo(company_id: uuid.UUID, logo: UploadFile = FastAPIFile(...)):
+    """Subir o reemplazar el logo de la empresa. Se guarda como base64 en la DB."""
+    try:
+        company = await sync_to_async(Company.objects.get)(id=company_id)
+    except Company.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    allowed_types = {"image/jpeg", "image/png", "image/webp"}
+    if logo.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Formato no soportado. Usa JPG, PNG o WebP.")
+
+    contents = await logo.read()
+    if len(contents) > 3 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="La imagen no debe superar 3 MB.")
+
+    b64 = base64.b64encode(contents).decode("utf-8")
+    content_type = logo.content_type or "image/png"
+    logo_url = f"data:{content_type};base64,{b64}"
+
+    company.logo_url = logo_url
+    await sync_to_async(company.save)(update_fields=['logo_url'])
+
+    return {"logo_url": logo_url}
+
+
+@router.delete("/{company_id}/logo")
+async def delete_company_logo(company_id: uuid.UUID):
+    """Eliminar el logo de la empresa."""
+    try:
+        company = await sync_to_async(Company.objects.get)(id=company_id)
+    except Company.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    company.logo_url = ""
+    await sync_to_async(company.save)(update_fields=['logo_url'])
     return {"success": True}
 
 
@@ -2511,17 +2596,37 @@ async def login_with_otp(payload: LoginOTPRequest):
     session_hours = 72 if payload.remember else 8
     expires_at = (timezone.now() + timedelta(hours=session_hours)).isoformat()
 
-    # Cargar company de forma segura en contexto sync
-    def _get_company_data():
+    # Cargar company + programa de forma segura en contexto sync
+    def _get_company_and_program_data():
+        company_data = None
         if user.company_id:
             try:
                 company = Company.objects.get(id=user.company_id)
-                return {"id": str(company.id), "name": company.name}
+                company_data = {"id": str(company.id), "name": company.name, "slug": company.slug}
             except Company.DoesNotExist:
                 pass
-        return None
 
-    company_data = await sync_to_async(_get_company_data)()
+        program_participant = None
+        try:
+            from programs.models import ProgramParticipant
+            pp = ProgramParticipant.objects.select_related('program', 'program__company').filter(
+                user=user, deleted_at__isnull=True
+            ).order_by('-created_at').first()
+            if pp and pp.program:
+                slug = pp.program.company.slug if pp.program.company else None
+                program_participant = {
+                    "participant_id": str(pp.id),
+                    "program_id": str(pp.program.id),
+                    "program_name": pp.program.name,
+                    "role": pp.role,
+                    "company_slug": slug,
+                }
+        except Exception:
+            pass
+
+        return company_data, program_participant
+
+    company_data, program_participant = await sync_to_async(_get_company_and_program_data)()
 
     return {
         "success": True,
@@ -2542,12 +2647,641 @@ async def login_with_otp(payload: LoginOTPRequest):
             "is_onboarded": user.is_onboarded,
             "is_account_activated": True,
             "view_permissions": user.view_permissions or [],
+            "portal_code": user.portal_code or "",
         },
         "company": company_data,
+        "program_participant": program_participant,
     }
 
 
-@router.post("/admin/resend-otp/{user_id}")
+@router.get("/portal/{portal_code}")
+async def get_portal_data(portal_code: str):
+    """Obtener datos de usuario y programa por portal_code (para ruta /p/{code})"""
+    def _resolve():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+
+        from programs.models import ProgramParticipant
+        programs_data = []
+        pps = ProgramParticipant.objects.select_related('program', 'program__company').filter(
+            user=user, deleted_at__isnull=True
+        ).order_by('-created_at')
+        for pp in pps:
+            if pp.program:
+                programs_data.append({
+                    "participant_id": pp.id,
+                    "program_id": str(pp.program.id),
+                    "program_name": pp.program.name,
+                    "role": pp.role,
+                    "company_slug": pp.program.company.slug if pp.program.company else None,
+                    "company_name": pp.program.company.name if pp.program.company else None,
+                })
+
+        return {
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "full_name": user.full_name,
+                "role": user.role,
+                "phone": getattr(user, 'phone', '') or "",
+                "position": getattr(user, 'position', '') or "",
+                "department": getattr(user, 'department', '') or "",
+                "avatar_url": getattr(user, 'avatar_url', '') or "",
+                "linkedin_url": getattr(user, 'linkedin_url', '') or "",
+                "bio": getattr(user, 'bio', '') or "",
+                "headline": getattr(user, 'headline', '') or "",
+                "skills": getattr(user, 'skills', []) or [],
+                "portal_code": user.portal_code,
+                "created_at": user.created_at.isoformat() if getattr(user, 'created_at', None) else "",
+            },
+            "programs": programs_data,
+        }
+
+    result = await sync_to_async(_resolve)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    return result
+
+
+@router.get("/portal/{portal_code}/badges")
+async def get_portal_badges(portal_code: str):
+    """Calcula insignias/badges en tiempo real para un usuario del portal."""
+    from programs.models import ProgramParticipant, Program, Vinculation
+    from django.db import models as db_models
+    from django.utils import timezone as tz
+    import math
+
+    def _calc():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+
+        now = tz.now()
+
+        # --- Data queries ---
+        pps = ProgramParticipant.objects.filter(user=user, deleted_at__isnull=True)
+        active_pps = pps.filter(status="active")
+        program_count = pps.values("program_id").distinct().count()
+
+        # People connected through vinculations
+        pp_ids = list(pps.values_list("id", flat=True))
+        vinc_count = 0
+        try:
+            vinc_count = Vinculation.objects.filter(
+                db_models.Q(participant1_id__in=pp_ids) | db_models.Q(participant2_id__in=pp_ids),
+                status="active",
+            ).count()
+        except Exception:
+            vinc_count = 0
+
+        # Participants in same programs (peers)
+        program_ids = list(pps.values_list("program_id", flat=True))
+        peers_count = (
+            ProgramParticipant.objects.filter(program_id__in=program_ids, deleted_at__isnull=True)
+            .exclude(user=user)
+            .values("user_id")
+            .distinct()
+            .count()
+        )
+
+        # Days on platform
+        created = getattr(user, "created_at", None)
+        days_on_platform = (now - created).days if created else 0
+
+        # Profile completeness
+        profile_fields = [
+            bool(user.full_name and user.full_name.strip()),
+            bool(getattr(user, "phone", "") and user.phone.strip()),
+            bool(getattr(user, "position", "") and user.position.strip()),
+            bool(getattr(user, "linkedin_url", "") and user.linkedin_url.strip()),
+            bool(getattr(user, "bio", "") and user.bio.strip()),
+            bool(getattr(user, "headline", "") and user.headline.strip()),
+            bool(getattr(user, "skills", None) and len(user.skills) > 0),
+            bool(getattr(user, "avatar_url", "") and user.avatar_url.strip()),
+        ]
+        profile_pct = int(sum(profile_fields) / len(profile_fields) * 100)
+
+        # Skills count
+        skills_count = len(getattr(user, "skills", []) or [])
+
+        # --- Build 10 badges ---
+        badges = []
+
+        # 1 - Personas impactadas
+        badges.append({
+            "id": "people_impacted",
+            "name": "Personas Impactadas",
+            "description": "Conecta y genera impacto en otros participantes de tus programas",
+            "icon": "people",
+            "category": "impact",
+            "tiers": [
+                {"level": 1, "label": "Bronce", "threshold": 1},
+                {"level": 2, "label": "Plata", "threshold": 5},
+                {"level": 3, "label": "Oro", "threshold": 15},
+            ],
+            "current_value": peers_count,
+            "earned": peers_count >= 1,
+            "tier": 3 if peers_count >= 15 else (2 if peers_count >= 5 else (1 if peers_count >= 1 else 0)),
+            "progress_pct": min(100, int(peers_count / 1 * 100)) if peers_count < 1 else 100,
+        })
+
+        # 2 - Programa asignado
+        badges.append({
+            "id": "program_pioneer",
+            "name": "Pionero del Programa",
+            "description": "Participa activamente en programas de mentoría",
+            "icon": "program",
+            "category": "engagement",
+            "tiers": [
+                {"level": 1, "label": "Bronce", "threshold": 1},
+                {"level": 2, "label": "Plata", "threshold": 3},
+                {"level": 3, "label": "Oro", "threshold": 5},
+            ],
+            "current_value": program_count,
+            "earned": program_count >= 1,
+            "tier": 3 if program_count >= 5 else (2 if program_count >= 3 else (1 if program_count >= 1 else 0)),
+            "progress_pct": min(100, int(program_count / 1 * 100)) if program_count < 1 else 100,
+        })
+
+        # 3 - Tiempo en plataforma
+        badges.append({
+            "id": "time_veteran",
+            "name": "Veterano",
+            "description": "Tiempo acumulado como miembro activo de la plataforma",
+            "icon": "clock",
+            "category": "loyalty",
+            "tiers": [
+                {"level": 1, "label": "Bronce", "threshold": 7},
+                {"level": 2, "label": "Plata", "threshold": 30},
+                {"level": 3, "label": "Oro", "threshold": 90},
+            ],
+            "current_value": days_on_platform,
+            "earned": days_on_platform >= 7,
+            "tier": 3 if days_on_platform >= 90 else (2 if days_on_platform >= 30 else (1 if days_on_platform >= 7 else 0)),
+            "progress_pct": min(100, int(days_on_platform / 7 * 100)),
+        })
+
+        # 4 - Perfil completo
+        badges.append({
+            "id": "profile_star",
+            "name": "Estrella del Perfil",
+            "description": "Completa toda tu información de perfil profesional",
+            "icon": "star",
+            "category": "profile",
+            "tiers": [
+                {"level": 1, "label": "Bronce", "threshold": 50},
+                {"level": 2, "label": "Plata", "threshold": 80},
+                {"level": 3, "label": "Oro", "threshold": 100},
+            ],
+            "current_value": profile_pct,
+            "earned": profile_pct >= 50,
+            "tier": 3 if profile_pct >= 100 else (2 if profile_pct >= 80 else (1 if profile_pct >= 50 else 0)),
+            "progress_pct": profile_pct,
+        })
+
+        # 5 - Primera conexión (vinculación activa)
+        badges.append({
+            "id": "first_link",
+            "name": "Primera Conexión",
+            "description": "Establece tu primera vinculación de mentoría",
+            "icon": "link",
+            "category": "network",
+            "tiers": [
+                {"level": 1, "label": "Bronce", "threshold": 1},
+                {"level": 2, "label": "Plata", "threshold": 3},
+                {"level": 3, "label": "Oro", "threshold": 10},
+            ],
+            "current_value": vinc_count,
+            "earned": vinc_count >= 1,
+            "tier": 3 if vinc_count >= 10 else (2 if vinc_count >= 3 else (1 if vinc_count >= 1 else 0)),
+            "progress_pct": min(100, int(vinc_count / 1 * 100)) if vinc_count < 1 else 100,
+        })
+
+        # 6 - Constructor de ecosistema (5+ peers)
+        badges.append({
+            "id": "ecosystem_builder",
+            "name": "Constructor de Ecosistema",
+            "description": "Amplía tu red interactuando con 5 o más participantes",
+            "icon": "ecosystem",
+            "category": "network",
+            "tiers": [
+                {"level": 1, "label": "Bronce", "threshold": 5},
+                {"level": 2, "label": "Plata", "threshold": 15},
+                {"level": 3, "label": "Oro", "threshold": 30},
+            ],
+            "current_value": peers_count,
+            "earned": peers_count >= 5,
+            "tier": 3 if peers_count >= 30 else (2 if peers_count >= 15 else (1 if peers_count >= 5 else 0)),
+            "progress_pct": min(100, int(peers_count / 5 * 100)),
+        })
+
+        # 7 - Experto en habilidades (skills)
+        badges.append({
+            "id": "skill_master",
+            "name": "Maestro de Habilidades",
+            "description": "Documenta y comparte tus habilidades profesionales",
+            "icon": "skills",
+            "category": "profile",
+            "tiers": [
+                {"level": 1, "label": "Bronce", "threshold": 3},
+                {"level": 2, "label": "Plata", "threshold": 6},
+                {"level": 3, "label": "Oro", "threshold": 10},
+            ],
+            "current_value": skills_count,
+            "earned": skills_count >= 3,
+            "tier": 3 if skills_count >= 10 else (2 if skills_count >= 6 else (1 if skills_count >= 3 else 0)),
+            "progress_pct": min(100, int(skills_count / 3 * 100)),
+        })
+
+        # 8 - Mentor activo (has active programs with active status)
+        active_count = active_pps.count()
+        badges.append({
+            "id": "active_mentor",
+            "name": "Mentor Activo",
+            "description": "Mantén participación activa en programas de mentoría",
+            "icon": "fire",
+            "category": "engagement",
+            "tiers": [
+                {"level": 1, "label": "Bronce", "threshold": 1},
+                {"level": 2, "label": "Plata", "threshold": 2},
+                {"level": 3, "label": "Oro", "threshold": 3},
+            ],
+            "current_value": active_count,
+            "earned": active_count >= 1,
+            "tier": 3 if active_count >= 3 else (2 if active_count >= 2 else (1 if active_count >= 1 else 0)),
+            "progress_pct": min(100, int(active_count / 1 * 100)) if active_count < 1 else 100,
+        })
+
+        # 9 - Identidad digital (avatar + LinkedIn)
+        has_avatar = bool(getattr(user, "avatar_url", "") and user.avatar_url.strip())
+        has_linkedin = bool(getattr(user, "linkedin_url", "") and user.linkedin_url.strip())
+        identity_score = int(has_avatar) + int(has_linkedin)
+        badges.append({
+            "id": "digital_identity",
+            "name": "Identidad Digital",
+            "description": "Sube tu foto de perfil y conecta tu LinkedIn",
+            "icon": "shield",
+            "category": "profile",
+            "tiers": [
+                {"level": 1, "label": "Bronce", "threshold": 1},
+                {"level": 2, "label": "Oro", "threshold": 2},
+            ],
+            "current_value": identity_score,
+            "earned": identity_score >= 1,
+            "tier": 2 if identity_score >= 2 else (1 if identity_score >= 1 else 0),
+            "progress_pct": int(identity_score / 2 * 100),
+        })
+
+        # 10 - Embajador (in multiple programs with multiple people)
+        ambassador_score = program_count * peers_count
+        badges.append({
+            "id": "ambassador",
+            "name": "Embajador",
+            "description": "Combina participación en programas e impacto en personas",
+            "icon": "trophy",
+            "category": "impact",
+            "tiers": [
+                {"level": 1, "label": "Bronce", "threshold": 5},
+                {"level": 2, "label": "Plata", "threshold": 20},
+                {"level": 3, "label": "Oro", "threshold": 50},
+            ],
+            "current_value": ambassador_score,
+            "earned": ambassador_score >= 5,
+            "tier": 3 if ambassador_score >= 50 else (2 if ambassador_score >= 20 else (1 if ambassador_score >= 5 else 0)),
+            "progress_pct": min(100, int(ambassador_score / 5 * 100)),
+        })
+
+        # Summary
+        earned_count = sum(1 for b in badges if b["earned"])
+        total_tiers = sum(b["tier"] for b in badges)
+        max_tiers = sum(len(b["tiers"]) for b in badges)
+
+        return {
+            "badges": badges,
+            "summary": {
+                "total_badges": len(badges),
+                "earned": earned_count,
+                "locked": len(badges) - earned_count,
+                "tier_points": total_tiers,
+                "max_tier_points": max_tiers,
+                "level": "Oro" if total_tiers >= 20 else ("Plata" if total_tiers >= 10 else ("Bronce" if total_tiers >= 3 else "Novato")),
+            },
+        }
+
+    result = await sync_to_async(_calc)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    return result
+
+
+# ============ PROGRAM CHAT — REAL-TIME MESSAGING ============
+
+# In-memory typing state: {program_id: {user_id: timestamp}}
+import time as _time
+_typing_state: dict[str, dict[str, float]] = {}
+
+
+class ChatMessageRequest(BaseModel):
+    content: str = ""
+    attachments: list = Field(default_factory=list)
+
+
+@router.get("/portal/{portal_code}/chat/programs")
+async def get_chat_programs(portal_code: str):
+    """Get list of programs this user can chat in."""
+    from programs.models import ProgramParticipant, Program
+
+    def _fetch():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+        pps = ProgramParticipant.objects.filter(user=user, deleted_at__isnull=True).select_related("program")
+        programs = []
+        for pp in pps:
+            p = pp.program
+            from programs.models import ProgramChatMessage
+            last_msg = ProgramChatMessage.objects.filter(program=p).order_by("-created_at").first()
+            unread = ProgramChatMessage.objects.filter(program=p, created_at__gt=pp.last_access_at).exclude(sender=user).count() if pp.last_access_at else ProgramChatMessage.objects.filter(program=p).exclude(sender=user).count()
+            programs.append({
+                "id": str(p.id),
+                "name": p.name,
+                "status": p.status,
+                "my_role": pp.role,
+                "participant_count": ProgramParticipant.objects.filter(program=p, deleted_at__isnull=True).count(),
+                "last_message": {
+                    "content": last_msg.content[:80] if last_msg else None,
+                    "sender_name": last_msg.sender.full_name or last_msg.sender.email.split("@")[0] if last_msg else None,
+                    "created_at": last_msg.created_at.isoformat() if last_msg else None,
+                } if last_msg else None,
+                "unread_count": unread,
+            })
+        return {"programs": programs, "user_id": str(user.id)}
+
+    result = await sync_to_async(_fetch)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    return result
+
+
+@router.get("/portal/{portal_code}/chat/{program_id}/messages")
+async def get_chat_messages(portal_code: str, program_id: str, before: Optional[str] = None, limit: int = 50):
+    """Get messages for a program chat. Supports cursor pagination with 'before' timestamp."""
+    from programs.models import ProgramParticipant, ProgramChatMessage
+
+    def _fetch():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+        # Verify user is in this program
+        if not ProgramParticipant.objects.filter(user=user, program_id=program_id, deleted_at__isnull=True).exists():
+            return "forbidden"
+
+        qs = ProgramChatMessage.objects.filter(program_id=program_id).select_related("sender").order_by("-created_at")
+        if before:
+            from django.utils.dateparse import parse_datetime
+            dt = parse_datetime(before)
+            if dt:
+                qs = qs.filter(created_at__lt=dt)
+        msgs = list(qs[:limit])
+        msgs.reverse()
+
+        # Mark as read (update last_access)
+        ProgramParticipant.objects.filter(user=user, program_id=program_id).update(last_access_at=timezone.now())
+
+        return {
+            "messages": [
+                {
+                    "id": str(m.id),
+                    "sender_id": str(m.sender.id),
+                    "sender_name": m.sender.full_name or m.sender.email.split("@")[0],
+                    "sender_avatar": getattr(m.sender, "avatar_url", "") or "",
+                    "sender_role": "",
+                    "content": m.content,
+                    "attachments": m.attachments or [],
+                    "is_system": m.is_system,
+                    "created_at": m.created_at.isoformat(),
+                }
+                for m in msgs
+            ],
+            "has_more": len(msgs) == limit,
+        }
+
+    result = await sync_to_async(_fetch)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    if result == "forbidden":
+        raise HTTPException(status_code=403, detail="No eres participante de este programa")
+    return result
+
+
+@router.post("/portal/{portal_code}/chat/{program_id}/messages")
+async def send_chat_message(portal_code: str, program_id: str, payload: ChatMessageRequest):
+    """Send a new message to the program chat."""
+    from programs.models import ProgramParticipant, ProgramChatMessage
+
+    def _send():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+        if not ProgramParticipant.objects.filter(user=user, program_id=program_id, deleted_at__isnull=True).exists():
+            return "forbidden"
+        if not payload.content.strip() and not payload.attachments:
+            return "empty"
+
+        msg = ProgramChatMessage.objects.create(
+            program_id=program_id,
+            sender=user,
+            content=payload.content.strip(),
+            attachments=payload.attachments,
+        )
+        return {
+            "id": str(msg.id),
+            "sender_id": str(user.id),
+            "sender_name": user.full_name or user.email.split("@")[0],
+            "sender_avatar": getattr(user, "avatar_url", "") or "",
+            "content": msg.content,
+            "attachments": msg.attachments,
+            "is_system": False,
+            "created_at": msg.created_at.isoformat(),
+        }
+
+    result = await sync_to_async(_send)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    if result == "forbidden":
+        raise HTTPException(status_code=403, detail="No tienes acceso")
+    if result == "empty":
+        raise HTTPException(status_code=400, detail="Mensaje vacío")
+    return result
+
+
+@router.get("/portal/{portal_code}/chat/{program_id}/poll")
+async def poll_chat(portal_code: str, program_id: str, after: Optional[str] = None):
+    """Long-poll endpoint: returns new messages since 'after' timestamp + typing users."""
+    from programs.models import ProgramParticipant, ProgramChatMessage
+
+    def _poll():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+        if not ProgramParticipant.objects.filter(user=user, program_id=program_id, deleted_at__isnull=True).exists():
+            return "forbidden"
+
+        qs = ProgramChatMessage.objects.filter(program_id=program_id).select_related("sender").order_by("created_at")
+        if after:
+            from django.utils.dateparse import parse_datetime
+            dt = parse_datetime(after)
+            if dt:
+                qs = qs.filter(created_at__gt=dt)
+
+        msgs = list(qs[:100])
+
+        # Typing indicator — clean stale entries (>4s)
+        now = _time.time()
+        typing_dict = _typing_state.get(program_id, {})
+        typing_users = []
+        for uid, ts in list(typing_dict.items()):
+            if now - ts > 4:
+                del typing_dict[uid]
+            elif uid != str(user.id):
+                typing_users.append(uid)
+
+        # Resolve typing user names
+        typing_names = []
+        if typing_users:
+            for u in User.objects.filter(id__in=typing_users):
+                typing_names.append(u.full_name or u.email.split("@")[0])
+
+        return {
+            "messages": [
+                {
+                    "id": str(m.id),
+                    "sender_id": str(m.sender.id),
+                    "sender_name": m.sender.full_name or m.sender.email.split("@")[0],
+                    "sender_avatar": getattr(m.sender, "avatar_url", "") or "",
+                    "content": m.content,
+                    "attachments": m.attachments or [],
+                    "is_system": m.is_system,
+                    "created_at": m.created_at.isoformat(),
+                }
+                for m in msgs
+            ],
+            "typing": typing_names,
+        }
+
+    result = await sync_to_async(_poll)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    if result == "forbidden":
+        raise HTTPException(status_code=403, detail="No tienes acceso")
+    return result
+
+
+@router.post("/portal/{portal_code}/chat/{program_id}/typing")
+async def set_typing(portal_code: str, program_id: str):
+    """Signal that user is typing."""
+    def _set():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+        if program_id not in _typing_state:
+            _typing_state[program_id] = {}
+        _typing_state[program_id][str(user.id)] = _time.time()
+        return {"ok": True}
+
+    result = await sync_to_async(_set)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    return result
+
+
+@router.get("/portal/{portal_code}/chat/{program_id}/participants")
+async def get_chat_participants(portal_code: str, program_id: str):
+    """Get list of participants in a program chat room."""
+    from programs.models import ProgramParticipant
+
+    def _fetch():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+        if not ProgramParticipant.objects.filter(user=user, program_id=program_id, deleted_at__isnull=True).exists():
+            return "forbidden"
+        pps = ProgramParticipant.objects.filter(program_id=program_id, deleted_at__isnull=True).select_related("user")
+        return {
+            "participants": [
+                {
+                    "id": str(pp.user.id),
+                    "name": pp.user.full_name or pp.user.email.split("@")[0],
+                    "avatar": getattr(pp.user, "avatar_url", "") or "",
+                    "role": pp.role,
+                    "is_me": pp.user.id == user.id,
+                }
+                for pp in pps
+            ]
+        }
+
+    result = await sync_to_async(_fetch)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    if result == "forbidden":
+        raise HTTPException(status_code=403, detail="No tienes acceso")
+    return result
+
+
+@router.post("/portal/{portal_code}/chat/{program_id}/upload")
+async def upload_chat_file(portal_code: str, program_id: str, file: UploadFile = FastAPIFile(...)):
+    """Upload a file attachment for chat. Returns file metadata to include in message."""
+    from programs.models import ProgramParticipant
+    import os, base64
+
+    def _check():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+        if not ProgramParticipant.objects.filter(user=user, program_id=program_id, deleted_at__isnull=True).exists():
+            return "forbidden"
+        return {"user_id": str(user.id)}
+
+    check = await sync_to_async(_check)()
+    if check is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    if check == "forbidden":
+        raise HTTPException(status_code=403, detail="No tienes acceso")
+
+    # Read file
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:  # 10MB limit
+        raise HTTPException(status_code=400, detail="Archivo muy grande (máx 10MB)")
+
+    # Save to static/chat_uploads/
+    import os
+    upload_dir = os.path.join(settings.BASE_DIR, "static", "chat_uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    safe_name = f"{uuid.uuid4().hex[:12]}_{file.filename}"
+    filepath = os.path.join(upload_dir, safe_name)
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    file_url = f"/static/chat_uploads/{safe_name}"
+    return {
+        "name": file.filename,
+        "url": file_url,
+        "size": len(content),
+        "type": file.content_type or "application/octet-stream",
+    }
+
+
+
 async def admin_resend_otp(
     user_id: uuid.UUID,
     authorization: Optional[str] = Header(None),
@@ -2758,6 +3492,16 @@ async def admin_companies_list(authorization: str = Header(None)):
     return [{"id": str(c[0]), "name": c[1]} for c in companies]
 
 
+@router.get("/by-slug/{slug}")
+async def get_company_by_slug(slug: str):
+    """Obtener empresa por slug"""
+    try:
+        company = await sync_to_async(Company.objects.get)(slug=slug)
+        return {"id": str(company.id), "name": company.name, "slug": company.slug}
+    except Company.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+
 @router.get("/{company_id}", response_model=CompanyResponse)
 async def get_company(company_id: uuid.UUID):
     """
@@ -2805,8 +3549,113 @@ async def update_company(company_id: uuid.UUID, payload: dict):
         )
 
 
+def _send_account_deleted_email(
+    company_name: str, company_corp_id: str, contact_name: str, contact_email: str,
+    contact_phone: str, plan: str, company_status: str, industry: str,
+    account_type: str, users_count: int, created_at: str,
+    deleted_by_name: str, deleted_by_email: str, client_ip: str, deletion_time: str,
+):
+    """Envía notificación de cuenta eliminada a macarena@inspiratoria.org con CC al contacto"""
+
+    plan_labels = {
+        'trial': 'Trial', 'starter': 'Starter', 'growth': 'Growth', 'enterprise': 'Enterprise',
+    }
+    status_labels = {
+        'pending': 'Pendiente', 'trial': 'Trial', 'active': 'Activa',
+        'suspended': 'Suspendida', 'cancelled': 'Cancelada',
+    }
+    type_labels = {'core': 'Core', 'studio': 'Studio'}
+
+    rows = [
+        ('Empresa', company_name),
+        ('ID Corporativo', company_corp_id or '—'),
+        ('Tipo de Cuenta', type_labels.get(account_type, account_type or '—')),
+        ('Plan', plan_labels.get(plan, plan or '—')),
+        ('Estado previo', status_labels.get(company_status, company_status or '—')),
+        ('Industria', industry or '—'),
+        ('Usuarios registrados', str(users_count)),
+        ('Creada el', created_at),
+        ('Contacto', contact_name or '—'),
+        ('Email de contacto', contact_email or '—'),
+        ('Teléfono de contacto', contact_phone or '—'),
+    ]
+
+    rows_html = ''
+    for i, (label, value) in enumerate(rows):
+        bg = '#f9fafb' if i % 2 == 0 else '#ffffff'
+        rows_html += (
+            f'<tr style="background:{bg};">'
+            f'<td style="padding:10px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:180px;">{label}</td>'
+            f'<td style="padding:10px 16px;font-size:13px;color:#111827;font-weight:500;border-bottom:1px solid #f3f4f6;">{value}</td>'
+            f'</tr>'
+        )
+
+    html_message = f'''
+    <div style="background-color:#f9fafb;padding:40px 16px;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+      <div style="max-width:560px;margin:0 auto;">
+        <div style="text-align:center;padding-bottom:28px;">
+          <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#0a0a0a;">Inspiratoria</span>
+        </div>
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
+          <div style="padding:32px 36px 24px;">
+            <div style="text-align:center;margin-bottom:24px;">
+              <div style="display:inline-block;width:48px;height:48px;background:#fef2f2;border-radius:12px;line-height:48px;font-size:22px;">&#128465;</div>
+            </div>
+            <h2 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#0a0a0a;text-align:center;">Cuenta Eliminada</h2>
+            <p style="margin:0 0 24px;font-size:14px;color:#6b7280;text-align:center;line-height:1.5;">
+              La cuenta <strong style="color:#111827;">{company_name}</strong> ha sido eliminada permanentemente de la plataforma.
+            </p>
+          </div>
+          <div style="padding:0 36px 28px;">
+            <p style="margin:0 0 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#9ca3af;font-weight:600;">Detalles de la cuenta</p>
+            <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+              {rows_html}
+            </table>
+          </div>
+          <div style="padding:0 36px 28px;">
+            <p style="margin:0 0 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#9ca3af;font-weight:600;">Eliminada por</p>
+            <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+              <tr style="background:#f9fafb;"><td style="padding:10px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:180px;">Usuario</td><td style="padding:10px 16px;font-size:13px;color:#111827;font-weight:500;border-bottom:1px solid #f3f4f6;">{deleted_by_name}</td></tr>
+              <tr style="background:#ffffff;"><td style="padding:10px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:180px;">Email</td><td style="padding:10px 16px;font-size:13px;color:#111827;font-weight:500;border-bottom:1px solid #f3f4f6;">{deleted_by_email or '—'}</td></tr>
+              <tr style="background:#f9fafb;"><td style="padding:10px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:180px;">Fecha y hora</td><td style="padding:10px 16px;font-size:13px;color:#111827;font-weight:500;border-bottom:1px solid #f3f4f6;">{deletion_time}</td></tr>
+              <tr style="background:#ffffff;"><td style="padding:10px 16px;font-size:13px;color:#6b7280;width:180px;">Dirección IP</td><td style="padding:10px 16px;font-size:13px;color:#111827;font-weight:500;">{client_ip or '—'}</td></tr>
+            </table>
+          </div>
+          <div style="padding:20px 36px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Este es un registro automático de seguridad. No requiere acción.</p>
+          </div>
+        </div>
+        <div style="text-align:center;padding-top:24px;">
+          <p style="margin:0;font-size:11px;color:#d1d5db;">&copy; Inspiratoria — Plataforma de Mentoring</p>
+        </div>
+      </div>
+    </div>'''
+
+    subject = f'[Inspiratoria] Cuenta eliminada: {company_name}'
+    plain_message = (
+        f'Cuenta eliminada: {company_name}\n'
+        f'ID: {company_corp_id}\nPlan: {plan}\nUsuarios: {users_count}\n'
+        f'Eliminada por: {deleted_by_name} ({deleted_by_email})\n'
+        f'Fecha: {deletion_time}\nIP: {client_ip}\n'
+    )
+
+    recipient_list = ['macarena@inspiratoria.org']
+    cc_list = [contact_email] if contact_email and contact_email != 'macarena@inspiratoria.org' else []
+
+    from django.core.mail import EmailMessage as DjangoEmailMessage
+    email = DjangoEmailMessage(
+        subject=subject,
+        body=html_message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=recipient_list,
+        cc=cc_list,
+    )
+    email.content_subtype = 'html'
+    email.send(fail_silently=False)
+
+
 @router.delete("/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_company(company_id: uuid.UUID):
+async def delete_company(company_id: uuid.UUID, request: Request):
     """
     Eliminar empresa y todos sus datos asociados (Admin Root only)
     PELIGRO: Esta acción es irreversible y eliminará:
@@ -2816,13 +3665,68 @@ async def delete_company(company_id: uuid.UUID):
     - Todos los datos asociados
     """
     from fastapi import status as http_status
+    import json
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
+
+        # Capture all company details before deletion
         company_name = company.name
-        
+        company_corp_id = company.corp_id or ''
+        company_contact_name = company.contact_name or ''
+        company_contact_email = company.contact_email or ''
+        company_contact_phone = company.contact_phone or ''
+        company_plan = company.plan or ''
+        company_status = company.status or ''
+        company_industry = company.industry or ''
+        company_account_type = getattr(company, 'account_type', '')
+        users_count = await sync_to_async(company.users.count)()
+        created_at = company.created_at.strftime('%d/%m/%Y %H:%M') if company.created_at else '—'
+
+        # Get deletion context from request body (optional)
+        deleted_by_name = 'Desconocido'
+        deleted_by_email = ''
+        client_ip = ''
+        try:
+            body = await request.json()
+            deleted_by_name = body.get('deleted_by_name', 'Desconocido')
+            deleted_by_email = body.get('deleted_by_email', '')
+            client_ip = body.get('client_ip', '')
+        except Exception:
+            pass
+
+        # Fallback IP from request headers
+        if not client_ip:
+            client_ip = request.headers.get('x-forwarded-for', request.headers.get('x-real-ip', ''))
+            if not client_ip and hasattr(request, 'client') and request.client:
+                client_ip = request.client.host or ''
+
+        deletion_time = timezone.now().strftime('%d/%m/%Y — %H:%M:%S')
+
         # Delete company (cascade will handle related objects)
         await sync_to_async(company.delete)()
-        
+
+        # Send notification email
+        try:
+            _send_account_deleted_email(
+                company_name=company_name,
+                company_corp_id=company_corp_id,
+                contact_name=company_contact_name,
+                contact_email=company_contact_email,
+                contact_phone=company_contact_phone,
+                plan=company_plan,
+                company_status=company_status,
+                industry=company_industry,
+                account_type=company_account_type,
+                users_count=users_count,
+                created_at=created_at,
+                deleted_by_name=deleted_by_name,
+                deleted_by_email=deleted_by_email,
+                client_ip=client_ip,
+                deletion_time=deletion_time,
+            )
+        except Exception as email_err:
+            print(f"[DELETE] Email notification failed: {email_err}")
+
         return None  # 204 No Content
     except Company.DoesNotExist:
         raise HTTPException(
@@ -3418,7 +4322,7 @@ async def login_with_totp(payload: TOTPLoginRequest):
         if user.company_id:
             try:
                 company = Company.objects.get(id=user.company_id)
-                return {"id": str(company.id), "name": company.name}
+                return {"id": str(company.id), "name": company.name, "slug": company.slug}
             except Company.DoesNotExist:
                 pass
         return None
@@ -3444,6 +4348,7 @@ async def login_with_totp(payload: TOTPLoginRequest):
             "is_onboarded": user.is_onboarded,
             "is_account_activated": True,
             "view_permissions": user.view_permissions or [],
+            "portal_code": user.portal_code or "",
         },
         "company": company_data,
     }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils.crypto import get_random_string
 import uuid
 
 
@@ -125,7 +126,7 @@ class Company(models.Model):
     max_participants = models.PositiveIntegerField(default=100)
     
     # Branding
-    logo_url = models.URLField(blank=True)
+    logo_url = models.TextField(blank=True, default="")
     primary_color = models.CharField(max_length=7, default="#FFD700")  # Hex color
     secondary_color = models.CharField(max_length=7, default="#1E293B")
     
@@ -347,6 +348,10 @@ class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True)
     position = models.CharField(max_length=100, blank=True)  # Cargo en la empresa
     department = models.CharField(max_length=100, blank=True)
+    linkedin_url = models.URLField(max_length=300, blank=True, default="")
+    bio = models.TextField(blank=True, default="")
+    headline = models.CharField(max_length=200, blank=True, default="")
+    skills = models.JSONField(default=list, blank=True)
     
     # Avatar (stored as base64 data URI in DB for Render compatibility)
     avatar_url = models.TextField(blank=True, default="")
@@ -378,6 +383,9 @@ class User(AbstractUser):
     # Token único para activación (link en email)
     activation_token = models.CharField(max_length=128, blank=True, default="")
     
+    # Portal code único para URL de participante (/p/{portal_code})
+    portal_code = models.CharField(max_length=12, unique=True, blank=True, null=True)
+    
     # Permisos de vistas del dashboard
     # Lista de vistas permitidas: dashboard, accounts, programs, billing, users, analytics, ecosystem, configuration
     view_permissions = models.JSONField(
@@ -397,11 +405,23 @@ class User(AbstractUser):
     def __str__(self) -> str:
         return f"{self.full_name} ({self.role})"
     
+    @staticmethod
+    def _generate_portal_code():
+        """Genera un código portal único de 8 caracteres alfanuméricos."""
+        from companies.models import User as _U
+        for _ in range(20):
+            code = get_random_string(8, 'abcdefghijkmnpqrstuvwxyz23456789')
+            if not _U.objects.filter(portal_code=code).exists():
+                return code
+        return get_random_string(12, 'abcdefghijkmnpqrstuvwxyz23456789')
+
     def save(self, *args, **kwargs):
         """
         Al guardar, si es superadmin o is_superuser, otorga todos los permisos automáticamente
         Esto implementa el Admin Root con permisos totales del SOP
         """
+        if not self.portal_code:
+            self.portal_code = User._generate_portal_code()
         if self.role == "superadmin" or self.is_superuser:
             self.can_manage_clients = True
             self.can_manage_programs = True

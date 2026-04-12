@@ -431,8 +431,8 @@ const gradients = [
 ];
 const gradient = (name: string) => gradients[name.charCodeAt(0) % gradients.length];
 
-const planLabel: Record<string, string> = { trial: "Trial", starter: "Starter", growth: "Growth", enterprise: "Enterprise" };
-const statusLabel: Record<string, string> = { active: "Activa", trial: "Trial", overdue: "Vencida", cancelled: "Cancelada", pending: "Pendiente" };
+const planLabel: Record<string, string> = { trial: "Suscripción", starter: "Starter", growth: "Growth", enterprise: "Enterprise" };
+const statusLabel: Record<string, string> = { active: "Activa", trial: "Activa", overdue: "Vencida", cancelled: "Cancelada", pending: "Pendiente" };
 const roleLabels: Record<string, string> = {
   admin_root: "Administradores",
   coordinator: "Coordinadores",
@@ -575,7 +575,8 @@ export default function BillingPage() {
     .filter(c => {
       const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.contact_email.toLowerCase().includes(search.toLowerCase());
       const matchPlan = filterPlan === "all" || c.plan === filterPlan;
-      const matchStatus = filterStatus === "all" || c.billing_status === filterStatus;
+      const normalizedStatus = c.billing_status === "trial" ? "active" : c.billing_status;
+      const matchStatus = filterStatus === "all" || normalizedStatus === filterStatus;
       return matchSearch && matchPlan && matchStatus;
     })
     .sort((a, b) => {
@@ -673,9 +674,9 @@ export default function BillingPage() {
                     </div>
 
                     <div className="bill-stat">
-                      <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", display: "block", marginBottom: 8 }}>EN TRIAL</span>
-                      <p style={{ fontSize: 28, fontWeight: 600, color: "#2563eb", margin: 0 }}>{stats?.trial ?? 0}</p>
-                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>cuentas en período de prueba</p>
+                      <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", display: "block", marginBottom: 8 }}>SUSCRIPCIONES ACTIVAS</span>
+                      <p style={{ fontSize: 28, fontWeight: 600, color: "#16a34a", margin: 0 }}>{(stats?.active ?? 0) + (stats?.trial ?? 0)}</p>
+                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>incluye cuentas migradas desde trial</p>
                     </div>
 
                     <div className="bill-stat">
@@ -726,7 +727,6 @@ export default function BillingPage() {
                         </div>
                         <select className="bill-select" value={filterPlan} onChange={e => setFilterPlan(e.target.value)}>
                           <option value="all">Todos los planes</option>
-                          <option value="trial">Trial</option>
                           <option value="starter">Starter</option>
                           <option value="growth">Growth</option>
                           <option value="enterprise">Enterprise</option>
@@ -734,7 +734,6 @@ export default function BillingPage() {
                         <select className="bill-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                           <option value="all">Todos los estados</option>
                           <option value="active">Activas</option>
-                          <option value="trial">Trial</option>
                           <option value="overdue">Vencidas</option>
                           <option value="cancelled">Canceladas</option>
                         </select>
@@ -782,8 +781,8 @@ export default function BillingPage() {
                                 </span>
                               </td>
                               <td style={{ padding: "12px 16px" }}>
-                                <span className={`bill-badge bill-badge-${c.billing_status}`}>
-                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.billing_status === "active" ? "#16a34a" : c.billing_status === "trial" ? "#2563eb" : c.billing_status === "overdue" ? "#dc2626" : "#6b7280" }}></span>
+                                <span className={`bill-badge bill-badge-${c.billing_status === "trial" ? "active" : c.billing_status}`}>
+                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.billing_status === "active" || c.billing_status === "trial" ? "#16a34a" : c.billing_status === "overdue" ? "#dc2626" : "#6b7280" }}></span>
                                   {statusLabel[c.billing_status] || c.billing_status}
                                 </span>
                               </td>

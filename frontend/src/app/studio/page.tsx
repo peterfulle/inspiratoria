@@ -21,7 +21,7 @@ export default function CoreRedirect() {
         const company = JSON.parse(companyStr);
         const slug = company?.slug || company?.name?.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'studio';
         const query = searchParams.toString();
-        router.replace(`/core/${slug}${query ? `?${query}` : ''}`);
+        router.replace(`/studio/${slug}${query ? `?${query}` : ''}`);
       } catch {
         router.replace('/login');
       }

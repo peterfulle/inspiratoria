@@ -673,7 +673,7 @@ export default function ProgramsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h1 className="text-lg sm:text-xl font-semibold text-neutral-900">Plantillas de Programas</h1>
-                <p className="text-neutral-500 text-sm mt-0.5">Catálogo white-label para clientes</p>
+                <p className="text-neutral-500 text-sm mt-0.5">Catálogo de programas disponibles</p>
               </div>
               
               <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -701,13 +701,6 @@ export default function ProgramsPage() {
         </header>
 
         <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-          {/* Info Banner */}
-          <div className="mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-100 rounded-xl">
-            <p className="text-sm text-blue-700">
-              <strong>White-Label:</strong> Estas son plantillas base. Cada empresa las agrega a su dashboard donde gestiona sus propios mentores, mentees y sesiones.
-            </p>
-          </div>
-
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="stat-card">

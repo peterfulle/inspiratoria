@@ -16,6 +16,7 @@ from .ai_service import neuralmorphic_service
 from companies.models import User, Company
 from programs.models import Program, Participant
 
+
 # Router
 router = APIRouter(prefix="/invitations", tags=["invitations"])
 

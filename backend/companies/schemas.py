@@ -87,6 +87,7 @@ class CompanyResponse(BaseModel):
     max_users: int
     max_programs: int
     max_participants: int
+    logo_url: Optional[str] = ""
     primary_color: str
     secondary_color: str
     onboarding_completed: bool
@@ -129,6 +130,7 @@ class UserResponse(BaseModel):
     department: Optional[str]
     avatar_url: Optional[str]
     is_onboarded: bool
+    view_permissions: Optional[list] = []
     created_at: datetime
 
     class Config:

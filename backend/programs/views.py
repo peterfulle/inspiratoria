@@ -2,16 +2,159 @@ from fastapi import APIRouter, HTTPException, status, UploadFile, File, Query
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, EmailStr
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from asgiref.sync import sync_to_async
 import pandas as pd
 import io
 import json
+import random
+import secrets
+
+from django.conf import settings
+from django.core.mail import send_mail
+from django.utils import timezone
+from django.db import models as db_models
 
 from companies.models import User
 from .models import Program, ProgramParticipant, Vinculation, AuditLog
 
 router = APIRouter(prefix="/programs", tags=["Programs"])
+
+
+PROGRAM_PARTICIPANT_ROLES = [
+    "facilitator",
+    "mentor",
+    "mentee",
+    "participant_cell",
+]
+
+LEGACY_PARTICIPANT_ROLE_MAP = {
+    "administrator": "facilitator",
+    "instructor": "mentor",
+    "participant": "participant_cell",
+    "observer": "participant_cell",
+}
+
+
+def normalize_participant_role(role: str) -> str:
+    role_normalized = (role or "").strip().lower()
+    if role_normalized in PROGRAM_PARTICIPANT_ROLES:
+        return role_normalized
+    if role_normalized in LEGACY_PARTICIPANT_ROLE_MAP:
+        return LEGACY_PARTICIPANT_ROLE_MAP[role_normalized]
+    return role_normalized
+
+
+def map_participant_role_to_user_role(participant_role: str) -> str:
+    role = normalize_participant_role(participant_role)
+    mapping = {
+        "facilitator": "facilitator_internal",
+        "mentor": "mentor",
+        "mentee": "mentee",
+        "participant_cell": "participant",
+    }
+    return mapping.get(role, "participant")
+
+
+def generate_otp_code() -> str:
+    return f"{random.randint(0, 9999):04d}"
+
+
+def send_participant_access_email(user: User, otp_code: str, activation_token: str):
+    """Envía email HTML con código OTP — diseño Inspiratoria (mismo que _send_otp_email)"""
+    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+    activation_link = f"{frontend_url}/activate/{activation_token}"
+
+    first_name = (user.full_name or user.first_name or "participante").split()[0]
+    d1, d2, d3, d4 = otp_code[0], otp_code[1], otp_code[2], otp_code[3]
+
+    subject = "Bienvenido a tu programa · Inspiratoria"
+    plain_message = (
+        f"Hola, {first_name}.\n\n"
+        f"Has sido agregado a un programa en Inspiratoria.\n\n"
+        f"Tu código de activación es: {otp_code}\n\n"
+        f"Activa tu cuenta aquí: {activation_link}\n\n"
+        f"Este código expira en 15 minutos.\n\n"
+        f"Equipo Inspiratoria"
+    )
+
+    html_message = f"""
+    <div style="background-color:#f9fafb;padding:40px 16px;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+      <div style="max-width:520px;margin:0 auto;">
+        <div style="text-align:center;padding-bottom:32px;">
+          <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#0a0a0a;">Inspiratoria</span>
+        </div>
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:40px 36px;">
+          <p style="margin:0 0 24px 0;color:#111827;font-size:17px;font-weight:500;">
+            Hola, {first_name}.
+          </p>
+          <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:1.7;">
+            Has sido agregado a un programa en Inspiratoria. Ya tienes acceso a la plataforma donde podrás participar, conectar con tu equipo y avanzar en tu proceso.
+          </p>
+          <p style="margin:0 0 28px 0;color:#374151;font-size:15px;line-height:1.7;">
+            Para comenzar, activa tu cuenta haciendo clic en el botón de abajo e ingresa tu código de acceso.
+          </p>
+          <div style="text-align:center;margin:0 0 12px 0;">
+            <p style="margin:0 0 12px 0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:3px;">Código de acceso</p>
+            <div style="display:inline-block;">
+              <span style="display:inline-block;width:48px;height:56px;line-height:56px;text-align:center;font-size:26px;font-weight:700;font-family:'Courier New',monospace;color:#0a0a0a;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;margin:0 3px;">{d1}</span>
+              <span style="display:inline-block;width:48px;height:56px;line-height:56px;text-align:center;font-size:26px;font-weight:700;font-family:'Courier New',monospace;color:#0a0a0a;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;margin:0 3px;">{d2}</span>
+              <span style="display:inline-block;width:48px;height:56px;line-height:56px;text-align:center;font-size:26px;font-weight:700;font-family:'Courier New',monospace;color:#0a0a0a;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;margin:0 3px;">{d3}</span>
+              <span style="display:inline-block;width:48px;height:56px;line-height:56px;text-align:center;font-size:26px;font-weight:700;font-family:'Courier New',monospace;color:#0a0a0a;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;margin:0 3px;">{d4}</span>
+            </div>
+            <p style="margin:10px 0 0 0;color:#9ca3af;font-size:12px;">Expira en 15 minutos</p>
+          </div>
+          <div style="text-align:center;margin:32px 0 0 0;">
+            <a href="{activation_link}" style="display:inline-block;background:#0a0a0a;color:#FFD902;padding:14px 40px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.3px;">Activar mi cuenta</a>
+          </div>
+        </div>
+        <div style="text-align:center;padding-top:28px;">
+          <p style="margin:0 0 12px 0;color:#d1d5db;font-size:11px;">
+            Si no solicitaste este acceso, puedes ignorar este mensaje.
+          </p>
+          <p style="margin:0;color:#d1d5db;font-size:11px;">Equipo Inspiratoria</p>
+        </div>
+      </div>
+    </div>
+    """
+
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        print(f"[PARTICIPANT EMAIL] Enviado a {user.email}")
+    except Exception as e:
+        print(f"[PARTICIPANT EMAIL ERROR] No se pudo enviar a {user.email}: {e}")
+
+
+def prepare_user_secure_access(user: User, send_invitation: bool):
+    if not send_invitation:
+        return
+
+    otp_code = generate_otp_code()
+    activation_token = secrets.token_urlsafe(32)
+
+    user.otp_code = otp_code
+    user.otp_expires_at = timezone.now() + timedelta(minutes=15)
+    user.activation_token = activation_token
+    user.is_account_activated = False
+    user.totp_enabled = False
+    user.is_onboarded = False
+    user.save(update_fields=[
+        "otp_code",
+        "otp_expires_at",
+        "activation_token",
+        "is_account_activated",
+        "totp_enabled",
+        "is_onboarded",
+    ])
+
+    send_participant_access_email(user, otp_code, activation_token)
 
 
 # ============ SCHEMAS ============
@@ -36,11 +179,12 @@ class CreateUserRequest(BaseModel):
     first_name: str
     last_name: str
     company_id: Optional[str] = None
+    role: Optional[str] = "participant_cell"
 
 
 class ParticipantCreateRequest(BaseModel):
     user_id: str
-    role: str = Field(..., pattern="^(administrator|instructor|participant|observer)$")
+    role: str = Field(..., pattern="^(facilitator|mentor|mentee|participant_cell|administrator|instructor|participant|observer)$")
     status: str = Field(default="pending", pattern="^(active|pending|suspended|inactive)$")
     send_invitation: bool = True
     vinculation_mentor_id: Optional[str] = None  # Si se vincula con un mentor al crear
@@ -64,7 +208,7 @@ class ParticipantResponse(BaseModel):
 
 
 class ParticipantUpdateRequest(BaseModel):
-    role: Optional[str] = Field(None, pattern="^(administrator|instructor|participant|observer)$")
+    role: Optional[str] = Field(None, pattern="^(facilitator|mentor|mentee|participant_cell|administrator|instructor|participant|observer)$")
     status: Optional[str] = Field(None, pattern="^(active|pending|suspended|inactive)$")
     configuration: Optional[Dict[str, Any]] = None
 
@@ -154,6 +298,89 @@ def validate_email_format(email: str) -> bool:
     import re
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return bool(re.match(pattern, email))
+
+
+# ============ PARTICIPANT PORTAL (My Programs) ============
+
+@router.get("/my-programs/{user_id}")
+async def get_my_programs(user_id: str):
+    """
+    Obtener los programas en los que participa un usuario (vista participante).
+    Retorna programas con módulos, actividades, progreso, etc.
+    """
+    def fetch():
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+        memberships = ProgramParticipant.objects.filter(
+            user=user, deleted_at__isnull=True
+        ).select_related('program', 'program__company')
+
+        results = []
+        for m in memberships:
+            p = m.program
+            # Activities for this program
+            activities = list(p.activities.all().values(
+                'id', 'name', 'description', 'activity_type', 'status',
+                'start_date', 'end_date', 'modality', 'meeting_url',
+            ))
+            # Modules (Content) from training activities
+            modules = []
+            for act in p.activities.filter(activity_type='training'):
+                for mod in act.modules.all().order_by('order'):
+                    modules.append({
+                        "id": mod.id,
+                        "title": mod.title,
+                        "description": mod.description,
+                        "order": mod.order,
+                        "duration_minutes": mod.duration_minutes,
+                        "is_published": mod.is_published,
+                        "activity_name": act.name,
+                    })
+            # Vinculations (mentor/mentee pairs)
+            from programs.models import Vinculation
+            vinc = Vinculation.objects.filter(
+                program=p, status='active'
+            ).filter(
+                db_models.Q(participant1__user=user) | db_models.Q(participant2__user=user)
+            ).select_related('participant1__user', 'participant2__user').first()
+            vinculation_info = None
+            if vinc:
+                other = vinc.participant2 if vinc.participant1.user == user else vinc.participant1
+                vinculation_info = {
+                    "type": vinc.type,
+                    "partner_name": other.user.get_full_name(),
+                    "partner_email": other.user.email,
+                    "partner_role": other.role,
+                }
+            # Total participants
+            total_participants = ProgramParticipant.objects.filter(
+                program=p, deleted_at__isnull=True
+            ).count()
+
+            results.append({
+                "id": str(p.id),
+                "name": p.name,
+                "description": p.description,
+                "theme": p.theme,
+                "status": p.status,
+                "company_name": p.company.name if p.company else None,
+                "company_slug": p.company.slug if p.company else None,
+                "my_role": m.role,
+                "my_status": m.status,
+                "joined_at": m.created_at.isoformat() if m.created_at else None,
+                "activated_at": m.activated_at.isoformat() if m.activated_at else None,
+                "total_participants": total_participants,
+                "activities": activities,
+                "modules": modules,
+                "vinculation": vinculation_info,
+            })
+        return results
+
+    data = await sync_to_async(fetch)()
+    return data
 
 
 # ============ PARTICIPANT ENDPOINTS ============
@@ -342,7 +569,7 @@ async def create_participant(program_id: str, payload: ParticipantCreateRequest)
                 detail="Usuario no encontrado"
             )
         
-        # Verificar si ya existe
+        # Verificar si ya existe (activo)
         if ProgramParticipant.objects.filter(
             program=program,
             user=user,
@@ -353,14 +580,33 @@ async def create_participant(program_id: str, payload: ParticipantCreateRequest)
                 detail="El usuario ya es participante de este programa"
             )
         
-        # Crear participante
-        participant = ProgramParticipant.objects.create(
-            program=program,
-            user=user,
-            role=payload.role,
-            status=payload.status,
-            invitation_sent_at=datetime.now() if payload.send_invitation else None
-        )
+        # Crear participante (o reactivar si fue soft-deleted)
+        participant_role = normalize_participant_role(payload.role)
+        existing_deleted = ProgramParticipant.objects.filter(
+            program=program, user=user
+        ).exclude(deleted_at__isnull=True).first()
+
+        if existing_deleted:
+            existing_deleted.role = participant_role
+            existing_deleted.status = payload.status
+            existing_deleted.deleted_at = None
+            existing_deleted.invitation_sent_at = datetime.now() if payload.send_invitation else None
+            existing_deleted.save()
+            participant = existing_deleted
+        else:
+            participant = ProgramParticipant.objects.create(
+                program=program,
+                user=user,
+                role=participant_role,
+                status=payload.status,
+                invitation_sent_at=datetime.now() if payload.send_invitation else None
+            )
+
+        # Mantener rol de usuario alineado al rol operativo dentro del programa
+        user_role = map_participant_role_to_user_role(participant_role)
+        if user.role != user_role:
+            user.role = user_role
+            user.save(update_fields=['role'])
         
         # Si se especificó vinculación con mentor
         if payload.vinculation_mentor_id:
@@ -380,7 +626,7 @@ async def create_participant(program_id: str, payload: ParticipantCreateRequest)
             except ProgramParticipant.DoesNotExist:
                 pass  # Silenciar error si no existe el mentor
         
-        # TODO: Enviar invitación por email si send_invitation=True
+        prepare_user_secure_access(user, payload.send_invitation)
         
         # Construir respuesta
         return {
@@ -431,7 +677,11 @@ async def update_participant(program_id: str, participant_id: str, payload: Part
         
         # Actualizar campos
         if payload.role:
-            participant.role = payload.role
+            participant.role = normalize_participant_role(payload.role)
+            user_role = map_participant_role_to_user_role(participant.role)
+            if participant.user.role != user_role:
+                participant.user.role = user_role
+                participant.user.save(update_fields=['role'])
         if payload.status:
             participant.status = payload.status
             if payload.status == 'active' and not participant.activated_at:
@@ -488,9 +738,9 @@ async def delete_participant(program_id: str, participant_id: str):
                 detail="Participante no encontrado"
             )
         
-        participant.is_deleted = True
         participant.status = 'deleted'
-        participant.save()
+        participant.deleted_at = datetime.now()
+        participant.save(update_fields=['status', 'deleted_at'])
     
     await sync_to_async(delete)()
     return None
@@ -552,12 +802,19 @@ async def create_user_for_program(request: CreateUserRequest):
     def create():
         from companies.models import Company
         
-        # Verificar si el email ya existe
-        if User.objects.filter(email=request.email).exists():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Ya existe un usuario con este email"
-            )
+        # Si el usuario ya existe, retornarlo (para poder agregarlo a programas)
+        existing = User.objects.filter(email=request.email).first()
+        if existing:
+            return {
+                "id": str(existing.id),
+                "email": existing.email,
+                "nombre": existing.first_name,
+                "apellidos": existing.last_name,
+                "telefono": getattr(existing, 'phone', ''),
+                "role": existing.role,
+                "company": existing.company.name if existing.company else None,
+                "is_onboarded": existing.is_onboarded,
+            }
         
         # Verificar company si se proporciona
         company = None
@@ -578,19 +835,19 @@ async def create_user_for_program(request: CreateUserRequest):
         # Crear usuario
         user = User.objects.create(
             email=request.email,
-            username=username,  # Username único generado
+            username=username,
             first_name=request.first_name,
             last_name=request.last_name,
             company=company,
-            role='participant',  # Rol por defecto
+            role=map_participant_role_to_user_role(request.role or 'participant_cell'),
             is_onboarded=False,
         )
         
         return {
             "id": str(user.id),
             "email": user.email,
-            "nombre": user.first_name,  # Mapear a 'nombre'
-            "apellidos": user.last_name,  # Mapear a 'apellidos'
+            "nombre": user.first_name,
+            "apellidos": user.last_name,
             "telefono": getattr(user, 'phone', ''),
             "role": user.role,
             "company": company.name if company else None,
@@ -626,7 +883,7 @@ async def download_template(program_id: str):
         'email': ['ejemplo@empresa.com'],
         'first_name': ['Juan'],
         'last_name': ['Pérez'],
-        'role': ['participant'],  # administrator, instructor, participant, observer
+        'role': ['participant_cell'],  # facilitator, mentor, mentee, participant_cell
         'vinculation_email': [''],  # Email del mentor (opcional)
     })
     
@@ -664,7 +921,11 @@ async def validate_batch(program_id: str, file: UploadFile = File(...)):
         
         # Leer Excel
         try:
-            df = pd.read_excel(file.file)
+            filename = (file.filename or '').lower()
+            if filename.endswith('.csv'):
+                df = pd.read_csv(file.file)
+            else:
+                df = pd.read_excel(file.file)
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -701,7 +962,7 @@ async def validate_batch(program_id: str, file: UploadFile = File(...)):
             email = str(row.get('email', '')).strip().lower()
             first_name = str(row.get('first_name', '')).strip()
             last_name = str(row.get('last_name', '')).strip()
-            role = str(row.get('role', '')).strip().lower()
+            role = normalize_participant_role(str(row.get('role', '')).strip().lower())
             vinculation_email = str(row.get('vinculation_email', '')).strip().lower() if pd.notna(row.get('vinculation_email')) else None
             
             # Validar email
@@ -715,7 +976,7 @@ async def validate_batch(program_id: str, file: UploadFile = File(...)):
                 errors.append("Apellido requerido")
             
             # Validar rol
-            valid_roles = ['administrator', 'instructor', 'participant', 'observer']
+            valid_roles = PROGRAM_PARTICIPANT_ROLES
             if role not in valid_roles:
                 errors.append(f"Rol inválido. Debe ser: {', '.join(valid_roles)}")
             
@@ -798,17 +1059,24 @@ async def import_batch(program_id: str, payload: BatchImportRequest):
                     defaults={
                         'first_name': row_data['first_name'].strip(),
                         'last_name': row_data['last_name'].strip(),
-                        'role': 'participant',
+                        'role': map_participant_role_to_user_role(row_data.get('role', 'participant_cell')),
                         'is_onboarded': False,
                     }
                 )
+
+                normalized_role = normalize_participant_role(row_data.get('role', 'participant_cell'))
+
+                desired_user_role = map_participant_role_to_user_role(normalized_role)
+                if user.role != desired_user_role:
+                    user.role = desired_user_role
+                    user.save(update_fields=['role'])
                 
                 # Crear participante
                 participant, part_created = ProgramParticipant.objects.get_or_create(
                     program=program,
                     user=user,
                     defaults={
-                        'role': row_data['role'],
+                        'role': normalized_role,
                         'status': 'pending',
                         'invitation_sent_at': datetime.now() if payload.send_invitations else None,
                     }
@@ -821,7 +1089,7 @@ async def import_batch(program_id: str, payload: BatchImportRequest):
                         'user_created': user_created
                     })
                     
-                    # TODO: Enviar invitación si send_invitations=True
+                    prepare_user_secure_access(user, payload.send_invitations)
                 
             except Exception as e:
                 errors.append({

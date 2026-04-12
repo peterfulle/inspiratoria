@@ -515,6 +515,12 @@ class ProgramParticipant(models.Model):
     Extiende la funcionalidad del modelo Participant original.
     """
     ROLE_CHOICES = [
+        # Roles nuevos para gestion de participantes del programa
+        ("facilitator", "Facilitador"),
+        ("mentor", "Mentor"),
+        ("mentee", "Mentee"),
+        ("participant_cell", "Participante Celula"),
+        # Roles legacy para compatibilidad con data historica
         ("administrator", "Administrador"),
         ("instructor", "Instructor"),
         ("participant", "Participante"),
@@ -539,7 +545,7 @@ class ProgramParticipant(models.Model):
         on_delete=models.CASCADE, 
         related_name="program_memberships"
     )
-    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="participant")
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="participant_cell")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     
     # Fechas de seguimiento
@@ -637,6 +643,27 @@ class AuditLog(models.Model):
     
     def __str__(self) -> str:
         return f"{self.action} - {self.admin_user.username} - {self.created_at}"
+
+
+class ProgramChatMessage(models.Model):
+    """Mensajes de chat grupal por programa — tiempo real entre participantes."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    program = models.ForeignKey(Program, on_delete=models.CASCADE, related_name="chat_messages")
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_chat_messages")
+    content = models.TextField(blank=True)
+    # Attachments stored as JSON list: [{"name": "file.pdf", "url": "...", "size": 1234, "type": "application/pdf"}]
+    attachments = models.JSONField(default=list, blank=True)
+    is_system = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["program", "-created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.sender.email}: {self.content[:50]}"
 
 
 class ProgramTemplate(models.Model):

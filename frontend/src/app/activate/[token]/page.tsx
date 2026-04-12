@@ -152,15 +152,19 @@ export default function ActivatePage() {
       localStorage.setItem("auth_token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       if (data.company) localStorage.setItem("company", JSON.stringify(data.company));
+      if (data.program_participant) localStorage.setItem("program_participant", JSON.stringify(data.program_participant));
       if (data.expires_at) localStorage.setItem("session_expires_at", data.expires_at);
 
       setStep("done");
       setTimeout(() => {
         const role = data.user?.role;
-        if (role === "admin_root" || role === "inspiratoria_admin" || role === "superadmin") {
+        const pp = data.program_participant;
+        if (pp && pp.company_slug) {
+          router.push(`/studio/${pp.company_slug}`);
+        } else if (role === "admin_root" || role === "inspiratoria_admin" || role === "superadmin") {
           router.push("/dashboard");
         } else if (data.company) {
-          router.push("/core");
+          router.push("/studio");
         } else {
           router.push("/dashboard");
         }

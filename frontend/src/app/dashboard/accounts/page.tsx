@@ -1539,6 +1539,7 @@ interface CompanyItem {
   program_count?: number;
   assigned_pm_id?: string | null;
   assigned_pm_name?: string | null;
+  logo_url?: string;
 }
 
 // ============================================================================
@@ -1610,6 +1611,26 @@ export default function AccountsPage() {
     }
   };
 
+  const resetStudioModal = () => {
+    setShowModal(false);
+    setModalStep(1);
+    setModalLoading(false);
+    setModalError('');
+    setModalEmailError('');
+    setCountryDropdownOpen(false);
+    setModalForm({ nombre: '', apellido: '', cargo: '', empresa: '', email: '', pais: '', whatsapp: '', idea: '' });
+    setModalCountry(null);
+  };
+
+  const normalizeBackendError = (detail: unknown) => {
+    const raw = typeof detail === 'string' ? detail : 'Error al crear la cuenta';
+    const low = raw.toLowerCase();
+    if (low.includes('unique') || low.includes('already exists') || low.includes('ya existe') || low.includes('email')) {
+      return 'Ya existe un usuario con ese email. Usa otro correo corporativo.';
+    }
+    return raw;
+  };
+
   const handleModalSubmit = async () => {
     setModalError('');
     setModalLoading(true);
@@ -1617,23 +1638,50 @@ export default function AccountsPage() {
       const fullWhatsapp = modalCountry ? `${modalCountry.dial} ${modalForm.whatsapp}` : modalForm.whatsapp;
       const submitData = { ...modalForm, whatsapp: fullWhatsapp };
 
-      // Register in backend
-      try {
-        await fetch(`${API}/api/companies/auth/register-studio`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(submitData),
-        });
-      } catch { /* don't block */ }
+      // 1) Crea empresa Studio
+      const registerRes = await fetch(`${API}/api/companies/auth/register-studio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submitData),
+      });
+      const registerData = await registerRes.json().catch(() => ({}));
+      if (!registerRes.ok || !registerData?.company?.id) {
+        throw new Error(normalizeBackendError(registerData?.detail || 'No se pudo crear la empresa Studio'));
+      }
 
-      // Send notification email
-      try {
-        await fetch('/api/studio-inquiry', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(submitData),
-        });
-      } catch { /* don't block */ }
+      // 2) Crea usuario admin + cuenta Studio (activa, sin revisión manual)
+      const adminName = `${modalForm.nombre} ${modalForm.apellido}`.trim();
+      const createRes = await fetch(`${API}/api/companies/solicitudes/${registerData.company.id}/create-account`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_name: adminName,
+          admin_email: modalForm.email,
+          admin_position: modalForm.cargo || 'Administrador de Programa',
+        }),
+      });
+      const accountData = await createRes.json().catch(() => ({}));
+      if (!createRes.ok) {
+        throw new Error(normalizeBackendError(accountData?.detail || 'No se pudo crear el usuario administrador'));
+      }
+
+      // 3) Enviar credenciales por correo
+      const baseUrl = window.location.origin;
+      await fetch('/api/studio-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_name: adminName,
+          admin_email: modalForm.email,
+          company_name: modalForm.empresa,
+          generated_password: accountData.generated_password,
+          access_hash: accountData.access_hash,
+          corp_id: accountData.corp_id || registerData.company.corp_id || '',
+          plan: accountData.plan || registerData.company.plan || 'trial',
+          login_url: `${baseUrl}/login`,
+          dashboard_url: `${baseUrl}/studio/${registerData.company.slug || 'studio'}/dashboard`,
+        }),
+      });
 
       setModalStep(4);
       // Refresh companies list
@@ -1646,8 +1694,8 @@ export default function AccountsPage() {
         const sRes = await fetch(`${API}/api/companies/stats`);
         if (sRes.ok) setStats(await sRes.json());
       } catch { /* ignore */ }
-    } catch {
-      setModalError('Error de conexión. Intenta nuevamente.');
+    } catch (err: any) {
+      setModalError(err?.message || 'Error de conexión. Intenta nuevamente.');
     } finally {
       setModalLoading(false);
     }
@@ -1840,7 +1888,7 @@ export default function AccountsPage() {
             </h1>
             <p className="acc-subtitle">Gestión de clientes y suscripciones</p>
           </div>
-          <button className="acc-btn-primary" onClick={() => { setShowModal(true); setModalStep(1); setModalError(''); setModalForm({ nombre: '', apellido: '', cargo: '', empresa: '', email: '', pais: '', whatsapp: '', idea: '' }); setModalCountry(null); setModalEmailError(''); }}>
+          <button className="acc-btn-primary" onClick={() => { resetStudioModal(); setShowModal(true); }}>
             {Icons.plus}
             Nueva Cuenta
           </button>
@@ -1970,8 +2018,8 @@ export default function AccountsPage() {
                 className="acc-company-row"
                 onClick={() => router.push(`/dashboard/accounts/${company.id}`)}
               >
-                <div className="acc-company-avatar">
-                  {getInitials(company.name)}
+                <div className="acc-company-avatar" style={company.logo_url ? { padding: 0, overflow: 'hidden' } : {}}>
+                  {company.logo_url ? <img src={company.logo_url} alt={company.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(company.name)}
                 </div>
                 <div className="acc-company-info">
                   <div className="acc-company-name">{company.name}</div>
@@ -2028,8 +2076,8 @@ export default function AccountsPage() {
                 onClick={() => router.push(`/dashboard/accounts/${company.id}`)}
               >
                 <div className="acc-card-header">
-                  <div className="acc-company-avatar">
-                    {getInitials(company.name)}
+                  <div className="acc-company-avatar" style={company.logo_url ? { padding: 0, overflow: 'hidden' } : {}}>
+                    {company.logo_url ? <img src={company.logo_url} alt={company.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(company.name)}
                   </div>
                   <div className="acc-company-info">
                     <div className="acc-company-name">{company.name}</div>
@@ -2114,7 +2162,7 @@ export default function AccountsPage() {
 
       {/* ═══ MODAL: Nueva Cuenta Studio ═══ */}
       {showModal && (
-        <div className="acc-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
+        <div className="acc-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) resetStudioModal(); }}>
           <div className="acc-modal-body">
             {/* Header */}
             <div className="acc-modal-header">
@@ -2122,7 +2170,7 @@ export default function AccountsPage() {
                 Nueva Cuenta Studio
                 <span className="acc-modal-badge">Studio</span>
               </div>
-              <button className="acc-modal-close" onClick={() => setShowModal(false)}>
+              <button className="acc-modal-close" onClick={resetStudioModal}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -2310,7 +2358,7 @@ export default function AccountsPage() {
                     </div>
                   </div>
 
-                  <button className="acc-modal-btn" onClick={() => setShowModal(false)} style={{ marginTop: '1rem' }}>
+                  <button className="acc-modal-btn" onClick={resetStudioModal} style={{ marginTop: '1rem' }}>
                     Cerrar
                   </button>
                 </div>

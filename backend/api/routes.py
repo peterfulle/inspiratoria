@@ -316,11 +316,14 @@ def list_programs(company_id: Optional[str] = None) -> List[dict]:
             "company": {
                 "id": str(p.company.id),
                 "name": p.company.name,
+                "slug": p.company.slug,
             } if p.company else None,
             "status": p.status,
             "activities": activities_data,
             "activities_count": len(activities_data),
             "participants_count": participants_count,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "updated_at": p.updated_at.isoformat() if p.updated_at else None,
         })
     
     return result
@@ -451,6 +454,7 @@ def create_program(payload: ProgramIn) -> dict:
         "company": {
             "id": str(program.company.id),
             "name": program.company.name,
+            "slug": program.company.slug,
         } if program.company else None,
         "status": program.status,
         "activities": activities_data,
@@ -535,6 +539,7 @@ def get_program(program_id: str) -> dict:
             "company": {
                 "id": str(program.company.id),
                 "name": program.company.name,
+                "slug": program.company.slug,
             } if program.company else None,
             "status": program.status,
             "activities": activities_data,
@@ -566,6 +571,7 @@ def update_program(program_id: str, payload: ProgramIn) -> dict:
             "company": {
                 "id": str(program.company.id),
                 "name": program.company.name,
+                "slug": program.company.slug,
             } if program.company else None,
             "status": program.status,
         }
@@ -700,8 +706,11 @@ def get_program_participants(program_id: str):
                     "id": str(user.id),
                     "nombre": user.first_name,
                     "apellidos": user.last_name,
+                    "full_name": getattr(user, 'full_name', '') or f"{user.first_name} {user.last_name}".strip(),
                     "email": user.email,
                     "telefono": getattr(user, 'phone', ''),
+                    "avatar_url": getattr(user, 'avatar_url', '') or '',
+                    "headline": getattr(user, 'headline', '') or '',
                 },
                 "role": p.role or "participant",
                 "status": p.status or "pending",
@@ -792,10 +801,19 @@ def add_participant_to_program(program_id: str, payload: dict):
             raise HTTPException(status_code=400, detail="El usuario ya está en este programa")
         
         # Crear participante
+        normalized_role = (payload.get('role') or 'participant_cell').strip().lower()
+        legacy_map = {
+            'administrator': 'facilitator',
+            'instructor': 'mentor',
+            'participant': 'participant_cell',
+            'observer': 'participant_cell',
+        }
+        normalized_role = legacy_map.get(normalized_role, normalized_role)
+
         participant = ProgramParticipant.objects.create(
             program=program,
             user=user,
-            role=payload.get('role', 'participant'),
+            role=normalized_role,
             status=payload.get('status', 'pending')
         )
         
@@ -821,17 +839,21 @@ def add_participant_to_program(program_id: str, payload: dict):
 @router.delete("/programs/{program_id}/participants/{participant_id}", status_code=204)
 def remove_participant_from_program(program_id: str, participant_id: str):
     """
-    Eliminar un participante de un programa
+    Eliminar un participante de un programa (soft delete)
     """
     from programs.models import ProgramParticipant
+    from datetime import datetime
     import uuid
     
     try:
         participant = ProgramParticipant.objects.get(
-            id=uuid.UUID(participant_id),
-            program_id=uuid.UUID(program_id)
+            id=participant_id,
+            program_id=uuid.UUID(program_id),
+            deleted_at__isnull=True
         )
-        participant.delete()
+        participant.status = 'deleted'
+        participant.deleted_at = datetime.now()
+        participant.save(update_fields=['status', 'deleted_at'])
     except ProgramParticipant.DoesNotExist:
         raise HTTPException(status_code=404, detail="Participant not found")
 
@@ -840,6 +862,7 @@ class CreateUserRequest(BaseModel):
     email: str
     first_name: str
     last_name: str
+    role: str = 'participant_cell'
 
 
 @router.post("/programs/users", status_code=201)
@@ -860,7 +883,8 @@ async def create_user_for_program(request: CreateUserRequest):
             email=request.email,
             first_name=request.first_name,
             last_name=request.last_name,
-            username=request.email  # Usar email como username
+            username=request.email,  # Usar email como username
+            role='participant' if request.role == 'participant_cell' else request.role,
         )
         
         return {

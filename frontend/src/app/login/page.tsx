@@ -51,7 +51,7 @@ export default function LoginPage() {
     if (role === "admin_root" || role === "inspiratoria_admin" || role === "superadmin") {
       return "/dashboard";
     }
-    if (hasCompany) return "/core";
+    if (hasCompany) return "/studio";
     return "/dashboard";
   };
 

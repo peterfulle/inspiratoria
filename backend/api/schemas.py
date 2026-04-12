@@ -11,6 +11,7 @@ class CompanyBasic(BaseModel):
     """Schema básico para company anidado"""
     id: str
     name: str
+    slug: Optional[str] = None
 
 
 class ProgramIn(BaseModel):
@@ -30,6 +31,8 @@ class ProgramOut(ProgramIn):
     activities: Optional[List[Dict[str, Any]]] = None  # Lista de actividades
     activities_count: Optional[int] = 0
     participants_count: Optional[int] = 0
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

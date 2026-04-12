@@ -130,19 +130,34 @@ function AdminLoginContent() {
 
       const data = res.data;
 
-      // Save session
+      // Clear old session data first
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("company");
+      localStorage.removeItem("program_participant");
+      localStorage.removeItem("session_expires_at");
+
+      // Save new session
       localStorage.setItem("auth_token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       if (data.company) localStorage.setItem("company", JSON.stringify(data.company));
+      if (data.program_participant) localStorage.setItem("program_participant", JSON.stringify(data.program_participant));
       if (data.expires_at) localStorage.setItem("session_expires_at", data.expires_at);
 
       setSuccess("¡Bienvenido!");
       setTimeout(() => {
         const role = data.user?.role;
-        if (role === "admin_root" || role === "inspiratoria_admin" || role === "superadmin") {
+        const pp = data.program_participant;
+        const portalCode = data.user?.portal_code;
+        const participantRoles = ['facilitator', 'mentor', 'mentee', 'participant_cell', 'participant', 'facilitator_internal'];
+        if (participantRoles.includes(role) && portalCode) {
+          router.push(`/p/${portalCode}`);
+        } else if (pp && pp.company_slug && portalCode && participantRoles.includes(role)) {
+          router.push(`/p/${portalCode}`);
+        } else if (role === "admin_root" || role === "inspiratoria_admin" || role === "superadmin") {
           router.push("/dashboard");
         } else if (data.company) {
-          router.push("/core");
+          router.push("/studio");
         } else {
           router.push("/dashboard");
         }
