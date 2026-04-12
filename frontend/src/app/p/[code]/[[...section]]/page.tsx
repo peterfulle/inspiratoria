@@ -1903,7 +1903,7 @@ export default function ParticipantPortalPage() {
       return { status: 'locked' as const, progress: 0 };
     });
 
-    const completedModules = moduleStatuses.filter(m => m.status === 'completed').length;
+    const completedModules = moduleStatuses.filter((m: any) => m.status === 'completed').length;
     const completedActivities = activities.filter((a: any) => a.status === 'completed').length;
 
     // Build timeline items: interleave modules with milestones at correct positions

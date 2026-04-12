@@ -9,7 +9,7 @@ interface Program {
   description: string;
   theme: string;
   status: string;
-  company?: { id: string; name: string };
+  company?: { id: string; name: string; slug?: string };
   company_name?: string;
   created_at: string;
   updated_at: string;
