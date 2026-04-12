@@ -3215,7 +3215,7 @@ async def get_chat_participants(portal_code: str, program_id: str):
             return None
         if not ProgramParticipant.objects.filter(user=user, program_id=program_id, deleted_at__isnull=True).exists():
             return "forbidden"
-        pps = ProgramParticipant.objects.filter(program_id=program_id, deleted_at__isnull=True).select_related("user")
+        pps = ProgramParticipant.objects.filter(program_id=program_id, deleted_at__isnull=True).select_related("user", "program")
         return {
             "participants": [
                 {
@@ -3224,6 +3224,14 @@ async def get_chat_participants(portal_code: str, program_id: str):
                     "avatar": getattr(pp.user, "avatar_url", "") or "",
                     "role": pp.role,
                     "is_me": pp.user.id == user.id,
+                    "email": pp.user.email,
+                    "headline": getattr(pp.user, "headline", "") or "",
+                    "bio": getattr(pp.user, "bio", "") or "",
+                    "skills": getattr(pp.user, "skills", []) or [],
+                    "linkedin_url": getattr(pp.user, "linkedin_url", "") or "",
+                    "position": getattr(pp.user, "position", "") or "",
+                    "department": getattr(pp.user, "department", "") or "",
+                    "program_name": pp.program.name if pp.program else "",
                 }
                 for pp in pps
             ]

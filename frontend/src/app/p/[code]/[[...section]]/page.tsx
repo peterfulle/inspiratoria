@@ -608,11 +608,39 @@ const styles = `
   /* System message */
   .cht-system { text-align: center; font-size: 0.68rem; color: #444; padding: 10px 0; font-style: italic; }
 
+  /* Profile detail modal */
+  .cht-profile-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); animation: chtFadeIn 0.2s; }
+  @keyframes chtFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .cht-profile-card { width: 380px; max-width: 92vw; max-height: 85vh; overflow-y: auto; background: #ffffff; border-radius: 20px; border: 1px solid #e5e7eb; box-shadow: 0 24px 64px rgba(0,0,0,0.12); animation: chtSlideUp 0.25s ease-out; }
+  @keyframes chtSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .cht-profile-header { position: relative; padding: 32px 24px 20px; text-align: center; border-bottom: 1px solid #f0f0f0; }
+  .cht-profile-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; border: none; background: #f3f4f6; color: #6b7280; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; font-size: 1.1rem; }
+  .cht-profile-close:hover { background: #e5e7eb; color: #111; }
+  .cht-profile-avatar { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 14px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 700; color: #9ca3af; overflow: hidden; border: 2px solid #e5e7eb; }
+  .cht-profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .cht-profile-name { font-size: 1.1rem; font-weight: 700; color: #111827; margin-bottom: 4px; }
+  .cht-profile-headline { font-size: 0.78rem; color: #6b7280; line-height: 1.4; }
+  .cht-profile-role-badge { display: inline-block; margin-top: 10px; padding: 4px 14px; border-radius: 20px; font-size: 0.68rem; font-weight: 600; text-transform: capitalize; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+  .cht-profile-body { padding: 20px 24px; }
+  .cht-profile-section { margin-bottom: 18px; }
+  .cht-profile-label { font-size: 0.62rem; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .cht-profile-value { font-size: 0.82rem; color: #374151; line-height: 1.5; }
+  .cht-profile-value a { color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
+  .cht-profile-value a:hover { color: #1d4ed8; }
+  .cht-profile-skills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cht-profile-skill { padding: 4px 10px; border-radius: 8px; font-size: 0.68rem; font-weight: 500; background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+  .cht-profile-program { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f9fafb; border-radius: 12px; border: 1px solid #e5e7eb; }
+  .cht-profile-program-icon { width: 36px; height: 36px; border-radius: 10px; background: #e0e7ff; display: flex; align-items: center; justify-content: center; color: #4338ca; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }
+  .cht-profile-program-name { font-size: 0.78rem; font-weight: 600; color: #111827; }
+  .cht-profile-program-role { font-size: 0.62rem; color: #6b7280; text-transform: capitalize; }
+  .cht-profile-empty { font-size: 0.75rem; color: #9ca3af; font-style: italic; }
+
   @media (max-width: 768px) {
     .cht-page { flex-direction: column; height: calc(100vh - 120px); }
     .cht-sidebar { width: 100%; max-height: 220px; border-right: none; border-bottom: 1px solid #1e1e1e; }
     .cht-msg-body { max-width: 85%; }
     .cht-messages { padding: 16px 14px; }
+    .cht-profile-card { width: 95vw; }
   }
 `;
 
@@ -713,6 +741,7 @@ export default function ParticipantPortalPage() {
   const [chatUserId, setChatUserId] = useState('');
   const [chatParticipants, setChatParticipants] = useState<any[]>([]);
   const [chatSidebarTab, setChatSidebarTab] = useState<'chats' | 'people'>('chats');
+  const [chatProfileDetail, setChatProfileDetail] = useState<any>(null);
   const chatMessagesRef = useRef<HTMLDivElement>(null);
   const chatPollRef = useRef<any>(null);
   const chatTypingRef = useRef<any>(null);
@@ -2704,7 +2733,7 @@ export default function ParticipantPortalPage() {
                 </div>
               ) : (
                 chatParticipants.map((p: any) => (
-                  <div key={p.id} className="cht-person">
+                  <div key={p.id} className="cht-person" onClick={() => setChatProfileDetail(p)} style={{ cursor: 'pointer' }}>
                     <div className="cht-person-avi">
                       {p.avatar ? <img src={avatarSrc(p.avatar)} alt="" /> : p.name.charAt(0).toUpperCase()}
                     </div>
@@ -2775,7 +2804,10 @@ export default function ParticipantPortalPage() {
                         {showDate && <div className="cht-date-sep"><span>{dateLabel}</span></div>}
                         <div className={`cht-msg-group${isMine ? ' mine' : ''}`}>
                           {!sameSender ? (
-                            <div className="cht-msg-avi">
+                            <div className="cht-msg-avi" style={{ cursor: 'pointer' }} onClick={() => {
+                              const participant = chatParticipants.find((p: any) => p.id === m.sender_id);
+                              if (participant) setChatProfileDetail(participant);
+                            }}>
                               {m.sender_avatar ? <img src={avatarSrc(m.sender_avatar)} alt="" /> : m.sender_name.charAt(0).toUpperCase()}
                             </div>
                           ) : <div style={{ width: 34, flexShrink: 0 }} />}
@@ -2861,6 +2893,95 @@ export default function ParticipantPortalPage() {
             </div>
           )}
         </div>
+
+      {/* Profile Detail Modal */}
+      {chatProfileDetail && (
+        <div className="cht-profile-overlay" onClick={() => setChatProfileDetail(null)}>
+          <div className="cht-profile-card" onClick={e => e.stopPropagation()}>
+            <div className="cht-profile-header">
+              <button className="cht-profile-close" onClick={() => setChatProfileDetail(null)}>&times;</button>
+              <div className="cht-profile-avatar">
+                {chatProfileDetail.avatar ? <img src={avatarSrc(chatProfileDetail.avatar)} alt="" /> : chatProfileDetail.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="cht-profile-name">{chatProfileDetail.name}</div>
+              {chatProfileDetail.headline && <div className="cht-profile-headline">{chatProfileDetail.headline}</div>}
+              <span className="cht-profile-role-badge">{chatProfileDetail.role || 'Participante'}</span>
+            </div>
+            <div className="cht-profile-body">
+              {/* Program */}
+              {(chatProfileDetail.program_name || chatActiveProgram?.name) && (
+                <div className="cht-profile-section">
+                  <div className="cht-profile-label">Programa</div>
+                  <div className="cht-profile-program">
+                    <div className="cht-profile-program-icon">{(chatProfileDetail.program_name || chatActiveProgram?.name || '?').charAt(0)}</div>
+                    <div>
+                      <div className="cht-profile-program-name">{chatProfileDetail.program_name || chatActiveProgram?.name}</div>
+                      <div className="cht-profile-program-role">{chatProfileDetail.role || 'Participante'}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Position / Department */}
+              {(chatProfileDetail.position || chatProfileDetail.department) && (
+                <div className="cht-profile-section">
+                  <div className="cht-profile-label">Cargo</div>
+                  <div className="cht-profile-value">
+                    {chatProfileDetail.position}{chatProfileDetail.position && chatProfileDetail.department ? ' · ' : ''}{chatProfileDetail.department}
+                  </div>
+                </div>
+              )}
+
+              {/* Bio */}
+              {chatProfileDetail.bio && (
+                <div className="cht-profile-section">
+                  <div className="cht-profile-label">Acerca de</div>
+                  <div className="cht-profile-value">{chatProfileDetail.bio}</div>
+                </div>
+              )}
+
+              {/* Skills */}
+              {chatProfileDetail.skills && chatProfileDetail.skills.length > 0 && (
+                <div className="cht-profile-section">
+                  <div className="cht-profile-label">Habilidades</div>
+                  <div className="cht-profile-skills">
+                    {chatProfileDetail.skills.map((s: string, i: number) => (
+                      <span key={i} className="cht-profile-skill">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* LinkedIn */}
+              {chatProfileDetail.linkedin_url && (
+                <div className="cht-profile-section">
+                  <div className="cht-profile-label">LinkedIn</div>
+                  <div className="cht-profile-value">
+                    <a href={chatProfileDetail.linkedin_url} target="_blank" rel="noopener noreferrer">
+                      {chatProfileDetail.linkedin_url.replace(/^https?:\/\/(www\.)?/, '')}
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Email */}
+              {chatProfileDetail.email && !chatProfileDetail.is_me && (
+                <div className="cht-profile-section">
+                  <div className="cht-profile-label">Email</div>
+                  <div className="cht-profile-value">
+                    <a href={`mailto:${chatProfileDetail.email}`}>{chatProfileDetail.email}</a>
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state */}
+              {!chatProfileDetail.bio && (!chatProfileDetail.skills || chatProfileDetail.skills.length === 0) && !chatProfileDetail.linkedin_url && !chatProfileDetail.position && (
+                <div className="cht-profile-empty">Este participante aún no ha completado su perfil.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     );
   };
