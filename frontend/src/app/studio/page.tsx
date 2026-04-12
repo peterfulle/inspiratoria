@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function CoreRedirect() {
+function StudioRedirectInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -37,5 +37,13 @@ export default function CoreRedirect() {
         <p className="text-sm text-gray-500">Redirigiendo a tu Studio...</p>
       </div>
     </div>
+  );
+}
+
+export default function CoreRedirect() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}>
+      <StudioRedirectInner />
+    </Suspense>
   );
 }
