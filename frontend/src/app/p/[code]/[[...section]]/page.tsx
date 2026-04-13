@@ -757,6 +757,16 @@ export default function ParticipantPortalPage() {
   const totalSessions = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.sessions || 0), 0) || 0;
   const totalResources = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.resources?.length || 0), 0) || 0;
 
+  // Profile completeness gate — all these fields must be filled
+  const isProfileComplete = !!(
+    portalUser?.full_name?.trim() &&
+    portalUser?.headline?.trim() &&
+    portalUser?.position?.trim() &&
+    portalUser?.department?.trim() &&
+    portalUser?.bio?.trim() &&
+    portalUser?.linkedin_url?.trim()
+  );
+
   // Derive detail tab from URL section
   const detailTab = (() => {
     const map: Record<string, string> = { 'my-program': 'overview', 'my-progress': 'progress', 'my-modules': 'modules', 'my-activities': 'activities', 'my-participants': 'participants', 'my-milestones': 'milestones', 'my-ecosystem': 'ecosystem' };
@@ -849,6 +859,13 @@ export default function ParticipantPortalPage() {
     localStorage.removeItem('session_expires_at');
     router.push('/login/admin');
   };
+
+  // Force redirect to profile if incomplete
+  useEffect(() => {
+    if (!loading && portalUser && !isProfileComplete && activeNav !== 'my-profile') {
+      navigate('my-profile');
+    }
+  }, [loading, portalUser, isProfileComplete, activeNav]);
 
   // Clock
   // Fetch badges when entering the badges tab
@@ -2288,6 +2305,46 @@ export default function ParticipantPortalPage() {
         <p className="dash-subtitle">{roleLabel} en {companyName || 'Inspiratoria'}</p>
       </div>
 
+      {!isProfileComplete && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fef3c7 0%, #fff7ed 100%)',
+          border: '1px solid #fbbf24',
+          borderRadius: 14,
+          padding: '18px 22px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 14,
+        }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#92400e" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#92400e', marginBottom: 4 }}>Completa tu perfil para desbloquear la plataforma</div>
+            <div style={{ fontSize: '0.78rem', color: '#a16207', lineHeight: 1.5 }}>
+              Para acceder a todas las funcionalidades necesitas completar los siguientes campos:
+              {' '}<strong>Nombre completo</strong>, <strong>Headline</strong>, <strong>Cargo</strong>, <strong>Departamento</strong>, <strong>Biografía</strong> y <strong>LinkedIn</strong>.
+            </div>
+            {!profileEditing && (
+              <button
+                onClick={startEditProfile}
+                style={{
+                  marginTop: 10, padding: '8px 20px', borderRadius: 10, border: 'none',
+                  background: '#f59e0b', color: '#fff', fontWeight: 600, fontSize: '0.78rem',
+                  cursor: 'pointer', transition: 'background 0.15s',
+                }}
+                onMouseOver={e => (e.currentTarget.style.background = '#d97706')}
+                onMouseOut={e => (e.currentTarget.style.background = '#f59e0b')}
+              >
+                Completar ahora
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {profileMsg && (
         <div className={`prof-msg ${profileMsg.startsWith('ok:') ? 'prof-msg-ok' : 'prof-msg-err'}`}>
           {profileMsg.replace(/^(ok:|err:)/, '')}
@@ -3043,17 +3100,27 @@ export default function ParticipantPortalPage() {
             {navItems.map(section => (
               <div key={section.section} className="p-nav-section">
                 {sidebarExpanded && <div className="p-nav-section-title" style={{ opacity: 1, height: 'auto' }}>{section.section}</div>}
-                {section.items.map(item => (
+                {section.items.map(item => {
+                  const locked = !isProfileComplete && item.id !== 'my-profile';
+                  return (
                   <button key={item.id}
                     className={`p-nav-item ${activeNav === item.id ? 'active' : ''}`}
-                    style={{ justifyContent: sidebarExpanded ? 'flex-start' : 'center', gap: sidebarExpanded ? 12 : 0, padding: sidebarExpanded ? '10px 14px' : '10px 0' }}
-                    onClick={() => navigate(item.id)}>
+                    style={{
+                      justifyContent: sidebarExpanded ? 'flex-start' : 'center',
+                      gap: sidebarExpanded ? 12 : 0,
+                      padding: sidebarExpanded ? '10px 14px' : '10px 0',
+                      opacity: locked ? 0.35 : 1,
+                      cursor: locked ? 'not-allowed' : 'pointer',
+                    }}
+                    onClick={() => !locked && navigate(item.id)}>
                     <span className="nav-icon">{navIcons[item.icon] || navIcons.home}</span>
                     {sidebarExpanded && <span className="p-nav-label">{item.label}</span>}
                     {sidebarExpanded && item.count !== undefined && <span className="p-nav-count" style={{ display: 'inline-block' }}>{item.count}</span>}
-                    {!sidebarExpanded && <span className="nav-tooltip">{item.label}</span>}
+                    {sidebarExpanded && locked && <svg style={{ width: 12, height: 12, marginLeft: 'auto', opacity: 0.5 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>}
+                    {!sidebarExpanded && <span className="nav-tooltip">{locked ? `🔒 ${item.label}` : item.label}</span>}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             ))}
           </nav>
