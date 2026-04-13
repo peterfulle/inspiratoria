@@ -4454,6 +4454,94 @@ def _get_portal_user(portal_code: str):
         raise HTTPException(status_code=404, detail="Portal no encontrado")
 
 
+# ── My Mentor (for mentees) ─────────────────────────────────────────
+
+@router.get("/portal/{portal_code}/my-mentor")
+async def get_my_mentor(portal_code: str):
+    """Get the mentor assigned to this mentee via Vinculation or same program."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import ProgramParticipant, Vinculation
+
+        my_pps = ProgramParticipant.objects.filter(
+            user=user, role="mentee", deleted_at__isnull=True
+        ).select_related("program")
+
+        mentor = None
+
+        # 1) Via Vinculation (explicit pairing)
+        for pp in my_pps:
+            vincs = Vinculation.objects.filter(
+                participant2=pp, type="mentoria", status="active"
+            ).select_related("participant1", "participant1__user")
+            for v in vincs:
+                mu = v.participant1.user
+                mentor = {
+                    "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                    "position": mu.position or "", "department": mu.department or "",
+                    "avatar_url": getattr(mu, "avatar_url", "") or "",
+                    "linkedin_url": getattr(mu, "linkedin_url", "") or "",
+                    "bio": getattr(mu, "bio", "") or "",
+                    "headline": getattr(mu, "headline", "") or "",
+                    "skills": getattr(mu, "skills", []) or [],
+                    "mentor_topics": getattr(mu, "mentor_topics", []) or [],
+                    "mentor_style": getattr(mu, "mentor_style", "") or "",
+                    "program_name": pp.program.name, "program_id": str(pp.program.id),
+                    "source": "vinculation",
+                }
+                break
+            if mentor:
+                break
+            vincs2 = Vinculation.objects.filter(
+                participant1=pp, type="mentoria", status="active"
+            ).select_related("participant2", "participant2__user")
+            for v in vincs2:
+                mu = v.participant2.user
+                mentor = {
+                    "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                    "position": mu.position or "", "department": mu.department or "",
+                    "avatar_url": getattr(mu, "avatar_url", "") or "",
+                    "linkedin_url": getattr(mu, "linkedin_url", "") or "",
+                    "bio": getattr(mu, "bio", "") or "",
+                    "headline": getattr(mu, "headline", "") or "",
+                    "skills": getattr(mu, "skills", []) or [],
+                    "mentor_topics": getattr(mu, "mentor_topics", []) or [],
+                    "mentor_style": getattr(mu, "mentor_style", "") or "",
+                    "program_name": pp.program.name, "program_id": str(pp.program.id),
+                    "source": "vinculation",
+                }
+                break
+            if mentor:
+                break
+
+        # 2) Fallback: mentor from same programs
+        if not mentor:
+            for pp in my_pps:
+                mentor_pp = ProgramParticipant.objects.filter(
+                    program=pp.program, role="mentor", deleted_at__isnull=True,
+                ).exclude(user=user).select_related("user").first()
+                if mentor_pp:
+                    mu = mentor_pp.user
+                    mentor = {
+                        "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                        "position": mu.position or "", "department": mu.department or "",
+                        "avatar_url": getattr(mu, "avatar_url", "") or "",
+                        "linkedin_url": getattr(mu, "linkedin_url", "") or "",
+                        "bio": getattr(mu, "bio", "") or "",
+                        "headline": getattr(mu, "headline", "") or "",
+                        "skills": getattr(mu, "skills", []) or [],
+                        "mentor_topics": getattr(mu, "mentor_topics", []) or [],
+                        "mentor_style": getattr(mu, "mentor_style", "") or "",
+                        "program_name": pp.program.name, "program_id": str(pp.program.id),
+                        "source": "program",
+                    }
+                    break
+
+        return {"mentor": mentor}
+
+    return await sync_to_async(_resolve)()
+
+
 # ── My Mentees ──────────────────────────────────────────────────────
 
 @router.get("/portal/{portal_code}/mentees")

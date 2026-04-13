@@ -686,6 +686,7 @@ export default function ParticipantPortalPage() {
     'insignias': 'my-badges',
     'chat': 'my-chat',
     'mentees': 'my-mentees',
+    'mi-mentor': 'my-mentor',
     'sesiones': 'my-sessions',
     'red': 'my-network',
     'mis-actividades': 'my-portal-activities',
@@ -745,6 +746,10 @@ export default function ParticipantPortalPage() {
   const [menteesLoading, setMenteesLoading] = useState(false);
   const [selectedMentee, setSelectedMentee] = useState<any>(null);
 
+  // My Mentor state (for mentees)
+  const [myMentor, setMyMentor] = useState<any>(null);
+  const [mentorLoading, setMentorLoading] = useState(false);
+
   // Sessions state
   const [mySessions, setMySessions] = useState<any[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -797,8 +802,10 @@ export default function ParticipantPortalPage() {
   const totalSessions = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.sessions || 0), 0) || 0;
   const totalResources = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.resources?.length || 0), 0) || 0;
 
-  // Profile completeness gate — mentor profile wizard must be complete (step 4)
-  const isProfileComplete = (portalUser?.mentor_profile_step || 0) >= 4;
+  // Profile completeness gate — mentors need wizard step 4, mentees skip wizard
+  const userRole = portalUser?.role || '';
+  const isMentee = userRole === 'mentee';
+  const isProfileComplete = isMentee ? true : (portalUser?.mentor_profile_step || 0) >= 4;
 
   // Derive detail tab from URL section
   const detailTab = (() => {
@@ -806,7 +813,18 @@ export default function ParticipantPortalPage() {
     return (map[activeNav] || 'overview') as 'overview' | 'modules' | 'participants' | 'activities' | 'milestones' | 'ecosystem';
   })();
 
-  // Nav items
+  // Nav items — filtered by role
+  const mentoriaItems = isMentee ? [
+    { id: 'my-mentor', label: 'Mi Mentor', icon: 'participants' },
+    { id: 'my-sessions', label: 'Sesiones', icon: 'milestones' },
+    { id: 'my-network', label: 'Mi Red', icon: 'ecosystem' },
+    { id: 'my-portal-activities', label: 'Actividades', icon: 'activities' },
+  ] : [
+    { id: 'my-mentees', label: 'Mis Mentees', icon: 'participants' },
+    { id: 'my-sessions', label: 'Sesiones', icon: 'milestones' },
+    { id: 'my-network', label: 'Mi Red', icon: 'ecosystem' },
+    { id: 'my-portal-activities', label: 'Actividades', icon: 'activities' },
+  ];
   const navItems = [
     { section: 'Mi Espacio', items: [
       { id: 'dashboard', label: 'Inicio', icon: 'home' },
@@ -818,12 +836,7 @@ export default function ParticipantPortalPage() {
       { id: 'my-milestones', label: 'Hitos', icon: 'milestones', count: programTemplate?.milestones?.length || 0 },
       { id: 'my-ecosystem', label: 'Ecosistema', icon: 'ecosystem' },
     ]},
-    { section: 'Mentoría', items: [
-      { id: 'my-mentees', label: 'Mis Mentees', icon: 'participants' },
-      { id: 'my-sessions', label: 'Sesiones', icon: 'milestones' },
-      { id: 'my-network', label: 'Mi Red', icon: 'ecosystem' },
-      { id: 'my-portal-activities', label: 'Actividades', icon: 'activities' },
-    ]},
+    { section: 'Mentoría', items: mentoriaItems },
     { section: 'Personal', items: [
       { id: 'my-profile', label: 'Mi Perfil', icon: 'profile' },
     ]},
@@ -918,9 +931,9 @@ export default function ParticipantPortalPage() {
       .finally(() => setBadgesLoading(false));
   }, [activeNav, portalCode]);
 
-  // Fetch mentees when entering mentees OR sessions tab
+  // Fetch mentees when entering mentees OR sessions tab (mentor only)
   useEffect(() => {
-    if ((activeNav !== 'my-mentees' && activeNav !== 'my-sessions') || !portalCode) return;
+    if ((activeNav !== 'my-mentees' && activeNav !== 'my-sessions') || !portalCode || isMentee) return;
     if (myMentees.length > 0 && activeNav === 'my-sessions') return; // already loaded
     setMenteesLoading(true);
     fetch(`${API_URL}/api/companies/portal/${portalCode}/mentees`)
@@ -928,18 +941,34 @@ export default function ParticipantPortalPage() {
       .then(data => setMyMentees(data.mentees || []))
       .catch(() => setMyMentees([]))
       .finally(() => setMenteesLoading(false));
-  }, [activeNav, portalCode]);
+  }, [activeNav, portalCode, isMentee]);
 
-  // Fetch sessions when entering the sessions tab
+  // Fetch my mentor when mentee enters my-mentor, sessions or dashboard
   useEffect(() => {
-    if (activeNav !== 'my-sessions' || !portalCode) return;
+    if (!isMentee || !portalCode) return;
+    if (activeNav !== 'my-mentor' && activeNav !== 'my-sessions' && activeNav !== 'dashboard') return;
+    if (myMentor) return; // already loaded
+    setMentorLoading(true);
+    fetch(`${API_URL}/api/companies/portal/${portalCode}/my-mentor`)
+      .then(r => r.ok ? r.json() : { mentor: null })
+      .then(data => setMyMentor(data.mentor))
+      .catch(() => setMyMentor(null))
+      .finally(() => setMentorLoading(false));
+  }, [activeNav, portalCode, isMentee]);
+
+  // Fetch sessions when entering the sessions tab or mentee dashboard/mentor view
+  useEffect(() => {
+    if (!portalCode) return;
+    const needsSessions = activeNav === 'my-sessions' || (isMentee && (activeNav === 'dashboard' || activeNav === 'my-mentor'));
+    if (!needsSessions) return;
+    if (mySessions.length > 0 && activeNav !== 'my-sessions') return; // already loaded from sessions tab
     setSessionsLoading(true);
     fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`)
       .then(r => r.ok ? r.json() : { sessions: [] })
       .then(data => setMySessions(data.sessions || []))
       .catch(() => setMySessions([]))
       .finally(() => setSessionsLoading(false));
-  }, [activeNav, portalCode]);
+  }, [activeNav, portalCode, isMentee]);
 
   // Fetch activities when entering the activities tab (with completion status)
   useEffect(() => {
@@ -3767,9 +3796,341 @@ export default function ParticipantPortalPage() {
     );
   };
 
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER: DASHBOARD MENTEE
+  // ═══════════════════════════════════════════════════════════════
+  const renderMenteeDashboard = () => {
+    const upcoming = mySessions.filter(s => s.status === 'scheduled');
+    const completed = mySessions.filter(s => s.status === 'completed');
+
+    return (
+      <>
+        <div className="dash-header">
+          <h1 className="dash-title">Hola, {displayName}</h1>
+          <p className="dash-subtitle">Tu espacio de mentoría y aprendizaje</p>
+        </div>
+
+        {loadingPrograms ? (
+          <div className="empty-state">Cargando tus programas...</div>
+        ) : myPrograms.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', marginBottom: 8 }}>Aún no estás inscrito en un programa</h3>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>Cuando te asignen a un programa, aparecerá aquí.</p>
+          </div>
+        ) : (
+          <>
+            {/* Program cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: myPrograms.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16, marginBottom: 24 }}>
+              {myPrograms.map(mp => {
+                const gradient = THEME_GRADIENTS[mp.theme] || THEME_GRADIENTS.leadership;
+                return (
+                  <div key={mp.id} onClick={() => { setSelectedProgram(mp); navigate('my-program'); }}
+                    style={{ background: gradient, borderRadius: 16, padding: '28px 28px 20px', cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', transition: 'all 0.2s', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', top: 0, right: 0, width: 120, height: 120, background: 'rgba(255,255,255,0.06)', borderRadius: '0 0 0 120px' }} />
+                    <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22d3ee', display: 'inline-block' }} />
+                      Mentee
+                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8, lineHeight: 1.3 }}>{mp.name}</div>
+                    <div style={{ fontSize: '0.82rem', opacity: 0.8, marginBottom: 16, lineHeight: 1.5 }}>{mp.description?.slice(0, 120)}{(mp.description?.length || 0) > 120 ? '...' : ''}</div>
+                    <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem', opacity: 0.75 }}>
+                      <span>{programTemplate?.modules?.length || mp.modules?.length || 0} módulos</span>
+                      <span>{programDetail?.activities?.length || mp.activities?.length || 0} actividades</span>
+                    </div>
+                    <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem', fontWeight: 600, opacity: 0.9 }}>
+                      <span>Ver programa</span>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Mentor card */}
+            <div style={{ marginBottom: 24 }}>
+              <h2 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Tu Mentor
+              </h2>
+              {mentorLoading ? (
+                <div className="empty-state">Cargando...</div>
+              ) : myMentor ? (
+                <div onClick={() => navigate('my-mentor')} style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6', cursor: 'pointer', transition: 'all 0.2s' }}>
+                  <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #0891b2, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', fontWeight: 800, color: '#fff', flexShrink: 0, overflow: 'hidden' }}>
+                      {myMentor.avatar_url ? <img src={myMentor.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (myMentor.full_name || 'M').charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: '#111827' }}>{myMentor.full_name}</div>
+                      <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>{myMentor.headline || myMentor.position || ''}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: 2 }}>{myMentor.program_name}</div>
+                    </div>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ background: '#f9fafb', borderRadius: 14, padding: 20, textAlign: 'center', border: '1px dashed #d1d5db' }}>
+                  <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>El PM realizará el matching inteligente con tu mentor pronto.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Next session */}
+            {upcoming.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <h2 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Próxima sesión
+                </h2>
+                <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#111827', marginBottom: 6 }}>{upcoming[0].title}</div>
+                  <div style={{ fontSize: '0.82rem', color: '#6b7280', marginBottom: 4 }}>con {upcoming[0].mentor?.full_name}</div>
+                  <div style={{ fontSize: '0.82rem', color: '#4b5563', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    {new Date(upcoming[0].scheduled_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} • {upcoming[0].duration_minutes} min
+                  </div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    {upcoming[0].meeting_url && (
+                      <a href={upcoming[0].meeting_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 16px', borderRadius: 10, background: '#0891b2', color: '#fff', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Unirse
+                      </a>
+                    )}
+                    <button onClick={() => navigate('my-sessions')} style={{ padding: '8px 16px', borderRadius: 10, background: '#f3f4f6', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', color: '#374151' }}>Ver todas →</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Stats */}
+            <div className="stats-grid">
+              {[
+                { label: 'Programas activos', value: myPrograms.length, change: 'Inscrito como Mentee', stripe: '#0891b2' },
+                { label: 'Sesiones programadas', value: upcoming.length, change: 'Próximas sesiones', stripe: '#6366f1' },
+                { label: 'Sesiones completadas', value: completed.length, change: 'Total de sesiones: ' + (upcoming.length + completed.length), stripe: '#059669' },
+                { label: 'Empresa', value: companyName || '—', change: 'Mentee', stripe: '#f59e0b' },
+              ].map((s, i) => (
+                <div key={i} className="stat-card">
+                  <div className="stat-card-stripe" style={{ background: s.stripe }} />
+                  <div className="stat-label">{s.label}</div>
+                  <div className="stat-value" style={{ fontSize: typeof s.value === 'string' ? '0.9rem' : undefined }}>{s.value}</div>
+                  <div className="stat-change">{s.change}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER: SESIONES MENTEE (vista mentee — sin crear, solo ver)
+  // ═══════════════════════════════════════════════════════════════
+  const renderMenteeSessions = () => {
+    if (sessionsLoading) return <div className="empty-state">Cargando sesiones...</div>;
+
+    const upcoming = mySessions.filter(s => s.status === 'scheduled');
+    const completed = mySessions.filter(s => s.status === 'completed');
+
+    return (
+      <div>
+        <div className="dash-header">
+          <h1 className="dash-title">Mis Sesiones de Mentoría</h1>
+          <p className="dash-subtitle">{mySessions.length} sesiones total • Tu mentor organiza las sesiones</p>
+        </div>
+
+        {/* Upcoming sessions */}
+        {upcoming.length > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Próximas sesiones
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {upcoming.map(s => (
+                <div key={s.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>{s.title}</div>
+                      <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>con {s.mentor?.full_name} • {s.program_name}</div>
+                    </div>
+                    <span style={{ padding: '4px 10px', borderRadius: 8, background: '#e0f2fe', color: '#0891b2', fontSize: '0.72rem', fontWeight: 600 }}>Programada</span>
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#4b5563', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    {new Date(s.scheduled_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} • {s.duration_minutes} min
+                  </div>
+                  {s.meeting_url && (
+                    <a href={s.meeting_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 16px', borderRadius: 10, background: '#0891b2', color: '#fff', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Unirse a la reunión
+                    </a>
+                  )}
+                  {s.description && <p style={{ fontSize: '0.8rem', color: '#4b5563', marginTop: 10, lineHeight: 1.5, borderLeft: '3px solid #e0f2fe', paddingLeft: 12 }}>{s.description}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Completed sessions */}
+        {completed.length > 0 && (
+          <div>
+            <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Sesiones completadas
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {completed.map(s => (
+                <div key={s.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', border: '1px solid #f3f4f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{s.title}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>con {s.mentor?.full_name} • {new Date(s.scheduled_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div>
+                    </div>
+                    <span style={{ padding: '4px 10px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.72rem', fontWeight: 600 }}>Completada</span>
+                  </div>
+                  {s.session_notes && <div style={{ fontSize: '0.8rem', color: '#4b5563', marginTop: 6, lineHeight: 1.5, borderLeft: '3px solid #e5e7eb', paddingLeft: 12 }}>{s.session_notes.slice(0, 200)}{s.session_notes.length > 200 ? '...' : ''}</div>}
+                  {s.next_steps && (
+                    <div style={{ marginTop: 10, padding: '10px 14px', background: '#f0fdfa', borderRadius: 10, border: '1px solid #ccfbf1' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.75rem', color: '#047857', marginBottom: 4 }}>Próximos pasos</div>
+                      <div style={{ fontSize: '0.8rem', color: '#374151', lineHeight: 1.5 }}>{s.next_steps}</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {mySessions.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+            <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#f3f4f6', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 6 }}>Aún no tienes sesiones</h3>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>Tu mentor agendará las sesiones de mentoría. ¡Pronto recibirás una notificación!</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER: MI MENTOR (vista mentee)
+  // ═══════════════════════════════════════════════════════════════
+  const renderMyMentor = () => {
+    if (mentorLoading) return <div className="empty-state">Cargando información de tu mentor...</div>;
+    if (!myMentor) return (
+      <div>
+        <div className="dash-header"><h1 className="dash-title">Mi Mentor</h1><p className="dash-subtitle">Tu mentor asignado para el programa</p></div>
+        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#f3f4f6', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 6 }}>Aún no tienes un mentor asignado</h3>
+          <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>El PM del programa realizará el matching inteligente pronto.</p>
+        </div>
+      </div>
+    );
+
+    const m = myMentor;
+    const upcoming = mySessions.filter(s => s.status === 'scheduled');
+    const completed = mySessions.filter(s => s.status === 'completed');
+
+    return (
+      <div>
+        <div className="dash-header"><h1 className="dash-title">Mi Mentor</h1><p className="dash-subtitle">{m.program_name}</p></div>
+
+        {/* Mentor profile card */}
+        <div style={{ background: '#fff', borderRadius: 18, padding: 28, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6', marginBottom: 24 }}>
+          <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', marginBottom: 20 }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #0891b2, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', fontWeight: 800, color: '#fff', flexShrink: 0, overflow: 'hidden' }}>
+              {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (m.full_name || 'M').charAt(0).toUpperCase()}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: '1.2rem', color: '#111827', marginBottom: 4 }}>{m.full_name}</div>
+              <div style={{ fontSize: '0.88rem', color: '#6b7280', marginBottom: 4 }}>{m.headline || m.position || ''}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ padding: '3px 10px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.72rem', fontWeight: 600 }}>Mentor</span>
+                {m.department && <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>{m.department}</span>}
+              </div>
+            </div>
+          </div>
+
+          {m.bio && <p style={{ fontSize: '0.88rem', color: '#4b5563', lineHeight: 1.7, marginBottom: 16 }}>{m.bio}</p>}
+
+          {m.mentor_style && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 6 }}>Estilo de mentoría</div>
+              <div style={{ fontSize: '0.85rem', color: '#4b5563', padding: '10px 14px', background: '#f0fdfa', borderRadius: 10, border: '1px solid #ccfbf1' }}>{m.mentor_style}</div>
+            </div>
+          )}
+
+          {m.mentor_topics?.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 6 }}>Temas de mentoría</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {m.mentor_topics.map((t: string) => <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#e0f2fe', color: '#0e7490', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>)}
+              </div>
+            </div>
+          )}
+
+          {m.skills?.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 6 }}>Habilidades</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {m.skills.map((s: string) => <span key={s} style={{ padding: '4px 12px', borderRadius: 16, background: '#ecfeff', color: '#0e7490', fontSize: '0.75rem', fontWeight: 500 }}>{s}</span>)}
+              </div>
+            </div>
+          )}
+
+          {m.linkedin_url && (
+            <a href={m.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Ver perfil LinkedIn
+            </a>
+          )}
+        </div>
+
+        {/* Quick stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 16, textAlign: 'center', border: '1px solid #f3f4f6' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0891b2' }}>{upcoming.length}</div>
+            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Próximas sesiones</div>
+          </div>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 16, textAlign: 'center', border: '1px solid #f3f4f6' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#047857' }}>{completed.length}</div>
+            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Sesiones completadas</div>
+          </div>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 16, textAlign: 'center', border: '1px solid #f3f4f6' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#6366f1' }}>{upcoming.length + completed.length}</div>
+            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total sesiones</div>
+          </div>
+        </div>
+
+        {/* Next session preview */}
+        {upcoming.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 14, padding: 20, border: '1px solid #f3f4f6', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Próxima sesión
+            </h3>
+            <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827', marginBottom: 6 }}>{upcoming[0].title}</div>
+            <div style={{ fontSize: '0.82rem', color: '#4b5563', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              {new Date(upcoming[0].scheduled_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} • {upcoming[0].duration_minutes} min
+            </div>
+            {upcoming[0].meeting_url && (
+              <a href={upcoming[0].meeting_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 16px', borderRadius: 10, background: '#0891b2', color: '#fff', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none', marginTop: 4 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Unirse a la reunión
+              </a>
+            )}
+            <div style={{ marginTop: 10 }}>
+              <button onClick={() => navigate('my-sessions')} style={{ fontSize: '0.78rem', color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Ver todas las sesiones →</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderContent = () => {
     switch (activeNav) {
-      case 'dashboard': return renderDashboard();
+      case 'dashboard': return isMentee ? renderMenteeDashboard() : renderDashboard();
       case 'my-program': return renderMyProgram();
       case 'my-progress': return renderProgress();
       case 'my-modules': return renderMyProgram();
@@ -3781,10 +4142,11 @@ export default function ParticipantPortalPage() {
       case 'my-badges': return renderBadges();
       case 'my-chat': return renderChat();
       case 'my-mentees': return renderMentees();
-      case 'my-sessions': return renderSessions();
+      case 'my-mentor': return renderMyMentor();
+      case 'my-sessions': return isMentee ? renderMenteeSessions() : renderSessions();
       case 'my-network': return renderNetwork();
       case 'my-portal-activities': return renderPortalActivities();
-      default: return renderDashboard();
+      default: return isMentee ? renderMenteeDashboard() : renderDashboard();
     }
   };
 
