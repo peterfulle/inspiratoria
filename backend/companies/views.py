@@ -4440,3 +4440,361 @@ async def login_with_totp(payload: TOTPLoginRequest):
         },
         "company": company_data,
     }
+
+
+# ════════════════════════════════════════════════════════════════════
+# PORTAL — MENTEE PROFILES, SESSIONS, ACTIVITIES, NETWORK
+# ════════════════════════════════════════════════════════════════════
+
+def _get_portal_user(portal_code: str):
+    """Utility: resolve portal_code → User or raise 404."""
+    try:
+        return User.objects.get(portal_code=portal_code)
+    except User.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+
+
+# ── My Mentees ──────────────────────────────────────────────────────
+
+@router.get("/portal/{portal_code}/mentees")
+async def get_my_mentees(portal_code: str):
+    """Get mentees assigned to this mentor via Vinculation."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import ProgramParticipant, Vinculation
+
+        my_pps = ProgramParticipant.objects.filter(
+            user=user, role="mentor", deleted_at__isnull=True
+        ).select_related("program")
+
+        mentees = []
+        for pp in my_pps:
+            vincs = Vinculation.objects.filter(
+                participant1=pp, type="mentoria", status="active"
+            ).select_related("participant2", "participant2__user")
+            for v in vincs:
+                mu = v.participant2.user
+                mentees.append({
+                    "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                    "position": mu.position or "", "department": mu.department or "",
+                    "avatar_url": getattr(mu, "avatar_url", "") or "",
+                    "linkedin_url": getattr(mu, "linkedin_url", "") or "",
+                    "bio": getattr(mu, "bio", "") or "",
+                    "headline": getattr(mu, "headline", "") or "",
+                    "skills": getattr(mu, "skills", []) or [],
+                    "program_name": pp.program.name, "program_id": str(pp.program.id),
+                })
+            vincs2 = Vinculation.objects.filter(
+                participant2=pp, type="mentoria", status="active"
+            ).select_related("participant1", "participant1__user")
+            for v in vincs2:
+                mu = v.participant1.user
+                mentees.append({
+                    "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                    "position": mu.position or "", "department": mu.department or "",
+                    "avatar_url": getattr(mu, "avatar_url", "") or "",
+                    "linkedin_url": getattr(mu, "linkedin_url", "") or "",
+                    "bio": getattr(mu, "bio", "") or "",
+                    "headline": getattr(mu, "headline", "") or "",
+                    "skills": getattr(mu, "skills", []) or [],
+                    "program_name": pp.program.name, "program_id": str(pp.program.id),
+                })
+        return {"mentees": mentees}
+
+    return await sync_to_async(_resolve)()
+
+
+# ── Mentoring Sessions CRUD ─────────────────────────────────────────
+
+class SessionCreateRequest(BaseModel):
+    mentee_id: str
+    program_id: str
+    title: str
+    description: str = ""
+    scheduled_at: str
+    duration_minutes: int = 60
+    meeting_url: str = ""
+
+class SessionNotesRequest(BaseModel):
+    session_notes: str = ""
+    topics_covered: list = []
+    mentee_mood: Optional[int] = None
+    next_steps: str = ""
+
+
+@router.get("/portal/{portal_code}/sessions")
+async def get_my_sessions(portal_code: str):
+    """Get all mentoring sessions for this user."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import MentoringSession
+        from django.db.models import Q
+
+        sessions = MentoringSession.objects.filter(
+            Q(mentor=user) | Q(mentee=user)
+        ).select_related("mentor", "mentee", "program").order_by("-scheduled_at")
+
+        return {"sessions": [{
+            "id": str(s.id), "title": s.title, "description": s.description,
+            "scheduled_at": s.scheduled_at.isoformat(), "duration_minutes": s.duration_minutes,
+            "status": s.status, "meeting_url": s.meeting_url or "",
+            "mentor": {"id": str(s.mentor.id), "full_name": s.mentor.full_name or "", "avatar_url": getattr(s.mentor, "avatar_url", "") or ""},
+            "mentee": {"id": str(s.mentee.id), "full_name": s.mentee.full_name or "", "avatar_url": getattr(s.mentee, "avatar_url", "") or ""},
+            "program_name": s.program.name, "program_id": str(s.program.id),
+            "session_notes": s.session_notes or "", "topics_covered": s.topics_covered or [],
+            "mentee_mood": s.mentee_mood, "next_steps": s.next_steps or "",
+            "ai_suggestion": s.ai_suggestion or "", "created_at": s.created_at.isoformat(),
+        } for s in sessions]}
+
+    return await sync_to_async(_resolve)()
+
+
+@router.post("/portal/{portal_code}/sessions")
+async def create_session(portal_code: str, payload: SessionCreateRequest):
+    """Create a new mentoring session."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import MentoringSession, Program
+        from datetime import datetime as dt
+
+        try:
+            mentee = User.objects.get(id=payload.mentee_id)
+        except User.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Mentee no encontrado")
+        try:
+            program = Program.objects.get(id=payload.program_id)
+        except Program.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Programa no encontrado")
+
+        scheduled = dt.fromisoformat(payload.scheduled_at.replace("Z", "+00:00"))
+        session = MentoringSession.objects.create(
+            program=program, mentor=user, mentee=mentee,
+            title=payload.title, description=payload.description,
+            scheduled_at=scheduled, duration_minutes=payload.duration_minutes,
+            meeting_url=payload.meeting_url,
+        )
+        return {"id": str(session.id), "title": session.title, "scheduled_at": session.scheduled_at.isoformat(), "status": session.status}
+
+    return await sync_to_async(_resolve)()
+
+
+@router.put("/portal/{portal_code}/sessions/{session_id}")
+async def update_session(portal_code: str, session_id: str, payload: SessionCreateRequest):
+    """Update a mentoring session."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import MentoringSession
+        from datetime import datetime as dt
+
+        try:
+            session = MentoringSession.objects.get(id=session_id, mentor=user)
+        except MentoringSession.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Sesión no encontrada")
+
+        session.title = payload.title
+        session.description = payload.description
+        session.scheduled_at = dt.fromisoformat(payload.scheduled_at.replace("Z", "+00:00"))
+        session.duration_minutes = payload.duration_minutes
+        session.meeting_url = payload.meeting_url
+        session.save()
+        return {"success": True, "id": str(session.id)}
+
+    return await sync_to_async(_resolve)()
+
+
+@router.patch("/portal/{portal_code}/sessions/{session_id}/status")
+async def update_session_status(portal_code: str, session_id: str, status_val: str = "completed"):
+    """Mark session as completed/cancelled."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import MentoringSession
+
+        try:
+            session = MentoringSession.objects.get(id=session_id, mentor=user)
+        except MentoringSession.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Sesión no encontrada")
+
+        if status_val in ("completed", "cancelled", "no_show"):
+            session.status = status_val
+            session.save(update_fields=["status", "updated_at"])
+        return {"success": True, "status": session.status}
+
+    return await sync_to_async(_resolve)()
+
+
+# ── Session Notes + AI ──────────────────────────────────────────────
+
+@router.post("/portal/{portal_code}/sessions/{session_id}/notes")
+async def save_session_notes(portal_code: str, session_id: str, payload: SessionNotesRequest):
+    """Save notes for a session."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import MentoringSession
+
+        try:
+            session = MentoringSession.objects.get(id=session_id, mentor=user)
+        except MentoringSession.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Sesión no encontrada")
+
+        session.session_notes = payload.session_notes
+        session.topics_covered = payload.topics_covered
+        session.mentee_mood = payload.mentee_mood
+        session.next_steps = payload.next_steps
+        session.save()
+        return {"success": True}
+
+    return await sync_to_async(_resolve)()
+
+
+@router.post("/portal/{portal_code}/sessions/{session_id}/ai-suggest")
+async def ai_suggest_next_session(portal_code: str, session_id: str):
+    """AI suggest content for the next mentoring session based on notes."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import MentoringSession
+
+        try:
+            session = MentoringSession.objects.get(id=session_id, mentor=user)
+        except MentoringSession.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Sesión no encontrada")
+
+        mentee = session.mentee
+        mentor_topics = getattr(user, "mentor_topics", []) or []
+        mentor_style = getattr(user, "mentor_style", []) or []
+
+        prev_sessions = MentoringSession.objects.filter(
+            mentor=user, mentee=mentee, status="completed"
+        ).order_by("-scheduled_at")[:5]
+
+        history = ""
+        for ps in prev_sessions:
+            history += f"- '{ps.title}': {ps.session_notes[:200]}\n  Temas: {', '.join(ps.topics_covered or [])}\n  Próximos pasos: {ps.next_steps[:150]}\n"
+
+        prompt = f"""Eres un experto en diseño de sesiones de mentoría profesional.
+
+Mentor: {user.full_name} | Expertise: {', '.join(mentor_topics)} | Estilo: {', '.join(mentor_style)}
+Mentee: {mentee.full_name} | Cargo: {mentee.position or 'N/A'} | Área: {mentee.department or 'N/A'}
+Bio mentee: {getattr(mentee, 'bio', '') or 'No disponible'}
+
+Última sesión: "{session.title}"
+Notas: {session.session_notes or 'Sin notas'}
+Temas cubiertos: {', '.join(session.topics_covered or [])}
+Ánimo mentee (1-5): {session.mentee_mood or 'No registrado'}
+Próximos pasos: {session.next_steps or 'No definidos'}
+
+Historial:
+{history or 'Sin sesiones previas.'}
+
+Genera en español:
+1. Título sugerido para la próxima sesión
+2. 3-4 objetivos clave
+3. Actividades y ejercicios recomendados
+4. Preguntas poderosas para abrir la conversación
+5. Recursos o lecturas recomendadas"""
+
+        try:
+            from programs.ai_service import GeminiAIService
+            result = GeminiAIService._call_gemini(prompt, temperature=0.7)
+            if result:
+                session.ai_suggestion = result
+                session.save(update_fields=["ai_suggestion", "updated_at"])
+                return {"suggestion": result}
+        except Exception:
+            pass
+        return {"suggestion": "No se pudo generar sugerencia. Verifica la configuración de la IA."}
+
+    return await sync_to_async(_resolve)()
+
+
+# ── Activity Completion ──────────────────────────────────────────────
+
+@router.post("/portal/{portal_code}/activities/{activity_id}/complete")
+async def complete_activity(portal_code: str, activity_id: str):
+    """Mark an activity as completed by this user."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import Activity, ActivityCompletion
+
+        try:
+            activity = Activity.objects.get(id=activity_id)
+        except Activity.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Actividad no encontrada")
+
+        completion, created = ActivityCompletion.objects.get_or_create(
+            activity=activity, user=user,
+        )
+        if not created:
+            return {"success": True, "already_completed": True}
+        return {"success": True, "already_completed": False, "completed_at": completion.completed_at.isoformat()}
+
+    return await sync_to_async(_resolve)()
+
+
+@router.get("/portal/{portal_code}/activities")
+async def get_my_activities(portal_code: str):
+    """Get activities with completion status for this user."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import ProgramParticipant, Activity, ActivityCompletion
+
+        pps = ProgramParticipant.objects.filter(
+            user=user, deleted_at__isnull=True
+        ).values_list("program_id", flat=True)
+
+        activities = Activity.objects.filter(
+            program_id__in=list(pps)
+        ).select_related("program").order_by("start_date")
+
+        completed_ids = set(
+            ActivityCompletion.objects.filter(user=user).values_list("activity_id", flat=True)
+        )
+
+        return {"activities": [{
+            "id": a.id, "name": a.name, "description": a.description,
+            "activity_type": a.activity_type, "status": a.status,
+            "start_date": a.start_date.isoformat() if a.start_date else None,
+            "end_date": a.end_date.isoformat() if a.end_date else None,
+            "modality": a.modality or "", "meeting_url": a.meeting_url or "",
+            "program_name": a.program.name, "program_id": str(a.program.id),
+            "completed_by_me": a.id in completed_ids,
+        } for a in activities]}
+
+    return await sync_to_async(_resolve)()
+
+
+# ── Influence Network ────────────────────────────────────────────────
+
+@router.get("/portal/{portal_code}/network")
+async def get_influence_network(portal_code: str):
+    """Express profiles of people in the user's programs."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import ProgramParticipant
+
+        my_program_ids = ProgramParticipant.objects.filter(
+            user=user, deleted_at__isnull=True
+        ).values_list("program_id", flat=True)
+
+        peers = ProgramParticipant.objects.filter(
+            program_id__in=list(my_program_ids), deleted_at__isnull=True,
+        ).exclude(user=user).select_related("user", "program")
+
+        seen = set()
+        network = []
+        for p in peers:
+            u = p.user
+            if u.id in seen:
+                continue
+            seen.add(u.id)
+            network.append({
+                "id": str(u.id), "full_name": u.full_name or "",
+                "position": u.position or "", "department": u.department or "",
+                "avatar_url": getattr(u, "avatar_url", "") or "",
+                "linkedin_url": getattr(u, "linkedin_url", "") or "",
+                "bio": getattr(u, "bio", "") or "",
+                "headline": getattr(u, "headline", "") or "",
+                "role": p.role, "program_name": p.program.name,
+            })
+        return {"network": network}
+
+    return await sync_to_async(_resolve)()

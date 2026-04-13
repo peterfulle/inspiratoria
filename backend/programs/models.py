@@ -714,3 +714,62 @@ class ProgramTemplate(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.category})"
+
+
+# ================================================================================
+# SESIONES DE MENTORÍA
+# ================================================================================
+
+class MentoringSession(models.Model):
+    """Sesión de mentoría entre mentor y mentee dentro de un programa."""
+    STATUS_CHOICES = [
+        ("scheduled", "Programada"),
+        ("completed", "Completada"),
+        ("cancelled", "Cancelada"),
+        ("no_show", "No asistió"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    program = models.ForeignKey(Program, on_delete=models.CASCADE, related_name="mentoring_sessions")
+    mentor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mentor_sessions")
+    mentee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mentee_sessions")
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    scheduled_at = models.DateTimeField()
+    duration_minutes = models.PositiveIntegerField(default=60)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="scheduled")
+    meeting_url = models.URLField(blank=True)
+
+    # Notes written by mentor after session
+    session_notes = models.TextField(blank=True)
+    topics_covered = models.JSONField(default=list, blank=True)
+    mentee_mood = models.PositiveSmallIntegerField(null=True, blank=True, help_text="1-5")
+    next_steps = models.TextField(blank=True)
+
+    # AI-generated content suggestion for next session
+    ai_suggestion = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-scheduled_at"]
+
+    def __str__(self) -> str:
+        return f"{self.title} — {self.mentor.full_name} ↔ {self.mentee.full_name}"
+
+
+class ActivityCompletion(models.Model):
+    """Registro de actividad completada por un participante."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    activity = models.ForeignKey(Activity, on_delete=models.CASCADE, related_name="completions")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="activity_completions")
+    completed_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = [["activity", "user"]]
+        ordering = ["-completed_at"]
+
+    def __str__(self) -> str:
+        return f"{self.user.full_name} — {self.activity.name}"

@@ -685,6 +685,10 @@ export default function ParticipantPortalPage() {
     'perfil': 'my-profile',
     'insignias': 'my-badges',
     'chat': 'my-chat',
+    'mentees': 'my-mentees',
+    'sesiones': 'my-sessions',
+    'red': 'my-network',
+    'mis-actividades': 'my-portal-activities',
   };
   const NAV_TO_SLUG: Record<string, string> = Object.fromEntries(Object.entries(SECTION_SLUGS).map(([k, v]) => [v, k]));
   const activeNav = SECTION_SLUGS[sectionParam] || 'dashboard';
@@ -736,6 +740,30 @@ export default function ParticipantPortalPage() {
   const [badgesData, setBadgesData] = useState<any>(null);
   const [badgesLoading, setBadgesLoading] = useState(false);
 
+  // Mentees state
+  const [myMentees, setMyMentees] = useState<any[]>([]);
+  const [menteesLoading, setMenteesLoading] = useState(false);
+  const [selectedMentee, setSelectedMentee] = useState<any>(null);
+
+  // Sessions state
+  const [mySessions, setMySessions] = useState<any[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionForm, setSessionForm] = useState({ mentee_id: '', program_id: '', title: '', description: '', scheduled_at: '', duration_minutes: 60, meeting_url: '' });
+  const [showSessionForm, setShowSessionForm] = useState(false);
+  const [editingSession, setEditingSession] = useState<any>(null);
+  const [sessionNotesForm, setSessionNotesForm] = useState({ session_notes: '', topics_covered: [] as string[], mentee_mood: 0, next_steps: '' });
+  const [showNotesModal, setShowNotesModal] = useState<any>(null);
+  const [aiSuggestion, setAiSuggestion] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // Activities state
+  const [portalActivities, setPortalActivities] = useState<any[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+
+  // Network state
+  const [networkPeople, setNetworkPeople] = useState<any[]>([]);
+  const [networkLoading, setNetworkLoading] = useState(false);
+
   // Chat state
   const [chatPrograms, setChatPrograms] = useState<any[]>([]);
   const [chatActiveProgram, setChatActiveProgram] = useState<any>(null);
@@ -785,6 +813,12 @@ export default function ParticipantPortalPage() {
       { id: 'my-participants', label: 'Participantes', icon: 'participants', count: programParticipants.length || 0 },
       { id: 'my-milestones', label: 'Hitos', icon: 'milestones', count: programTemplate?.milestones?.length || 0 },
       { id: 'my-ecosystem', label: 'Ecosistema', icon: 'ecosystem' },
+    ]},
+    { section: 'Mentoría', items: [
+      { id: 'my-mentees', label: 'Mis Mentees', icon: 'participants' },
+      { id: 'my-sessions', label: 'Sesiones', icon: 'milestones' },
+      { id: 'my-network', label: 'Mi Red', icon: 'ecosystem' },
+      { id: 'my-portal-activities', label: 'Actividades', icon: 'activities' },
     ]},
     { section: 'Personal', items: [
       { id: 'my-profile', label: 'Mi Perfil', icon: 'profile' },
@@ -878,6 +912,50 @@ export default function ParticipantPortalPage() {
       .then(data => setBadgesData(data))
       .catch(() => setBadgesData(null))
       .finally(() => setBadgesLoading(false));
+  }, [activeNav, portalCode]);
+
+  // Fetch mentees when entering the mentees tab
+  useEffect(() => {
+    if (activeNav !== 'my-mentees' || !portalCode) return;
+    setMenteesLoading(true);
+    fetch(`${API_URL}/api/companies/portal/${portalCode}/mentees`)
+      .then(r => r.ok ? r.json() : { mentees: [] })
+      .then(data => setMyMentees(data.mentees || []))
+      .catch(() => setMyMentees([]))
+      .finally(() => setMenteesLoading(false));
+  }, [activeNav, portalCode]);
+
+  // Fetch sessions when entering the sessions tab
+  useEffect(() => {
+    if (activeNav !== 'my-sessions' || !portalCode) return;
+    setSessionsLoading(true);
+    fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`)
+      .then(r => r.ok ? r.json() : { sessions: [] })
+      .then(data => setMySessions(data.sessions || []))
+      .catch(() => setMySessions([]))
+      .finally(() => setSessionsLoading(false));
+  }, [activeNav, portalCode]);
+
+  // Fetch activities when entering the activities tab (with completion status)
+  useEffect(() => {
+    if (activeNav !== 'my-portal-activities' || !portalCode) return;
+    setActivitiesLoading(true);
+    fetch(`${API_URL}/api/companies/portal/${portalCode}/activities`)
+      .then(r => r.ok ? r.json() : { activities: [] })
+      .then(data => setPortalActivities(data.activities || []))
+      .catch(() => setPortalActivities([]))
+      .finally(() => setActivitiesLoading(false));
+  }, [activeNav, portalCode]);
+
+  // Fetch network when entering the network tab
+  useEffect(() => {
+    if (activeNav !== 'my-network' || !portalCode) return;
+    setNetworkLoading(true);
+    fetch(`${API_URL}/api/companies/portal/${portalCode}/network`)
+      .then(r => r.ok ? r.json() : { network: [] })
+      .then(data => setNetworkPeople(data.network || []))
+      .catch(() => setNetworkPeople([]))
+      .finally(() => setNetworkLoading(false));
   }, [activeNav, portalCode]);
 
   // ── Chat: fetch programs list ──
@@ -2441,7 +2519,7 @@ export default function ParticipantPortalPage() {
             ))}
           </div>
 
-          <div className="prof-form-card" style={{ maxWidth: 720 }}>
+          <div className="prof-form-card" style={{ maxWidth: mentorStep === 1 ? '100%' : 720 }}>
             <div className="prof-form-body" style={{ padding: '28px 24px' }}>
 
               {/* ════ STEP 1: Información Básica ════ */}
@@ -2867,6 +2945,340 @@ export default function ParticipantPortalPage() {
     fire: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1.001A3.75 3.75 0 0012 18z" /></svg>,
     shield: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>,
     trophy: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.318 2.916.52A6.003 6.003 0 0116.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.023 6.023 0 01-2.77.852m0 0a6.023 6.023 0 01-2.77-.852" /></svg>,
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER: MIS MENTEES
+  // ═══════════════════════════════════════════════════════════════
+  const renderMentees = () => {
+    if (menteesLoading) return <div className="empty-state">Cargando mentees...</div>;
+    if (myMentees.length === 0) return (
+      <div>
+        <div className="dash-header"><h1 className="dash-title">Mis Mentees</h1><p className="dash-subtitle">Mentees asignados a ti en tus programas de mentoría</p></div>
+        <div className="empty-state">Aún no tienes mentees asignados</div>
+      </div>
+    );
+
+    if (selectedMentee) {
+      const m = selectedMentee;
+      return (
+        <div>
+          <div className="dash-header" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={() => setSelectedMentee(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }}>← </button>
+            <div><h1 className="dash-title">Perfil de {m.full_name}</h1><p className="dash-subtitle">{m.program_name}</p></div>
+          </div>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', fontWeight: 700, color: '#0891b2', overflow: 'hidden', flexShrink: 0 }}>
+                {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (m.full_name || 'M').charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#111827' }}>{m.full_name}</div>
+                <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>{m.headline || m.position || ''}</div>
+                <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{m.department || ''}</div>
+              </div>
+            </div>
+            {m.bio && <div style={{ marginBottom: 16 }}><div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 4 }}>Bio</div><p style={{ fontSize: '0.85rem', color: '#4b5563', lineHeight: 1.6 }}>{m.bio}</p></div>}
+            {m.linkedin_url && <div style={{ marginBottom: 16 }}><a href={m.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.85rem', textDecoration: 'none' }}>🔗 Ver perfil LinkedIn</a></div>}
+            {m.skills?.length > 0 && (
+              <div><div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 8 }}>Habilidades</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{m.skills.map((s: string) => <span key={s} style={{ padding: '4px 12px', borderRadius: 16, background: '#ecfeff', color: '#0e7490', fontSize: '0.75rem', fontWeight: 500 }}>{s}</span>)}</div>
+              </div>
+            )}
+            <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
+              <button onClick={() => { setSessionForm(f => ({ ...f, mentee_id: m.id, program_id: m.program_id })); setShowSessionForm(true); navigate('my-sessions'); }} style={{ padding: '10px 20px', borderRadius: 10, background: '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Agendar sesión</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <div className="dash-header"><h1 className="dash-title">Mis Mentees</h1><p className="dash-subtitle">{myMentees.length} mentee{myMentees.length !== 1 ? 's' : ''} asignado{myMentees.length !== 1 ? 's' : ''}</p></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+          {myMentees.map((m: any) => (
+            <div key={m.id} onClick={() => setSelectedMentee(m)} style={{ background: '#fff', borderRadius: 14, padding: 20, cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', transition: 'box-shadow 0.15s', border: '1px solid #f3f4f6' }}>
+              <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 700, color: '#0891b2', overflow: 'hidden', flexShrink: 0 }}>
+                  {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (m.full_name || 'M').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>{m.full_name}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>{m.position || 'Sin cargo'}</div>
+                  <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{m.program_name}</div>
+                </div>
+              </div>
+              {m.headline && <div style={{ marginTop: 10, fontSize: '0.78rem', color: '#4b5563', lineHeight: 1.4 }}>{m.headline}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER: SESIONES DE MENTORÍA
+  // ═══════════════════════════════════════════════════════════════
+  const handleCreateSession = async () => {
+    if (!sessionForm.title || !sessionForm.scheduled_at || !sessionForm.mentee_id) return;
+    try {
+      const r = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionForm),
+      });
+      if (r.ok) {
+        setShowSessionForm(false);
+        setSessionForm({ mentee_id: '', program_id: '', title: '', description: '', scheduled_at: '', duration_minutes: 60, meeting_url: '' });
+        // Refresh
+        const res = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
+        if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
+      }
+    } catch {}
+  };
+
+  const handleSaveNotes = async (sessionId: string) => {
+    try {
+      await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/notes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionNotesForm),
+      });
+      setShowNotesModal(null);
+      // Refresh
+      const res = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
+      if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
+    } catch {}
+  };
+
+  const handleAiSuggest = async (sessionId: string) => {
+    setAiLoading(true);
+    setAiSuggestion('');
+    try {
+      const r = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/ai-suggest`, { method: 'POST' });
+      if (r.ok) { const d = await r.json(); setAiSuggestion(d.suggestion || ''); }
+    } catch {}
+    setAiLoading(false);
+  };
+
+  const handleCompleteSession = async (sessionId: string) => {
+    try {
+      await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/status?status_val=completed`, { method: 'PATCH' });
+      const res = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
+      if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
+    } catch {}
+  };
+
+  const handleCompleteActivity = async (actId: number) => {
+    try {
+      await fetch(`${API_URL}/api/companies/portal/${portalCode}/activities/${actId}/complete`, { method: 'POST' });
+      setPortalActivities(prev => prev.map(a => a.id === actId ? { ...a, completed_by_me: true } : a));
+    } catch {}
+  };
+
+  const renderSessions = () => {
+    if (sessionsLoading) return <div className="empty-state">Cargando sesiones...</div>;
+
+    const upcoming = mySessions.filter(s => s.status === 'scheduled');
+    const completed = mySessions.filter(s => s.status === 'completed');
+
+    return (
+      <div>
+        <div className="dash-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div><h1 className="dash-title">Sesiones de Mentoría</h1><p className="dash-subtitle">{mySessions.length} sesiones total</p></div>
+          <button onClick={() => setShowSessionForm(true)} style={{ padding: '10px 20px', borderRadius: 10, background: '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>+ Nueva sesión</button>
+        </div>
+
+        {/* New session form modal */}
+        {showSessionForm && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 500, maxHeight: '90vh', overflow: 'auto' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 16 }}>Nueva Sesión de Mentoría</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {myMentees.length > 0 && (
+                  <div className="prof-field">
+                    <label>Mentee</label>
+                    <select value={sessionForm.mentee_id} onChange={e => { const mt = myMentees.find((m: any) => m.id === e.target.value); setSessionForm(f => ({ ...f, mentee_id: e.target.value, program_id: mt?.program_id || f.program_id })); }} style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: '0.85rem' }}>
+                      <option value="">Seleccionar mentee...</option>
+                      {myMentees.map((m: any) => <option key={m.id} value={m.id}>{m.full_name} — {m.program_name}</option>)}
+                    </select>
+                  </div>
+                )}
+                <div className="prof-field"><label>Título *</label><input value={sessionForm.title} onChange={e => setSessionForm(f => ({ ...f, title: e.target.value }))} placeholder="Ej: Sesión de alineación de objetivos" /></div>
+                <div className="prof-field"><label>Fecha y hora *</label><input type="datetime-local" value={sessionForm.scheduled_at} onChange={e => setSessionForm(f => ({ ...f, scheduled_at: e.target.value }))} /></div>
+                <div className="prof-field"><label>Duración (min)</label><input type="number" value={sessionForm.duration_minutes} onChange={e => setSessionForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 60 }))} /></div>
+                <div className="prof-field"><label>Enlace de reunión</label><input value={sessionForm.meeting_url} onChange={e => setSessionForm(f => ({ ...f, meeting_url: e.target.value }))} placeholder="https://meet.google.com/..." /></div>
+                <div className="prof-field"><label>Descripción</label><textarea value={sessionForm.description} onChange={e => setSessionForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Temas a tratar..." /></div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
+                <button onClick={() => setShowSessionForm(false)} style={{ padding: '10px 20px', borderRadius: 10, background: '#f3f4f6', border: 'none', fontSize: '0.82rem', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={handleCreateSession} style={{ padding: '10px 20px', borderRadius: 10, background: '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Crear sesión</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Notes modal */}
+        {showNotesModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 600, maxHeight: '90vh', overflow: 'auto' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 4 }}>Notas de la sesión</h3>
+              <p style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 16 }}>{showNotesModal.title} — {showNotesModal.mentee?.full_name}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="prof-field"><label>¿De qué se trató esta sesión?</label><textarea value={sessionNotesForm.session_notes} onChange={e => setSessionNotesForm(f => ({ ...f, session_notes: e.target.value }))} rows={4} placeholder="Describe los temas principales y lo que se conversó..." /></div>
+                <div className="prof-field"><label>Estado emocional del mentee (1-5)</label>
+                  <div style={{ display: 'flex', gap: 8 }}>{[1,2,3,4,5].map(n => <button key={n} type="button" onClick={() => setSessionNotesForm(f => ({ ...f, mentee_mood: n }))} style={{ width: 40, height: 40, borderRadius: '50%', border: sessionNotesForm.mentee_mood === n ? '2px solid #0891b2' : '1.5px solid #d1d5db', background: sessionNotesForm.mentee_mood === n ? '#ecfeff' : '#fff', fontWeight: 600, cursor: 'pointer' }}>{n}</button>)}</div>
+                </div>
+                <div className="prof-field"><label>Próximos pasos</label><textarea value={sessionNotesForm.next_steps} onChange={e => setSessionNotesForm(f => ({ ...f, next_steps: e.target.value }))} rows={3} placeholder="Acciones acordadas para la siguiente sesión..." /></div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
+                <button onClick={() => setShowNotesModal(null)} style={{ padding: '10px 20px', borderRadius: 10, background: '#f3f4f6', border: 'none', fontSize: '0.82rem', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={() => handleSaveNotes(showNotesModal.id)} style={{ padding: '10px 20px', borderRadius: 10, background: '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Guardar notas</button>
+              </div>
+
+              {/* AI suggestion section */}
+              <div style={{ marginTop: 20, borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#111827' }}>🤖 IA: Diseña tu próxima sesión</div>
+                  <button onClick={() => handleAiSuggest(showNotesModal.id)} disabled={aiLoading} style={{ padding: '8px 16px', borderRadius: 10, background: aiLoading ? '#e5e7eb' : 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: aiLoading ? '#9ca3af' : '#fff', border: 'none', fontSize: '0.78rem', fontWeight: 600, cursor: aiLoading ? 'not-allowed' : 'pointer' }}>
+                    {aiLoading ? 'Generando...' : 'Generar sugerencia'}
+                  </button>
+                </div>
+                {aiSuggestion && (
+                  <div style={{ background: '#f5f3ff', borderRadius: 12, padding: 16, fontSize: '0.82rem', color: '#374151', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                    {aiSuggestion}
+                  </div>
+                )}
+                {showNotesModal.ai_suggestion && !aiSuggestion && (
+                  <div style={{ background: '#f5f3ff', borderRadius: 12, padding: 16, fontSize: '0.82rem', color: '#374151', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginBottom: 6 }}>Sugerencia anterior:</div>
+                    {showNotesModal.ai_suggestion}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Upcoming sessions */}
+        {upcoming.length > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#111827', marginBottom: 12 }}>📅 Próximas sesiones</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {upcoming.map(s => (
+                <div key={s.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div><div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>{s.title}</div><div style={{ fontSize: '0.78rem', color: '#6b7280' }}>con {s.mentee.full_name} • {s.program_name}</div></div>
+                    <span style={{ padding: '4px 10px', borderRadius: 8, background: '#e0f2fe', color: '#0891b2', fontSize: '0.72rem', fontWeight: 600 }}>Programada</span>
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#4b5563', marginBottom: 10 }}>📆 {new Date(s.scheduled_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} • {s.duration_minutes} min</div>
+                  {s.meeting_url && <a href={s.meeting_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.78rem', color: '#0891b2' }}>🔗 Unirse a la reunión</a>}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <button onClick={() => handleCompleteSession(s.id)} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #10b981', background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>✓ Completar</button>
+                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>📝 Notas</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Completed sessions */}
+        {completed.length > 0 && (
+          <div>
+            <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#111827', marginBottom: 12 }}>✅ Sesiones completadas</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {completed.map(s => (
+                <div key={s.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', border: '1px solid #f3f4f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                    <div><div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{s.title}</div><div style={{ fontSize: '0.75rem', color: '#6b7280' }}>con {s.mentee.full_name} • {new Date(s.scheduled_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div></div>
+                    <span style={{ padding: '4px 10px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.72rem', fontWeight: 600 }}>Completada</span>
+                  </div>
+                  {s.session_notes && <div style={{ fontSize: '0.8rem', color: '#4b5563', marginTop: 6, lineHeight: 1.5, borderLeft: '3px solid #e5e7eb', paddingLeft: 12 }}>{s.session_notes.slice(0, 200)}{s.session_notes.length > 200 ? '...' : ''}</div>}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>{s.session_notes ? '📝 Ver notas' : '📝 Agregar notas'}</button>
+                    <button onClick={() => { setAiSuggestion(''); setShowNotesModal(s); setTimeout(() => handleAiSuggest(s.id), 200); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #8b5cf6', background: '#f5f3ff', color: '#6d28d9', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>🤖 IA: Próxima sesión</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {mySessions.length === 0 && (
+          <div className="empty-state">No tienes sesiones aún. ¡Agenda tu primera sesión de mentoría!</div>
+        )}
+      </div>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER: MI RED DE INFLUENCIA
+  // ═══════════════════════════════════════════════════════════════
+  const renderNetwork = () => {
+    if (networkLoading) return <div className="empty-state">Cargando red...</div>;
+    return (
+      <div>
+        <div className="dash-header"><h1 className="dash-title">Mi Red de Influencia</h1><p className="dash-subtitle">Perfiles express de las personas en tus programas</p></div>
+        {networkPeople.length === 0 ? (
+          <div className="empty-state">Aún no hay personas en tu red</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            {networkPeople.map((p: any) => (
+              <div key={p.id} style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6' }}>
+                <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 700, color: '#0891b2', overflow: 'hidden', flexShrink: 0 }}>
+                    {p.avatar_url ? <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (p.full_name || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{p.full_name}</div>
+                    <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>{p.position || p.headline || ''}</div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+                      <span style={{ padding: '2px 8px', borderRadius: 8, background: p.role === 'mentor' ? '#ecfdf5' : p.role === 'mentee' ? '#e0f2fe' : '#f3f4f6', color: p.role === 'mentor' ? '#047857' : p.role === 'mentee' ? '#0891b2' : '#6b7280', fontSize: '0.68rem', fontWeight: 600 }}>{p.role}</span>
+                    </div>
+                  </div>
+                </div>
+                {p.bio && <p style={{ fontSize: '0.78rem', color: '#4b5563', lineHeight: 1.5, marginBottom: 10 }}>{p.bio.slice(0, 120)}{p.bio.length > 120 ? '...' : ''}</p>}
+                {p.linkedin_url && <a href={p.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.78rem', textDecoration: 'none' }}>🔗 LinkedIn</a>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER: ACTIVIDADES CON COMPLETAR
+  // ═══════════════════════════════════════════════════════════════
+  const renderPortalActivities = () => {
+    if (activitiesLoading) return <div className="empty-state">Cargando actividades...</div>;
+    return (
+      <div>
+        <div className="dash-header"><h1 className="dash-title">Mis Actividades</h1><p className="dash-subtitle">{portalActivities.length} actividades en tus programas</p></div>
+        {portalActivities.length === 0 ? (
+          <div className="empty-state">No hay actividades asignadas aún</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {portalActivities.map((a: any) => (
+              <div key={a.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{a.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 2 }}>{a.program_name} • {a.activity_type === 'training' ? 'Entrenamiento' : 'Evento'}{a.start_date ? ` • ${new Date(a.start_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}` : ''}</div>
+                  {a.description && <div style={{ fontSize: '0.78rem', color: '#4b5563', marginTop: 4 }}>{a.description.slice(0, 100)}{a.description.length > 100 ? '...' : ''}</div>}
+                </div>
+                <div style={{ flexShrink: 0, marginLeft: 16 }}>
+                  {a.completed_by_me ? (
+                    <span style={{ padding: '6px 14px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 600 }}>✓ Completada</span>
+                  ) : (
+                    <button onClick={() => handleCompleteActivity(a.id)} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #0891b2', background: '#ecfeff', color: '#0891b2', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Completar</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Tier accent colors — subtle, only for the small dot/pill
@@ -3349,6 +3761,10 @@ export default function ParticipantPortalPage() {
       case 'my-profile': return renderProfile();
       case 'my-badges': return renderBadges();
       case 'my-chat': return renderChat();
+      case 'my-mentees': return renderMentees();
+      case 'my-sessions': return renderSessions();
+      case 'my-network': return renderNetwork();
+      case 'my-portal-activities': return renderPortalActivities();
       default: return renderDashboard();
     }
   };
