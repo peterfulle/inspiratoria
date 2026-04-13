@@ -2984,7 +2984,7 @@ export default function ParticipantPortalPage() {
               </div>
             </div>
             {m.bio && <div style={{ marginBottom: 16 }}><div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 4 }}>Bio</div><p style={{ fontSize: '0.85rem', color: '#4b5563', lineHeight: 1.6 }}>{m.bio}</p></div>}
-            {m.linkedin_url && <div style={{ marginBottom: 16 }}><a href={m.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.85rem', textDecoration: 'none' }}>🔗 Ver perfil LinkedIn</a></div>}
+            {m.linkedin_url && <div style={{ marginBottom: 16 }}><a href={m.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Ver perfil LinkedIn</a></div>}
             {m.skills?.length > 0 && (
               <div><div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 8 }}>Habilidades</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{m.skills.map((s: string) => <span key={s} style={{ padding: '4px 12px', borderRadius: 16, background: '#ecfeff', color: '#0e7490', fontSize: '0.75rem', fontWeight: 500 }}>{s}</span>)}</div>
@@ -3157,7 +3157,7 @@ export default function ParticipantPortalPage() {
               {/* AI suggestion section */}
               <div style={{ marginTop: 20, borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#111827' }}>🤖 IA: Diseña tu próxima sesión</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#111827', display: 'flex', alignItems: 'center', gap: 6 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> IA: Diseña tu próxima sesión</div>
                   <button onClick={() => handleAiSuggest(showNotesModal.id)} disabled={aiLoading} style={{ padding: '8px 16px', borderRadius: 10, background: aiLoading ? '#e5e7eb' : 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: aiLoading ? '#9ca3af' : '#fff', border: 'none', fontSize: '0.78rem', fontWeight: 600, cursor: aiLoading ? 'not-allowed' : 'pointer' }}>
                     {aiLoading ? 'Generando...' : 'Generar sugerencia'}
                   </button>
@@ -3181,7 +3181,7 @@ export default function ParticipantPortalPage() {
         {/* Upcoming sessions */}
         {upcoming.length > 0 && (
           <div style={{ marginBottom: 28 }}>
-            <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#111827', marginBottom: 12 }}>📅 Próximas sesiones</h3>
+            <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Próximas sesiones</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {upcoming.map(s => (
                 <div key={s.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6' }}>
@@ -3189,11 +3189,11 @@ export default function ParticipantPortalPage() {
                     <div><div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>{s.title}</div><div style={{ fontSize: '0.78rem', color: '#6b7280' }}>con {s.mentee.full_name} • {s.program_name}</div></div>
                     <span style={{ padding: '4px 10px', borderRadius: 8, background: '#e0f2fe', color: '#0891b2', fontSize: '0.72rem', fontWeight: 600 }}>Programada</span>
                   </div>
-                  <div style={{ fontSize: '0.82rem', color: '#4b5563', marginBottom: 10 }}>📆 {new Date(s.scheduled_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} • {s.duration_minutes} min</div>
-                  {s.meeting_url && <a href={s.meeting_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.78rem', color: '#0891b2' }}>🔗 Unirse a la reunión</a>}
+                  <div style={{ fontSize: '0.82rem', color: '#4b5563', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> {new Date(s.scheduled_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} • {s.duration_minutes} min</div>
+                  {s.meeting_url && <a href={s.meeting_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.78rem', color: '#0891b2', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Unirse a la reunión</a>}
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button onClick={() => handleCompleteSession(s.id)} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #10b981', background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>✓ Completar</button>
-                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>📝 Notas</button>
+                    <button onClick={() => handleCompleteSession(s.id)} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #10b981', background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Completar</button>
+                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Notas</button>
                   </div>
                 </div>
               ))}
@@ -3204,7 +3204,7 @@ export default function ParticipantPortalPage() {
         {/* Completed sessions */}
         {completed.length > 0 && (
           <div>
-            <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#111827', marginBottom: 12 }}>✅ Sesiones completadas</h3>
+            <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Sesiones completadas</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {completed.map(s => (
                 <div key={s.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', border: '1px solid #f3f4f6' }}>
@@ -3214,8 +3214,8 @@ export default function ParticipantPortalPage() {
                   </div>
                   {s.session_notes && <div style={{ fontSize: '0.8rem', color: '#4b5563', marginTop: 6, lineHeight: 1.5, borderLeft: '3px solid #e5e7eb', paddingLeft: 12 }}>{s.session_notes.slice(0, 200)}{s.session_notes.length > 200 ? '...' : ''}</div>}
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>{s.session_notes ? '📝 Ver notas' : '📝 Agregar notas'}</button>
-                    <button onClick={() => { setAiSuggestion(''); setShowNotesModal(s); setTimeout(() => handleAiSuggest(s.id), 200); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #8b5cf6', background: '#f5f3ff', color: '#6d28d9', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>🤖 IA: Próxima sesión</button>
+                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> {s.session_notes ? 'Ver notas' : 'Agregar notas'}</span></button>
+                    <button onClick={() => { setAiSuggestion(''); setShowNotesModal(s); setTimeout(() => handleAiSuggest(s.id), 200); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #8b5cf6', background: '#f5f3ff', color: '#6d28d9', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6d28d9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> IA: Próxima sesión</button>
                   </div>
                 </div>
               ))}
@@ -3257,7 +3257,7 @@ export default function ParticipantPortalPage() {
                   </div>
                 </div>
                 {p.bio && <p style={{ fontSize: '0.78rem', color: '#4b5563', lineHeight: 1.5, marginBottom: 10 }}>{p.bio.slice(0, 120)}{p.bio.length > 120 ? '...' : ''}</p>}
-                {p.linkedin_url && <a href={p.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.78rem', textDecoration: 'none' }}>🔗 LinkedIn</a>}
+                {p.linkedin_url && <a href={p.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.78rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> LinkedIn</a>}
               </div>
             ))}
           </div>

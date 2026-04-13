@@ -4582,11 +4582,13 @@ async def get_my_sessions(portal_code: str):
 
 @router.post("/portal/{portal_code}/sessions")
 async def create_session(portal_code: str, payload: SessionCreateRequest):
-    """Create a new mentoring session."""
+    """Create a new mentoring session, send emails, create audit log."""
     def _resolve():
         user = _get_portal_user(portal_code)
-        from programs.models import MentoringSession, Program
+        from programs.models import MentoringSession, Program, AuditLog, Notification
         from datetime import datetime as dt
+        from django.core.mail import send_mail
+        from django.conf import settings as django_settings
 
         try:
             mentee = User.objects.get(id=payload.mentee_id)
@@ -4604,7 +4606,179 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
             scheduled_at=scheduled, duration_minutes=payload.duration_minutes,
             meeting_url=payload.meeting_url,
         )
-        return {"id": str(session.id), "title": session.title, "scheduled_at": session.scheduled_at.isoformat(), "status": session.status}
+
+        # ── Audit log (bitácora) ────────────────────────────────
+        AuditLog.objects.create(
+            program=program,
+            admin_user=user,
+            action="session_created",
+            entity="mentoring_session",
+            entity_id=str(session.id),
+            details={
+                "title": session.title,
+                "mentor": user.full_name or user.email,
+                "mentee": mentee.full_name or mentee.email,
+                "scheduled_at": session.scheduled_at.isoformat(),
+                "duration_minutes": session.duration_minutes,
+                "meeting_url": session.meeting_url or "",
+            },
+        )
+
+        # ── In-app notifications ────────────────────────────────
+        formatted_date = scheduled.strftime("%d/%m/%Y a las %H:%M")
+        Notification.objects.create(
+            recipient=mentee, sender=user,
+            notification_type="system",
+            title="Nueva sesión de mentoría agendada",
+            message=f"{user.full_name or 'Tu mentor'} agendó una sesión: \"{session.title}\" para el {formatted_date}.",
+            link=f"/p/{mentee.portal_code}/sesiones" if mentee.portal_code else "",
+        )
+        Notification.objects.create(
+            recipient=user, sender=user,
+            notification_type="system",
+            title="Sesión de mentoría creada",
+            message=f"Creaste una sesión: \"{session.title}\" con {mentee.full_name or mentee.email} para el {formatted_date}.",
+            link=f"/p/{user.portal_code}/sesiones" if user.portal_code else "",
+        )
+
+        # ── Email to mentee ─────────────────────────────────────
+        frontend_url = getattr(django_settings, "FRONTEND_URL", "https://inspiratoria.aplifly.com")
+        mentee_portal_link = f"{frontend_url}/p/{mentee.portal_code}/sesiones" if mentee.portal_code else frontend_url
+        meeting_block = ""
+        if session.meeting_url:
+            meeting_block = f"""
+              <div style="text-align:center;margin:20px 0 0 0;">
+                <a href="{session.meeting_url}" style="display:inline-block;background:#0891b2;color:#ffffff;padding:12px 32px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none;">Enlace de reunión</a>
+              </div>"""
+
+        mentee_html = f"""
+        <div style="background-color:#f9fafb;padding:40px 16px;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+          <div style="max-width:520px;margin:0 auto;">
+            <div style="text-align:center;padding-bottom:32px;">
+              <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#0a0a0a;">Inspiratoria</span>
+            </div>
+            <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:40px 36px;">
+              <p style="margin:0 0 8px 0;color:#111827;font-size:17px;font-weight:600;">
+                Nueva sesión de mentoría agendada
+              </p>
+              <p style="margin:0 0 24px 0;color:#6b7280;font-size:14px;">
+                Hola {mentee.full_name or 'Mentee'}, tu mentor ha agendado una sesión contigo.
+              </p>
+              <div style="background:#f0fdfa;border:1px solid #ccfbf1;border-radius:12px;padding:20px;margin-bottom:24px;">
+                <table style="width:100%;border-collapse:collapse;">
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;width:110px;">Sesión</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{session.title}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;">Mentor</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{user.full_name or user.email}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;">Fecha</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{formatted_date}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;">Duración</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{session.duration_minutes} minutos</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;">Programa</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{program.name}</td>
+                  </tr>
+                </table>
+              </div>
+              {f'<p style="margin:0 0 16px 0;color:#4b5563;font-size:13px;line-height:1.6;">{session.description}</p>' if session.description else ''}
+              {meeting_block}
+              <div style="text-align:center;margin:24px 0 0 0;">
+                <a href="{mentee_portal_link}" style="display:inline-block;background:#0a0a0a;color:#FFD902;padding:14px 40px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none;">Ver mis sesiones</a>
+              </div>
+            </div>
+            <div style="text-align:center;padding-top:28px;">
+              <p style="margin:0;color:#d1d5db;font-size:11px;">Equipo Inspiratoria</p>
+            </div>
+          </div>
+        </div>"""
+
+        # ── Email to mentor (confirmation) ──────────────────────
+        mentor_portal_link = f"{frontend_url}/p/{user.portal_code}/sesiones" if user.portal_code else frontend_url
+        mentor_html = f"""
+        <div style="background-color:#f9fafb;padding:40px 16px;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+          <div style="max-width:520px;margin:0 auto;">
+            <div style="text-align:center;padding-bottom:32px;">
+              <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#0a0a0a;">Inspiratoria</span>
+            </div>
+            <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:40px 36px;">
+              <p style="margin:0 0 8px 0;color:#111827;font-size:17px;font-weight:600;">
+                Sesión de mentoría confirmada
+              </p>
+              <p style="margin:0 0 24px 0;color:#6b7280;font-size:14px;">
+                Hola {user.full_name or 'Mentor'}, tu sesión ha sido creada exitosamente.
+              </p>
+              <div style="background:#f0fdfa;border:1px solid #ccfbf1;border-radius:12px;padding:20px;margin-bottom:24px;">
+                <table style="width:100%;border-collapse:collapse;">
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;width:110px;">Sesión</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{session.title}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;">Mentee</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{mentee.full_name or mentee.email}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;">Fecha</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{formatted_date}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;">Duración</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{session.duration_minutes} minutos</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;">Programa</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{program.name}</td>
+                  </tr>
+                </table>
+              </div>
+              {meeting_block}
+              <div style="text-align:center;margin:24px 0 0 0;">
+                <a href="{mentor_portal_link}" style="display:inline-block;background:#0a0a0a;color:#FFD902;padding:14px 40px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none;">Ver mis sesiones</a>
+              </div>
+            </div>
+            <div style="text-align:center;padding-top:28px;">
+              <p style="margin:0;color:#d1d5db;font-size:11px;">Equipo Inspiratoria</p>
+            </div>
+          </div>
+        </div>"""
+
+        # Send emails (fail_silently so session creation still succeeds)
+        try:
+            send_mail(
+                subject=f"📅 Nueva sesión de mentoría: {session.title}",
+                message=f"Tu mentor {user.full_name or user.email} agendó una sesión \"{session.title}\" para el {formatted_date}. Programa: {program.name}.",
+                from_email=django_settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[mentee.email],
+                html_message=mentee_html,
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+        try:
+            send_mail(
+                subject=f"✅ Sesión confirmada: {session.title}",
+                message=f"Creaste la sesión \"{session.title}\" con {mentee.full_name or mentee.email} para el {formatted_date}. Programa: {program.name}.",
+                from_email=django_settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                html_message=mentor_html,
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+        return {
+            "id": str(session.id), "title": session.title,
+            "scheduled_at": session.scheduled_at.isoformat(), "status": session.status,
+            "emails_sent": True,
+        }
 
     return await sync_to_async(_resolve)()
 
