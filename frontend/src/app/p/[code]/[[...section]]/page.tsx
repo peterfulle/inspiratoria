@@ -914,9 +914,10 @@ export default function ParticipantPortalPage() {
       .finally(() => setBadgesLoading(false));
   }, [activeNav, portalCode]);
 
-  // Fetch mentees when entering the mentees tab
+  // Fetch mentees when entering mentees OR sessions tab
   useEffect(() => {
-    if (activeNav !== 'my-mentees' || !portalCode) return;
+    if ((activeNav !== 'my-mentees' && activeNav !== 'my-sessions') || !portalCode) return;
+    if (myMentees.length > 0 && activeNav === 'my-sessions') return; // already loaded
     setMenteesLoading(true);
     fetch(`${API_URL}/api/companies/portal/${portalCode}/mentees`)
       .then(r => r.ok ? r.json() : { mentees: [] })
@@ -3020,8 +3021,15 @@ export default function ParticipantPortalPage() {
   // ═══════════════════════════════════════════════════════════════
   // RENDER: SESIONES DE MENTORÍA
   // ═══════════════════════════════════════════════════════════════
+  const [sessionFormError, setSessionFormError] = useState('');
+  const [sessionCreating, setSessionCreating] = useState(false);
+
   const handleCreateSession = async () => {
-    if (!sessionForm.title || !sessionForm.scheduled_at || !sessionForm.mentee_id) return;
+    setSessionFormError('');
+    if (!sessionForm.title) { setSessionFormError('El título es obligatorio'); return; }
+    if (!sessionForm.scheduled_at) { setSessionFormError('La fecha es obligatoria'); return; }
+    if (!sessionForm.mentee_id) { setSessionFormError('Debes seleccionar un mentee'); return; }
+    setSessionCreating(true);
     try {
       const r = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3030,11 +3038,16 @@ export default function ParticipantPortalPage() {
       if (r.ok) {
         setShowSessionForm(false);
         setSessionForm({ mentee_id: '', program_id: '', title: '', description: '', scheduled_at: '', duration_minutes: 60, meeting_url: '' });
-        // Refresh
         const res = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
         if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
+      } else {
+        const err = await r.text();
+        setSessionFormError(`Error al crear sesión: ${err}`);
       }
-    } catch {}
+    } catch (e: any) {
+      setSessionFormError('Error de conexión al crear la sesión');
+    }
+    setSessionCreating(false);
   };
 
   const handleSaveNotes = async (sessionId: string) => {
@@ -3093,16 +3106,21 @@ export default function ParticipantPortalPage() {
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 500, maxHeight: '90vh', overflow: 'auto' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 16 }}>Nueva Sesión de Mentoría</h3>
+              {sessionFormError && <div style={{ background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14 }}>{sessionFormError}</div>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {myMentees.length > 0 && (
-                  <div className="prof-field">
-                    <label>Mentee</label>
+                <div className="prof-field">
+                  <label>Mentee *</label>
+                  {menteesLoading ? (
+                    <div style={{ fontSize: '0.82rem', color: '#6b7280', padding: 8 }}>Cargando participantes...</div>
+                  ) : myMentees.length > 0 ? (
                     <select value={sessionForm.mentee_id} onChange={e => { const mt = myMentees.find((m: any) => m.id === e.target.value); setSessionForm(f => ({ ...f, mentee_id: e.target.value, program_id: mt?.program_id || f.program_id })); }} style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: '0.85rem' }}>
                       <option value="">Seleccionar mentee...</option>
-                      {myMentees.map((m: any) => <option key={m.id} value={m.id}>{m.full_name} — {m.program_name}</option>)}
+                      {myMentees.map((m: any) => <option key={m.id} value={m.id}>{m.full_name || m.email} — {m.program_name}</option>)}
                     </select>
-                  </div>
-                )}
+                  ) : (
+                    <div style={{ fontSize: '0.82rem', color: '#9ca3af', padding: 8, background: '#f9fafb', borderRadius: 10 }}>No hay mentees asignados en tus programas</div>
+                  )}
+                </div>
                 <div className="prof-field"><label>Título *</label><input value={sessionForm.title} onChange={e => setSessionForm(f => ({ ...f, title: e.target.value }))} placeholder="Ej: Sesión de alineación de objetivos" /></div>
                 <div className="prof-field"><label>Fecha y hora *</label><input type="datetime-local" value={sessionForm.scheduled_at} onChange={e => setSessionForm(f => ({ ...f, scheduled_at: e.target.value }))} /></div>
                 <div className="prof-field"><label>Duración (min)</label><input type="number" value={sessionForm.duration_minutes} onChange={e => setSessionForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 60 }))} /></div>
@@ -3110,8 +3128,8 @@ export default function ParticipantPortalPage() {
                 <div className="prof-field"><label>Descripción</label><textarea value={sessionForm.description} onChange={e => setSessionForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Temas a tratar..." /></div>
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
-                <button onClick={() => setShowSessionForm(false)} style={{ padding: '10px 20px', borderRadius: 10, background: '#f3f4f6', border: 'none', fontSize: '0.82rem', cursor: 'pointer' }}>Cancelar</button>
-                <button onClick={handleCreateSession} style={{ padding: '10px 20px', borderRadius: 10, background: '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Crear sesión</button>
+                <button onClick={() => { setShowSessionForm(false); setSessionFormError(''); }} style={{ padding: '10px 20px', borderRadius: 10, background: '#f3f4f6', border: 'none', fontSize: '0.82rem', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={handleCreateSession} disabled={sessionCreating} style={{ padding: '10px 20px', borderRadius: 10, background: sessionCreating ? '#9ca3af' : '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: sessionCreating ? 'not-allowed' : 'pointer' }}>{sessionCreating ? 'Creando...' : 'Crear sesión'}</button>
               </div>
             </div>
           </div>

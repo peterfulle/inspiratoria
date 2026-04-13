@@ -4458,7 +4458,7 @@ def _get_portal_user(portal_code: str):
 
 @router.get("/portal/{portal_code}/mentees")
 async def get_my_mentees(portal_code: str):
-    """Get mentees assigned to this mentor via Vinculation."""
+    """Get mentees assigned to this mentor via Vinculation OR from same programs."""
     def _resolve():
         user = _get_portal_user(portal_code)
         from programs.models import ProgramParticipant, Vinculation
@@ -4468,37 +4468,68 @@ async def get_my_mentees(portal_code: str):
         ).select_related("program")
 
         mentees = []
+        seen_ids = set()
+
+        # 1) Via Vinculation (explicit mentor-mentee pairing)
         for pp in my_pps:
             vincs = Vinculation.objects.filter(
                 participant1=pp, type="mentoria", status="active"
             ).select_related("participant2", "participant2__user")
             for v in vincs:
                 mu = v.participant2.user
-                mentees.append({
-                    "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
-                    "position": mu.position or "", "department": mu.department or "",
-                    "avatar_url": getattr(mu, "avatar_url", "") or "",
-                    "linkedin_url": getattr(mu, "linkedin_url", "") or "",
-                    "bio": getattr(mu, "bio", "") or "",
-                    "headline": getattr(mu, "headline", "") or "",
-                    "skills": getattr(mu, "skills", []) or [],
-                    "program_name": pp.program.name, "program_id": str(pp.program.id),
-                })
+                if mu.id not in seen_ids:
+                    seen_ids.add(mu.id)
+                    mentees.append({
+                        "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                        "position": mu.position or "", "department": mu.department or "",
+                        "avatar_url": getattr(mu, "avatar_url", "") or "",
+                        "linkedin_url": getattr(mu, "linkedin_url", "") or "",
+                        "bio": getattr(mu, "bio", "") or "",
+                        "headline": getattr(mu, "headline", "") or "",
+                        "skills": getattr(mu, "skills", []) or [],
+                        "program_name": pp.program.name, "program_id": str(pp.program.id),
+                        "source": "vinculation",
+                    })
             vincs2 = Vinculation.objects.filter(
                 participant2=pp, type="mentoria", status="active"
             ).select_related("participant1", "participant1__user")
             for v in vincs2:
                 mu = v.participant1.user
-                mentees.append({
-                    "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
-                    "position": mu.position or "", "department": mu.department or "",
-                    "avatar_url": getattr(mu, "avatar_url", "") or "",
-                    "linkedin_url": getattr(mu, "linkedin_url", "") or "",
-                    "bio": getattr(mu, "bio", "") or "",
-                    "headline": getattr(mu, "headline", "") or "",
-                    "skills": getattr(mu, "skills", []) or [],
-                    "program_name": pp.program.name, "program_id": str(pp.program.id),
-                })
+                if mu.id not in seen_ids:
+                    seen_ids.add(mu.id)
+                    mentees.append({
+                        "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                        "position": mu.position or "", "department": mu.department or "",
+                        "avatar_url": getattr(mu, "avatar_url", "") or "",
+                        "linkedin_url": getattr(mu, "linkedin_url", "") or "",
+                        "bio": getattr(mu, "bio", "") or "",
+                        "headline": getattr(mu, "headline", "") or "",
+                        "skills": getattr(mu, "skills", []) or [],
+                        "program_name": pp.program.name, "program_id": str(pp.program.id),
+                        "source": "vinculation",
+                    })
+
+        # 2) Fallback: mentees from the same programs where user is mentor
+        for pp in my_pps:
+            program_mentees = ProgramParticipant.objects.filter(
+                program=pp.program, role="mentee", deleted_at__isnull=True,
+            ).exclude(user=user).select_related("user")
+            for pm in program_mentees:
+                mu = pm.user
+                if mu.id not in seen_ids:
+                    seen_ids.add(mu.id)
+                    mentees.append({
+                        "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                        "position": mu.position or "", "department": mu.department or "",
+                        "avatar_url": getattr(mu, "avatar_url", "") or "",
+                        "linkedin_url": getattr(mu, "linkedin_url", "") or "",
+                        "bio": getattr(mu, "bio", "") or "",
+                        "headline": getattr(mu, "headline", "") or "",
+                        "skills": getattr(mu, "skills", []) or [],
+                        "program_name": pp.program.name, "program_id": str(pp.program.id),
+                        "source": "program",
+                    })
+
         return {"mentees": mentees}
 
     return await sync_to_async(_resolve)()
