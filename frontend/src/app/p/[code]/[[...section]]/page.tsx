@@ -729,6 +729,8 @@ export default function ParticipantPortalPage() {
   const [newSkill, setNewSkill] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [mentorStep, setMentorStep] = useState(0); // Multi-step wizard: 0=not started, 1-4 steps
+  const [otherTopicInput, setOtherTopicInput] = useState('');
+  const [otherAreaInput, setOtherAreaInput] = useState('');
 
   // Badges state
   const [badgesData, setBadgesData] = useState<any>(null);
@@ -2339,9 +2341,6 @@ export default function ParticipantPortalPage() {
       return { ...f, [field]: arr.includes(value) ? arr.filter((v: string) => v !== value) : [...arr, value] };
     });
   };
-
-  const [otherTopicInput, setOtherTopicInput] = useState('');
-  const [otherAreaInput, setOtherAreaInput] = useState('');
 
   const addOtherItem = (field: string, value: string, setter: (v: string) => void) => {
     const trimmed = value.trim();
