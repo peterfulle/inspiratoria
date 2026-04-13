@@ -764,6 +764,10 @@ export default function ParticipantPortalPage() {
   const [networkPeople, setNetworkPeople] = useState<any[]>([]);
   const [networkLoading, setNetworkLoading] = useState(false);
 
+  // Session form state
+  const [sessionFormError, setSessionFormError] = useState('');
+  const [sessionCreating, setSessionCreating] = useState(false);
+
   // Chat state
   const [chatPrograms, setChatPrograms] = useState<any[]>([]);
   const [chatActiveProgram, setChatActiveProgram] = useState<any>(null);
@@ -3021,9 +3025,6 @@ export default function ParticipantPortalPage() {
   // ═══════════════════════════════════════════════════════════════
   // RENDER: SESIONES DE MENTORÍA
   // ═══════════════════════════════════════════════════════════════
-  const [sessionFormError, setSessionFormError] = useState('');
-  const [sessionCreating, setSessionCreating] = useState(false);
-
   const handleCreateSession = async () => {
     setSessionFormError('');
     if (!sessionForm.title) { setSessionFormError('El título es obligatorio'); return; }
