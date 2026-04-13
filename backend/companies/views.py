@@ -2395,6 +2395,19 @@ class ProfileUpdateRequest(BaseModel):
     bio: Optional[str] = None
     headline: Optional[str] = None
     skills: Optional[list] = None
+    # Mentor profile extended fields
+    gender: Optional[str] = None
+    personal_email: Optional[str] = None
+    presentation: Optional[str] = None
+    mentor_topics: Optional[list] = None
+    mentor_objectives: Optional[list] = None
+    mentor_style: Optional[list] = None
+    experience_level: Optional[str] = None
+    experience_area: Optional[list] = None
+    mentee_preference: Optional[list] = None
+    mentee_outcomes: Optional[list] = None
+    session_structure: Optional[list] = None
+    mentor_profile_step: Optional[int] = None
 
 
 @router.get("/auth/profile")
@@ -2453,6 +2466,49 @@ async def update_profile(payload: ProfileUpdateRequest, authorization: Optional[
     if payload.skills is not None:
         user.skills = [str(s).strip()[:50] for s in payload.skills[:20] if str(s).strip()]
         update_fields.append('skills')
+    # Extended mentor profile fields
+    if payload.gender is not None:
+        valid_genders = ['masculino', 'femenino', 'no_binario', 'prefiero_no_decir']
+        user.gender = payload.gender.strip()[:20] if payload.gender.strip() in valid_genders else ''
+        update_fields.append('gender')
+    if payload.personal_email is not None:
+        import re as _re
+        email_val = payload.personal_email.strip()[:254]
+        if email_val and _re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email_val):
+            user.personal_email = email_val
+        elif not email_val:
+            user.personal_email = ''
+        update_fields.append('personal_email') if 'personal_email' not in update_fields else None
+    if payload.presentation is not None:
+        user.presentation = payload.presentation.strip()[:2000]
+        update_fields.append('presentation')
+    if payload.mentor_topics is not None:
+        user.mentor_topics = [str(s).strip()[:100] for s in payload.mentor_topics[:15] if str(s).strip()]
+        update_fields.append('mentor_topics')
+    if payload.mentor_objectives is not None:
+        user.mentor_objectives = [str(s).strip()[:100] for s in payload.mentor_objectives[:15] if str(s).strip()]
+        update_fields.append('mentor_objectives')
+    if payload.mentor_style is not None:
+        user.mentor_style = [str(s).strip()[:100] for s in payload.mentor_style[:10] if str(s).strip()]
+        update_fields.append('mentor_style')
+    if payload.experience_level is not None:
+        user.experience_level = payload.experience_level.strip()[:30]
+        update_fields.append('experience_level')
+    if payload.experience_area is not None:
+        user.experience_area = [str(s).strip()[:100] for s in payload.experience_area[:15] if str(s).strip()]
+        update_fields.append('experience_area')
+    if payload.mentee_preference is not None:
+        user.mentee_preference = [str(s).strip()[:100] for s in payload.mentee_preference[:10] if str(s).strip()]
+        update_fields.append('mentee_preference')
+    if payload.mentee_outcomes is not None:
+        user.mentee_outcomes = [str(s).strip()[:100] for s in payload.mentee_outcomes[:10] if str(s).strip()]
+        update_fields.append('mentee_outcomes')
+    if payload.session_structure is not None:
+        user.session_structure = [str(s).strip()[:100] for s in payload.session_structure[:10] if str(s).strip()]
+        update_fields.append('session_structure')
+    if payload.mentor_profile_step is not None:
+        user.mentor_profile_step = max(0, min(4, payload.mentor_profile_step))
+        update_fields.append('mentor_profile_step')
 
     if update_fields:
         await sync_to_async(user.save)(update_fields=update_fields)
@@ -2466,6 +2522,18 @@ async def update_profile(payload: ProfileUpdateRequest, authorization: Optional[
         "bio": getattr(user, 'bio', '') or "",
         "headline": getattr(user, 'headline', '') or "",
         "skills": getattr(user, 'skills', []) or [],
+        "gender": getattr(user, 'gender', '') or "",
+        "personal_email": getattr(user, 'personal_email', '') or "",
+        "presentation": getattr(user, 'presentation', '') or "",
+        "mentor_topics": getattr(user, 'mentor_topics', []) or [],
+        "mentor_objectives": getattr(user, 'mentor_objectives', []) or [],
+        "mentor_style": getattr(user, 'mentor_style', []) or [],
+        "experience_level": getattr(user, 'experience_level', '') or "",
+        "experience_area": getattr(user, 'experience_area', []) or [],
+        "mentee_preference": getattr(user, 'mentee_preference', []) or [],
+        "mentee_outcomes": getattr(user, 'mentee_outcomes', []) or [],
+        "session_structure": getattr(user, 'session_structure', []) or [],
+        "mentor_profile_step": getattr(user, 'mentor_profile_step', 0) or 0,
     }
 
 
@@ -2695,6 +2763,18 @@ async def get_portal_data(portal_code: str):
                 "skills": getattr(user, 'skills', []) or [],
                 "portal_code": user.portal_code,
                 "created_at": user.created_at.isoformat() if getattr(user, 'created_at', None) else "",
+                "gender": getattr(user, 'gender', '') or "",
+                "personal_email": getattr(user, 'personal_email', '') or "",
+                "presentation": getattr(user, 'presentation', '') or "",
+                "mentor_topics": getattr(user, 'mentor_topics', []) or [],
+                "mentor_objectives": getattr(user, 'mentor_objectives', []) or [],
+                "mentor_style": getattr(user, 'mentor_style', []) or [],
+                "experience_level": getattr(user, 'experience_level', '') or "",
+                "experience_area": getattr(user, 'experience_area', []) or [],
+                "mentee_preference": getattr(user, 'mentee_preference', []) or [],
+                "mentee_outcomes": getattr(user, 'mentee_outcomes', []) or [],
+                "session_structure": getattr(user, 'session_structure', []) or [],
+                "mentor_profile_step": getattr(user, 'mentor_profile_step', 0) or 0,
             },
             "programs": programs_data,
         }

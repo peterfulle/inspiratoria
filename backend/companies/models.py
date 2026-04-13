@@ -343,7 +343,7 @@ class User(AbstractUser):
     
     role = models.CharField(max_length=30, choices=ROLE_CHOICES, default="mentee")
     
-    # Perfil
+    # Perfil básico
     full_name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, blank=True)
     position = models.CharField(max_length=100, blank=True)  # Cargo en la empresa
@@ -355,6 +355,26 @@ class User(AbstractUser):
     
     # Avatar (stored as base64 data URI in DB for Render compatibility)
     avatar_url = models.TextField(blank=True, default="")
+    
+    # Perfil extendido mentor (multi-step onboarding)
+    GENDER_CHOICES = [
+        ("masculino", "Masculino"),
+        ("femenino", "Femenino"),
+        ("no_binario", "No binario"),
+        ("prefiero_no_decir", "Prefiero no decir"),
+    ]
+    gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True, default="")
+    personal_email = models.EmailField(max_length=254, blank=True, default="")
+    presentation = models.TextField(blank=True, default="")  # Breve presentación 3-5 líneas
+    mentor_topics = models.JSONField(default=list, blank=True)  # Temas de valor como mentor
+    mentor_objectives = models.JSONField(default=list, blank=True)  # Objetivos a acompañar
+    mentor_style = models.JSONField(default=list, blank=True)  # Estilo de acompañamiento
+    experience_level = models.CharField(max_length=30, blank=True, default="")  # Nivel experiencia
+    experience_area = models.JSONField(default=list, blank=True)  # Área de experiencia
+    mentee_preference = models.JSONField(default=list, blank=True)  # Perfil mentee preferido
+    mentee_outcomes = models.JSONField(default=list, blank=True)  # Resultados esperados
+    session_structure = models.JSONField(default=list, blank=True)  # Estructura sesiones
+    mentor_profile_step = models.PositiveIntegerField(default=0)  # Paso actual del wizard (0=no iniciado, 4=completo)
     
     # Onboarding
     is_onboarded = models.BooleanField(default=False)

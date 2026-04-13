@@ -720,9 +720,15 @@ export default function ParticipantPortalPage() {
   const [profileForm, setProfileForm] = useState({
     full_name: '', phone: '', position: '', department: '',
     linkedin_url: '', bio: '', headline: '', skills: [] as string[],
+    gender: '', personal_email: '', presentation: '',
+    mentor_topics: [] as string[], mentor_objectives: [] as string[],
+    mentor_style: [] as string[], experience_level: '',
+    experience_area: [] as string[], mentee_preference: [] as string[],
+    mentee_outcomes: [] as string[], session_structure: [] as string[],
   });
   const [newSkill, setNewSkill] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [mentorStep, setMentorStep] = useState(0); // Multi-step wizard: 0=not started, 1-4 steps
 
   // Badges state
   const [badgesData, setBadgesData] = useState<any>(null);
@@ -757,15 +763,8 @@ export default function ParticipantPortalPage() {
   const totalSessions = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.sessions || 0), 0) || 0;
   const totalResources = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.resources?.length || 0), 0) || 0;
 
-  // Profile completeness gate — all these fields must be filled
-  const isProfileComplete = !!(
-    portalUser?.full_name?.trim() &&
-    portalUser?.headline?.trim() &&
-    portalUser?.position?.trim() &&
-    portalUser?.department?.trim() &&
-    portalUser?.bio?.trim() &&
-    portalUser?.linkedin_url?.trim()
-  );
+  // Profile completeness gate — mentor profile wizard must be complete (step 4)
+  const isProfileComplete = (portalUser?.mentor_profile_step || 0) >= 4;
 
   // Derive detail tab from URL section
   const detailTab = (() => {
@@ -2203,9 +2202,22 @@ export default function ParticipantPortalPage() {
       bio: portalUser?.bio || '',
       headline: portalUser?.headline || '',
       skills: Array.isArray(portalUser?.skills) ? [...portalUser.skills] : [],
+      gender: portalUser?.gender || '',
+      personal_email: portalUser?.personal_email || '',
+      presentation: portalUser?.presentation || '',
+      mentor_topics: Array.isArray(portalUser?.mentor_topics) ? [...portalUser.mentor_topics] : [],
+      mentor_objectives: Array.isArray(portalUser?.mentor_objectives) ? [...portalUser.mentor_objectives] : [],
+      mentor_style: Array.isArray(portalUser?.mentor_style) ? [...portalUser.mentor_style] : [],
+      experience_level: portalUser?.experience_level || '',
+      experience_area: Array.isArray(portalUser?.experience_area) ? [...portalUser.experience_area] : [],
+      mentee_preference: Array.isArray(portalUser?.mentee_preference) ? [...portalUser.mentee_preference] : [],
+      mentee_outcomes: Array.isArray(portalUser?.mentee_outcomes) ? [...portalUser.mentee_outcomes] : [],
+      session_structure: Array.isArray(portalUser?.session_structure) ? [...portalUser.session_structure] : [],
     });
     setProfileEditing(true);
     setProfileMsg('');
+    // Start from where user left off, or step 1
+    setMentorStep(Math.max(1, Math.min(4, (portalUser?.mentor_profile_step || 0) + 1)));
   };
 
   const cancelEditProfile = () => {
@@ -2213,16 +2225,21 @@ export default function ParticipantPortalPage() {
     setProfileMsg('');
   };
 
-  const saveProfile = async () => {
+  const saveProfile = async (stepOverride?: number) => {
     const token = localStorage.getItem('auth_token');
     if (!token) return;
     setProfileSaving(true);
     setProfileMsg('');
     try {
+      const bodyData: any = { ...profileForm };
+      // When step is completed, update the mentor_profile_step to the highest step completed
+      if (stepOverride !== undefined) {
+        bodyData.mentor_profile_step = stepOverride;
+      }
       const res = await fetch(`${API_URL}/api/companies/auth/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(profileForm),
+        body: JSON.stringify(bodyData),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -2230,8 +2247,16 @@ export default function ParticipantPortalPage() {
       }
       const updated = await res.json();
       setPortalUser((prev: any) => ({ ...prev, ...updated }));
-      setProfileEditing(false);
-      setProfileMsg('ok:Perfil actualizado correctamente');
+      if (stepOverride !== undefined && stepOverride >= 4) {
+        setProfileEditing(false);
+        setMentorStep(0);
+        setProfileMsg('ok:¡Perfil de mentor completado exitosamente!');
+      } else if (stepOverride !== undefined) {
+        setProfileMsg('ok:Paso guardado correctamente');
+      } else {
+        setProfileEditing(false);
+        setProfileMsg('ok:Perfil actualizado correctamente');
+      }
     } catch (e: any) {
       setProfileMsg('err:' + (e.message || 'Error al guardar'));
     } finally {
@@ -2298,269 +2323,538 @@ export default function ParticipantPortalPage() {
   const initials = (portalUser?.full_name || portalUser?.email || 'U')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
-  const renderProfile = () => (
-    <>
-      <div className="dash-header">
-        <h1 className="dash-title">Mi Perfil</h1>
-        <p className="dash-subtitle">{roleLabel} en {companyName || 'Inspiratoria'}</p>
-      </div>
+  /* ── Mentor multi-step wizard helpers ── */
+  const MENTOR_TOPICS = ['Liderazgo', 'Comunicación efectiva', 'Desarrollo de carrera', 'Gestión de equipos', 'Marca personal y posicionamiento profesional', 'Networking y visibilidad', 'Transiciones laborales', 'Bienestar y equilibrio', 'Influencia e impacto'];
+  const MENTOR_OBJECTIVES = ['Ganar claridad sobre su rumbo profesional', 'Prepararse para un nuevo desafío', 'Fortalecer su seguridad y autoconfianza', 'Mejorar sus habilidades de comunicación', 'Diseñar un plan de crecimiento', 'Desarrollar su liderazgo', 'Navegar un cambio organizacional o de carrera', 'Ordenar prioridades y foco'];
+  const MENTOR_STYLES = ['Cercano y contenedor', 'Estratégico y orientado a objetivos', 'Práctico y enfocado en la acción', 'Reflexivo, basado en preguntas', 'Directo y desafiante', 'Inspirador y motivador', 'Mixto, depende del momento'];
+  const EXP_LEVELS = ['3 a 5 años', '6 a 10 años', '11 a 15 años', '16 a 20 años', 'Más de 20 años'];
+  const EXP_AREAS = ['Operaciones', 'Comercial / Ventas', 'Marketing', 'Personas / RRHH', 'Finanzas', 'Tecnología', 'Sostenibilidad / RSE', 'Proyectos / Innovación', 'Supply chain / Logística'];
+  const MENTEE_PREFS = ['Personas en etapa inicial de su carrera', 'Talento con alto potencial en transición a roles de liderazgo', 'Personas en transición laboral o reinvención profesional', 'Nuevas jefaturas o primeros cargos de liderazgo', 'Profesionales que buscan mayor visibilidad o posicionamiento', 'Personas que enfrentan desafíos de comunicación o equipos', 'Me adapto según la necesidad'];
+  const MENTEE_OUTCOMES_OPTS = ['Más claridad sobre su camino profesional', 'Mayor confianza en sí misma', 'Un plan de acción concreto', 'Herramientas para liderar mejor', 'Mejor comunicación e influencia', 'Más foco y orden en sus prioridades', 'Una mirada más amplia de su carrera'];
+  const SESSION_STRUCTURES = ['Conversación abierta y flexible', 'Sesiones con objetivos claros por encuentro', 'Trabajo sobre casos o situaciones reales del mentee', 'Seguimiento de avances entre sesiones', 'Uso de herramientas y ejercicios prácticos', 'Mixto, según la etapa del proceso'];
 
-      {!isProfileComplete && (
-        <div style={{
-          background: 'linear-gradient(135deg, #fef3c7 0%, #fff7ed 100%)',
-          border: '1px solid #fbbf24',
-          borderRadius: 14,
-          padding: '18px 22px',
-          marginBottom: 20,
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 14,
-        }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#92400e" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
+  const toggleArrayItem = (field: string, value: string) => {
+    setProfileForm(f => {
+      const arr = (f as any)[field] as string[];
+      return { ...f, [field]: arr.includes(value) ? arr.filter((v: string) => v !== value) : [...arr, value] };
+    });
+  };
+
+  const [otherTopicInput, setOtherTopicInput] = useState('');
+  const [otherAreaInput, setOtherAreaInput] = useState('');
+
+  const addOtherItem = (field: string, value: string, setter: (v: string) => void) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    setProfileForm(f => {
+      const arr = (f as any)[field] as string[];
+      if (arr.includes(trimmed)) return f;
+      return { ...f, [field]: [...arr, trimmed] };
+    });
+    setter('');
+  };
+
+  const wizardStepLabels = ['', 'Información Básica', 'Expertise del Mentor', 'Experiencia', 'Expectativas'];
+
+  const MultiChip = ({ options, field, allowOther, otherValue, onOtherChange, onOtherAdd }: {
+    options: string[]; field: string; allowOther?: boolean; otherValue?: string; onOtherChange?: (v: string) => void; onOtherAdd?: () => void;
+  }) => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      {options.map(opt => {
+        const selected = ((profileForm as any)[field] as string[]).includes(opt);
+        return (
+          <button key={opt} type="button" onClick={() => toggleArrayItem(field, opt)} style={{
+            padding: '8px 16px', borderRadius: 20, border: selected ? '2px solid #0891b2' : '1.5px solid #d1d5db',
+            background: selected ? '#ecfeff' : '#fff', color: selected ? '#0e7490' : '#4b5563',
+            fontSize: '0.8rem', fontWeight: selected ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s',
+          }}>{opt}</button>
+        );
+      })}
+      {/* Custom items not in predefined list */}
+      {((profileForm as any)[field] as string[]).filter((v: string) => !options.includes(v)).map((v: string) => (
+        <button key={v} type="button" onClick={() => toggleArrayItem(field, v)} style={{
+          padding: '8px 16px', borderRadius: 20, border: '2px solid #0891b2',
+          background: '#ecfeff', color: '#0e7490', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+        }}>{v} ×</button>
+      ))}
+      {allowOther && (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <input value={otherValue || ''} onChange={e => onOtherChange?.(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onOtherAdd?.(); } }}
+            placeholder="Otra…" maxLength={60}
+            style={{ padding: '8px 12px', borderRadius: 20, border: '1.5px solid #d1d5db', fontSize: '0.8rem', width: 130 }} />
+          <button type="button" onClick={onOtherAdd} style={{
+            padding: '6px 12px', borderRadius: 20, border: 'none', background: '#0891b2', color: '#fff',
+            fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+          }}>+</button>
+        </div>
+      )}
+    </div>
+  );
+
+  const SingleChip = ({ options, field }: { options: string[]; field: string }) => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      {options.map(opt => {
+        const selected = (profileForm as any)[field] === opt;
+        return (
+          <button key={opt} type="button" onClick={() => setProfileForm(f => ({ ...f, [field]: opt }))} style={{
+            padding: '8px 16px', borderRadius: 20, border: selected ? '2px solid #0891b2' : '1.5px solid #d1d5db',
+            background: selected ? '#ecfeff' : '#fff', color: selected ? '#0e7490' : '#4b5563',
+            fontSize: '0.8rem', fontWeight: selected ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s',
+          }}>{opt}</button>
+        );
+      })}
+    </div>
+  );
+
+  const renderProfile = () => {
+    // If editing (wizard mode), show the multi-step wizard
+    if (profileEditing && mentorStep >= 1) {
+      return (
+        <>
+          <div className="dash-header">
+            <h1 className="dash-title">Completa tu Perfil de Mentor</h1>
+            <p className="dash-subtitle">Paso {mentorStep} de 4 — {wizardStepLabels[mentorStep]}</p>
           </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#92400e', marginBottom: 4 }}>Completa tu perfil para desbloquear la plataforma</div>
-            <div style={{ fontSize: '0.78rem', color: '#a16207', lineHeight: 1.5 }}>
-              Para acceder a todas las funcionalidades necesitas completar los siguientes campos:
-              {' '}<strong>Nombre completo</strong>, <strong>Headline</strong>, <strong>Cargo</strong>, <strong>Departamento</strong>, <strong>Biografía</strong> y <strong>LinkedIn</strong>.
+
+          {profileMsg && (
+            <div className={`prof-msg ${profileMsg.startsWith('ok:') ? 'prof-msg-ok' : 'prof-msg-err'}`}>
+              {profileMsg.replace(/^(ok:|err:)/, '')}
             </div>
-            {!profileEditing && (
-              <button
-                onClick={startEditProfile}
-                style={{
-                  marginTop: 10, padding: '8px 20px', borderRadius: 10, border: 'none',
-                  background: '#f59e0b', color: '#fff', fontWeight: 600, fontSize: '0.78rem',
-                  cursor: 'pointer', transition: 'background 0.15s',
-                }}
-                onMouseOver={e => (e.currentTarget.style.background = '#d97706')}
-                onMouseOut={e => (e.currentTarget.style.background = '#f59e0b')}
-              >
+          )}
+
+          {/* Step indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 28, padding: '0 4px' }}>
+            {[1, 2, 3, 4].map(s => (
+              <div key={s} style={{ display: 'flex', alignItems: 'center', flex: s < 4 ? 1 : 'none' }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, fontSize: '0.8rem', flexShrink: 0, transition: 'all 0.2s',
+                  background: s < mentorStep ? '#0891b2' : s === mentorStep ? '#0891b2' : '#e5e7eb',
+                  color: s <= mentorStep ? '#fff' : '#9ca3af',
+                }}>
+                  {s < mentorStep ? '✓' : s}
+                </div>
+                {s < 4 && (
+                  <div style={{ flex: 1, height: 3, background: s < mentorStep ? '#0891b2' : '#e5e7eb', transition: 'background 0.2s' }} />
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="prof-form-card" style={{ maxWidth: 720 }}>
+            <div className="prof-form-body" style={{ padding: '28px 24px' }}>
+
+              {/* ════ STEP 1: Información Básica ════ */}
+              {mentorStep === 1 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {/* Avatar upload */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 4 }}>
+                    <div className="prof-avatar" style={{ width: 80, height: 80, fontSize: '1.4rem' }}>
+                      {portalUser?.avatar_url ? <img src={portalUser.avatar_url} alt="Avatar" /> : initials}
+                      <label className="prof-avatar-overlay" htmlFor="avatar-upload" style={{ borderRadius: '50%' }}>
+                        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
+                      </label>
+                      <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#111827' }}>Foto de perfil</div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Sube una foto profesional (máx. 2 MB)</div>
+                      {avatarUploading && <div style={{ fontSize: '0.72rem', color: '#0891b2', marginTop: 4 }}>Subiendo...</div>}
+                    </div>
+                  </div>
+
+                  <div className="prof-form-grid">
+                    <div className="prof-field">
+                      <label>Nombre y apellido *</label>
+                      <input value={profileForm.full_name} onChange={e => setProfileForm(f => ({ ...f, full_name: e.target.value }))} placeholder="Tu nombre completo" />
+                    </div>
+                    <div className="prof-field">
+                      <label>Género</label>
+                      <select value={profileForm.gender} onChange={e => setProfileForm(f => ({ ...f, gender: e.target.value }))}
+                        style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: '0.85rem', background: '#fff' }}>
+                        <option value="">Seleccionar...</option>
+                        <option value="masculino">Masculino</option>
+                        <option value="femenino">Femenino</option>
+                        <option value="no_binario">No binario</option>
+                        <option value="prefiero_no_decir">Prefiero no decir</option>
+                      </select>
+                    </div>
+                    <div className="prof-field">
+                      <label>Mail personal</label>
+                      <input type="email" value={profileForm.personal_email} onChange={e => setProfileForm(f => ({ ...f, personal_email: e.target.value }))} placeholder="tu@correo.com" />
+                    </div>
+                    <div className="prof-field">
+                      <label>Cargo actual *</label>
+                      <input value={profileForm.position} onChange={e => setProfileForm(f => ({ ...f, position: e.target.value }))} placeholder="Ej: Gerente de Innovación" />
+                    </div>
+                    <div className="prof-field">
+                      <label>Empresa / Área *</label>
+                      <input value={profileForm.department} onChange={e => setProfileForm(f => ({ ...f, department: e.target.value }))} placeholder="Ej: Acme Corp / Tecnología" />
+                    </div>
+                    <div className="prof-field">
+                      <label>Perfil LinkedIn</label>
+                      <input type="url" value={profileForm.linkedin_url} onChange={e => setProfileForm(f => ({ ...f, linkedin_url: e.target.value }))} placeholder="https://www.linkedin.com/in/tu-perfil" />
+                    </div>
+                    <div className="prof-field full">
+                      <label>Breve presentación *</label>
+                      <textarea value={profileForm.presentation} onChange={e => setProfileForm(f => ({ ...f, presentation: e.target.value }))}
+                        placeholder="Cuéntanos en 3 a 5 líneas quién eres, a qué te dedicas y qué te motiva a ser mentor/a en este programa."
+                        maxLength={500} rows={4} />
+                      <span className="prof-hint">{profileForm.presentation.length}/500 caracteres</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ════ STEP 2: Expertise del Mentor ════ */}
+              {mentorStep === 2 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿En qué temas puedes aportar mayor valor como mentor/a?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={MENTOR_TOPICS} field="mentor_topics" allowOther otherValue={otherTopicInput} onOtherChange={setOtherTopicInput} onOtherAdd={() => addOtherItem('mentor_topics', otherTopicInput, setOtherTopicInput)} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Qué tipo de objetivos te acomoda más acompañar en un mentee?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={MENTOR_OBJECTIVES} field="mentor_objectives" />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Cómo describirías tu estilo de acompañamiento?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={MENTOR_STYLES} field="mentor_style" />
+                  </div>
+                </div>
+              )}
+
+              {/* ════ STEP 3: Experiencia ════ */}
+              {mentorStep === 3 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Cuál es tu nivel de experiencia profesional?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona una opción</div>
+                    <SingleChip options={EXP_LEVELS} field="experience_level" />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿En qué área o función has desarrollado mayor experiencia?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={EXP_AREAS} field="experience_area" allowOther otherValue={otherAreaInput} onOtherChange={setOtherAreaInput} onOtherAdd={() => addOtherItem('experience_area', otherAreaInput, setOtherAreaInput)} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Con qué perfil de mentee te sentirías más cómodo/a trabajando?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={MENTEE_PREFS} field="mentee_preference" />
+                  </div>
+                </div>
+              )}
+
+              {/* ════ STEP 4: Expectativas ════ */}
+              {mentorStep === 4 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Qué esperas que logre una persona al finalizar un proceso de mentoría contigo?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={MENTEE_OUTCOMES_OPTS} field="mentee_outcomes" />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Cómo prefieres estructurar las sesiones de mentoría?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={SESSION_STRUCTURES} field="session_structure" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Wizard navigation buttons */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderTop: '1px solid #f3f4f6' }}>
+              <button onClick={() => { if (mentorStep > 1) setMentorStep(s => s - 1); else cancelEditProfile(); }}
+                disabled={profileSaving} style={{
+                  padding: '10px 22px', borderRadius: 10, border: '1.5px solid #d1d5db', background: '#fff',
+                  color: '#4b5563', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer',
+                }}>
+                {mentorStep === 1 ? 'Cancelar' : '← Anterior'}
+              </button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {mentorStep < 4 ? (
+                  <button onClick={() => { saveProfile(mentorStep); setMentorStep(s => s + 1); }}
+                    disabled={profileSaving} style={{
+                      padding: '10px 28px', borderRadius: 10, border: 'none', background: '#0891b2',
+                      color: '#fff', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer', transition: 'background 0.15s',
+                    }}
+                    onMouseOver={e => (e.currentTarget.style.background = '#0e7490')}
+                    onMouseOut={e => (e.currentTarget.style.background = '#0891b2')}>
+                    {profileSaving ? 'Guardando…' : 'Siguiente →'}
+                  </button>
+                ) : (
+                  <button onClick={() => saveProfile(4)}
+                    disabled={profileSaving} style={{
+                      padding: '10px 28px', borderRadius: 10, border: 'none',
+                      background: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
+                      color: '#fff', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'transform 0.15s',
+                    }}
+                    onMouseOver={e => (e.currentTarget.style.transform = 'scale(1.03)')}
+                    onMouseOut={e => (e.currentTarget.style.transform = 'scale(1)')}>
+                    {profileSaving ? 'Guardando…' : '✓ Finalizar y desbloquear plataforma'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    // Read-only profile view (after wizard is complete)
+    return (
+      <>
+        <div className="dash-header">
+          <h1 className="dash-title">Mi Perfil</h1>
+          <p className="dash-subtitle">{roleLabel} en {companyName || 'Inspiratoria'}</p>
+        </div>
+
+        {!isProfileComplete && (
+          <div style={{
+            background: 'linear-gradient(135deg, #fef3c7 0%, #fff7ed 100%)',
+            border: '1px solid #fbbf24', borderRadius: 14, padding: '18px 22px', marginBottom: 20,
+            display: 'flex', alignItems: 'flex-start', gap: 14,
+          }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#92400e" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#92400e', marginBottom: 4 }}>Completa tu perfil para desbloquear la plataforma</div>
+              <div style={{ fontSize: '0.78rem', color: '#a16207', lineHeight: 1.5 }}>
+                Necesitas completar los 4 pasos del perfil de mentor para acceder a todas las funcionalidades.
+              </div>
+              <button onClick={startEditProfile} style={{
+                marginTop: 10, padding: '8px 20px', borderRadius: 10, border: 'none',
+                background: '#f59e0b', color: '#fff', fontWeight: 600, fontSize: '0.78rem',
+                cursor: 'pointer', transition: 'background 0.15s',
+              }}
+              onMouseOver={e => (e.currentTarget.style.background = '#d97706')}
+              onMouseOut={e => (e.currentTarget.style.background = '#f59e0b')}>
                 Completar ahora
               </button>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {profileMsg && (
-        <div className={`prof-msg ${profileMsg.startsWith('ok:') ? 'prof-msg-ok' : 'prof-msg-err'}`}>
-          {profileMsg.replace(/^(ok:|err:)/, '')}
-        </div>
-      )}
-
-      <div className="prof-grid">
-        {/* ── Left: Avatar Card ── */}
-        <div className="prof-avatar-card">
-          <div className="prof-avatar">
-            {portalUser?.avatar_url ? (
-              <img src={portalUser.avatar_url} alt="Avatar" />
-            ) : (
-              initials
-            )}
-            <label className="prof-avatar-overlay" htmlFor="avatar-upload">
-              <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                <circle cx="12" cy="13" r="3" />
-              </svg>
-            </label>
-            <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
+        {profileMsg && (
+          <div className={`prof-msg ${profileMsg.startsWith('ok:') ? 'prof-msg-ok' : 'prof-msg-err'}`}>
+            {profileMsg.replace(/^(ok:|err:)/, '')}
           </div>
-          <div className="prof-avatar-name">{portalUser?.full_name || displayName}</div>
-          <div className="prof-avatar-role">{roleLabel}</div>
-          {portalUser?.headline && !profileEditing && (
-            <div style={{ fontSize: '0.78rem', color: '#4b5563', marginBottom: 12 }}>{portalUser.headline}</div>
-          )}
-          {avatarUploading ? (
-            <button className="prof-avatar-btn" disabled>Subiendo...</button>
-          ) : (
-            <>
-              <label htmlFor="avatar-upload" className="prof-avatar-btn" style={{ cursor: 'pointer', textAlign: 'center', display: 'block', marginBottom: 6 }}>
-                Cambiar foto
+        )}
+
+        <div className="prof-grid">
+          {/* ── Left: Avatar Card ── */}
+          <div className="prof-avatar-card">
+            <div className="prof-avatar">
+              {portalUser?.avatar_url ? (
+                <img src={portalUser.avatar_url} alt="Avatar" />
+              ) : initials}
+              <label className="prof-avatar-overlay" htmlFor="avatar-upload">
+                <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <circle cx="12" cy="13" r="3" />
+                </svg>
               </label>
-              {portalUser?.avatar_url && (
-                <button className="prof-avatar-btn" onClick={deleteAvatar} style={{ color: '#ef4444', borderColor: '#fecaca' }}>Eliminar foto</button>
-              )}
-            </>
-          )}
-
-          {/* Read-only info */}
-          <div style={{ width: '100%', marginTop: 18, borderTop: '1px solid #f3f4f6', paddingTop: 14 }}>
-            <div style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 8 }}>Información</div>
-            <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 6 }}>
-              <span style={{ fontWeight: 600 }}>Email:</span> {portalUser?.email || '—'}
+              <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
             </div>
-            <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 6 }}>
-              <span style={{ fontWeight: 600 }}>Portal:</span>{' '}
-              <span style={{ fontFamily: 'monospace' }}>{portalCode}</span>
-            </div>
-            {portalUser?.created_at && (
-              <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
-                <span style={{ fontWeight: 600 }}>Miembro desde:</span>{' '}
-                {new Date(portalUser.created_at).toLocaleDateString('es-CL', { year: 'numeric', month: 'long' })}
-              </div>
+            <div className="prof-avatar-name">{portalUser?.full_name || displayName}</div>
+            <div className="prof-avatar-role">{roleLabel}</div>
+            {portalUser?.presentation && (
+              <div style={{ fontSize: '0.78rem', color: '#4b5563', marginBottom: 12, textAlign: 'center', lineHeight: 1.5 }}>{portalUser.presentation}</div>
             )}
+            {avatarUploading ? (
+              <button className="prof-avatar-btn" disabled>Subiendo...</button>
+            ) : (
+              <>
+                <label htmlFor="avatar-upload" className="prof-avatar-btn" style={{ cursor: 'pointer', textAlign: 'center', display: 'block', marginBottom: 6 }}>Cambiar foto</label>
+                {portalUser?.avatar_url && (
+                  <button className="prof-avatar-btn" onClick={deleteAvatar} style={{ color: '#ef4444', borderColor: '#fecaca' }}>Eliminar foto</button>
+                )}
+              </>
+            )}
+            <div style={{ width: '100%', marginTop: 18, borderTop: '1px solid #f3f4f6', paddingTop: 14 }}>
+              <div style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 8 }}>Información</div>
+              <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 6 }}>
+                <span style={{ fontWeight: 600 }}>Email:</span> {portalUser?.email || '—'}
+              </div>
+              {portalUser?.personal_email && (
+                <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 6 }}>
+                  <span style={{ fontWeight: 600 }}>Personal:</span> {portalUser.personal_email}
+                </div>
+              )}
+              {portalUser?.gender && (
+                <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 6 }}>
+                  <span style={{ fontWeight: 600 }}>Género:</span> {portalUser.gender === 'masculino' ? 'Masculino' : portalUser.gender === 'femenino' ? 'Femenino' : portalUser.gender === 'no_binario' ? 'No binario' : 'Prefiero no decir'}
+                </div>
+              )}
+              {portalUser?.linkedin_url && (
+                <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 6 }}>
+                  <span style={{ fontWeight: 600 }}>LinkedIn:</span>{' '}
+                  <a href={portalUser.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', textDecoration: 'none' }}>Ver perfil</a>
+                </div>
+              )}
+              <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 6 }}>
+                <span style={{ fontWeight: 600 }}>Portal:</span> <span style={{ fontFamily: 'monospace' }}>{portalCode}</span>
+              </div>
+              {portalUser?.created_at && (
+                <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+                  <span style={{ fontWeight: 600 }}>Miembro desde:</span>{' '}
+                  {new Date(portalUser.created_at).toLocaleDateString('es-CL', { year: 'numeric', month: 'long' })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* ── Right: Form Card ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="prof-form-card">
-            <div className="prof-form-head">
-              <span className="prof-form-title">Datos Personales</span>
-              {!profileEditing && (
+          {/* ── Right: Data cards ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Basic info card */}
+            <div className="prof-form-card">
+              <div className="prof-form-head">
+                <span className="prof-form-title">Datos Básicos</span>
                 <button className="prof-btn-edit" onClick={startEditProfile}>
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                   Editar
                 </button>
-              )}
+              </div>
+              <div className="prof-form-body">
+                <div className="prof-form-grid">
+                  <div className="prof-field"><label>Nombre</label><input disabled value={portalUser?.full_name || '—'} /></div>
+                  <div className="prof-field"><label>Cargo</label><input disabled value={portalUser?.position || '—'} /></div>
+                  <div className="prof-field"><label>Empresa / Área</label><input disabled value={portalUser?.department || '—'} /></div>
+                  <div className="prof-field"><label>Experiencia</label><input disabled value={portalUser?.experience_level || '—'} /></div>
+                </div>
+              </div>
             </div>
-            <div className="prof-form-body">
-              {profileEditing ? (
-                <>
-                  <div className="prof-form-grid">
-                    <div className="prof-field">
-                      <label>Nombre completo</label>
-                      <input value={profileForm.full_name} onChange={e => setProfileForm(f => ({ ...f, full_name: e.target.value }))} placeholder="Tu nombre completo" />
-                    </div>
-                    <div className="prof-field">
-                      <label>Titular / Headline</label>
-                      <input value={profileForm.headline} onChange={e => setProfileForm(f => ({ ...f, headline: e.target.value }))} placeholder="Ej: Mentor de innovación" maxLength={200} />
-                    </div>
-                    <div className="prof-field">
-                      <label>Teléfono</label>
-                      <input type="tel" value={profileForm.phone} onChange={e => setProfileForm(f => ({ ...f, phone: e.target.value }))} placeholder="+56 9 1234 5678" />
-                    </div>
-                    <div className="prof-field">
-                      <label>Cargo / Posición</label>
-                      <input value={profileForm.position} onChange={e => setProfileForm(f => ({ ...f, position: e.target.value }))} placeholder="Ej: Director de tecnología" />
-                    </div>
-                    <div className="prof-field">
-                      <label>Departamento / Área</label>
-                      <input value={profileForm.department} onChange={e => setProfileForm(f => ({ ...f, department: e.target.value }))} placeholder="Ej: Innovación" />
-                    </div>
-                    <div className="prof-field">
-                      <label>Perfil LinkedIn</label>
-                      <input type="url" value={profileForm.linkedin_url} onChange={e => setProfileForm(f => ({ ...f, linkedin_url: e.target.value }))} placeholder="https://www.linkedin.com/in/tu-perfil" />
-                      <span className="prof-hint">URL completa de tu perfil de LinkedIn</span>
-                    </div>
-                    <div className="prof-field full">
-                      <label>Biografía</label>
-                      <textarea value={profileForm.bio} onChange={e => setProfileForm(f => ({ ...f, bio: e.target.value }))} placeholder="Cuéntanos sobre tu experiencia, trayectoria y áreas de expertise…" maxLength={1000} rows={4} />
-                      <span className="prof-hint">{profileForm.bio.length}/1000 caracteres</span>
-                    </div>
-                    <div className="prof-field full">
-                      <label>Habilidades / Áreas de expertise</label>
-                      <div className="prof-skills-list">
-                        {profileForm.skills.map(sk => (
-                          <span key={sk} className="prof-skill-tag">
-                            {sk}
-                            <button onClick={() => removeSkill(sk)} aria-label={`Quitar ${sk}`}>&times;</button>
-                          </span>
+
+            {/* Mentor expertise card */}
+            {(portalUser?.mentor_topics?.length > 0 || portalUser?.mentor_objectives?.length > 0 || portalUser?.mentor_style?.length > 0) && (
+              <div className="prof-form-card">
+                <div className="prof-form-head"><span className="prof-form-title">Expertise de Mentoría</span></div>
+                <div className="prof-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {portalUser?.mentor_topics?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Temas de valor</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.mentor_topics.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#ecfeff', color: '#0e7490', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
                         ))}
                       </div>
-                      <div className="prof-skill-add">
-                        <input
-                          value={newSkill}
-                          onChange={e => setNewSkill(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSkill(); } }}
-                          placeholder="Agregar habilidad…"
-                          maxLength={50}
-                        />
-                        <button type="button" onClick={addSkill}>Agregar</button>
-                      </div>
-                      <span className="prof-hint">{profileForm.skills.length}/20 habilidades · Presiona Enter para agregar</span>
                     </div>
-                  </div>
-                </>
-              ) : (
-                <div className="prof-form-grid">
-                  <div className="prof-field">
-                    <label>Nombre completo</label>
-                    <input disabled value={portalUser?.full_name || '—'} />
-                  </div>
-                  <div className="prof-field">
-                    <label>Titular / Headline</label>
-                    <input disabled value={portalUser?.headline || '—'} />
-                  </div>
-                  <div className="prof-field">
-                    <label>Teléfono</label>
-                    <input disabled value={portalUser?.phone || '—'} />
-                  </div>
-                  <div className="prof-field">
-                    <label>Cargo / Posición</label>
-                    <input disabled value={portalUser?.position || '—'} />
-                  </div>
-                  <div className="prof-field">
-                    <label>Departamento / Área</label>
-                    <input disabled value={portalUser?.department || '—'} />
-                  </div>
-                  <div className="prof-field">
-                    <label>Perfil LinkedIn</label>
-                    {portalUser?.linkedin_url ? (
-                      <a href={portalUser.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.85rem', color: '#0891b2', textDecoration: 'none' }}>
-                        {portalUser.linkedin_url.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '').replace(/\/$/, '') || portalUser.linkedin_url}
-                      </a>
-                    ) : (
-                      <input disabled value="—" />
-                    )}
-                  </div>
-                  <div className="prof-field full">
-                    <label>Biografía</label>
-                    <textarea disabled value={portalUser?.bio || 'Sin biografía'} rows={3} />
-                  </div>
-                  {portalUser?.skills?.length > 0 && (
-                    <div className="prof-field full">
-                      <label>Habilidades</label>
-                      <div className="prof-skills-list">
-                        {portalUser.skills.map((sk: string) => (
-                          <span key={sk} className="prof-skill-tag">{sk}</span>
+                  )}
+                  {portalUser?.mentor_objectives?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Objetivos que acompaña</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.mentor_objectives.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#f0fdf4', color: '#166534', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {portalUser?.mentor_style?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Estilo de acompañamiento</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.mentor_style.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#fef3c7', color: '#92400e', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
                         ))}
                       </div>
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-            {profileEditing && (
-              <div className="prof-actions">
-                <button className="prof-btn-cancel" onClick={cancelEditProfile} disabled={profileSaving}>Cancelar</button>
-                <button className="prof-btn-save" onClick={saveProfile} disabled={profileSaving}>
-                  {profileSaving ? 'Guardando…' : 'Guardar cambios'}
-                </button>
+              </div>
+            )}
+
+            {/* Experience & preferences card */}
+            {(portalUser?.experience_area?.length > 0 || portalUser?.mentee_preference?.length > 0) && (
+              <div className="prof-form-card">
+                <div className="prof-form-head"><span className="prof-form-title">Experiencia y Preferencias</span></div>
+                <div className="prof-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {portalUser?.experience_area?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Áreas de experiencia</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.experience_area.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#ede9fe', color: '#5b21b6', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {portalUser?.mentee_preference?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Perfil de mentee preferido</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.mentee_preference.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#fce7f3', color: '#9d174d', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Expectations card */}
+            {(portalUser?.mentee_outcomes?.length > 0 || portalUser?.session_structure?.length > 0) && (
+              <div className="prof-form-card">
+                <div className="prof-form-head"><span className="prof-form-title">Expectativas</span></div>
+                <div className="prof-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {portalUser?.mentee_outcomes?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Lo que espero del mentee</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.mentee_outcomes.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#fff7ed', color: '#c2410c', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {portalUser?.session_structure?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Estructura de sesiones</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.session_structure.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#f0f9ff', color: '#0369a1', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Programs card */}
+            {myPrograms.length > 0 && (
+              <div className="prof-form-card">
+                <div className="prof-form-head"><span className="prof-form-title">Mis Programas</span></div>
+                <div className="prof-form-body">
+                  {myPrograms.map((mp: any) => (
+                    <div key={mp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827' }}>{mp.name}</div>
+                        <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>{ROLE_LABELS[mp.my_role] || mp.my_role}</div>
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
+                        {mp.joined_at ? new Date(mp.joined_at).toLocaleDateString('es-CL') : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-
-          {/* Programs card */}
-          {myPrograms.length > 0 && (
-            <div className="prof-form-card">
-              <div className="prof-form-head">
-                <span className="prof-form-title">Mis Programas</span>
-              </div>
-              <div className="prof-form-body">
-                {myPrograms.map((mp: any) => (
-                  <div key={mp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827' }}>{mp.name}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>{ROLE_LABELS[mp.my_role] || mp.my_role}</div>
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
-                      {mp.joined_at ? new Date(mp.joined_at).toLocaleDateString('es-CL') : ''}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
-      </div>
-    </>
-  );
+      </>
+    );
+  };
 
   // ── Badge icon mapping ──
   const badgeIcons: Record<string, JSX.Element> = {
