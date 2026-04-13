@@ -730,6 +730,9 @@ export default function ParticipantPortalPage() {
     mentor_style: [] as string[], experience_level: '',
     experience_area: [] as string[], mentee_preference: [] as string[],
     mentee_outcomes: [] as string[], session_structure: [] as string[],
+    mentee_goals: [] as string[], mentee_interests: [] as string[],
+    mentee_challenges: [] as string[], mentee_expectations: [] as string[],
+    preferred_mentor_style: [] as string[], session_format_preference: [] as string[],
   });
   const [newSkill, setNewSkill] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -802,10 +805,12 @@ export default function ParticipantPortalPage() {
   const totalSessions = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.sessions || 0), 0) || 0;
   const totalResources = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.resources?.length || 0), 0) || 0;
 
-  // Profile completeness gate — mentors need wizard step 4, mentees skip wizard
+  // Profile completeness gate — mentors need wizard step 4, mentees need mentee wizard step 4
   const userRole = portalUser?.role || '';
   const isMentee = userRole === 'mentee';
-  const isProfileComplete = isMentee ? true : (portalUser?.mentor_profile_step || 0) >= 4;
+  const isProfileComplete = isMentee 
+    ? (portalUser?.mentee_profile_step || 0) >= 4 
+    : (portalUser?.mentor_profile_step || 0) >= 4;
 
   // Derive detail tab from URL section
   const detailTab = (() => {
@@ -2327,11 +2332,21 @@ export default function ParticipantPortalPage() {
       mentee_preference: Array.isArray(portalUser?.mentee_preference) ? [...portalUser.mentee_preference] : [],
       mentee_outcomes: Array.isArray(portalUser?.mentee_outcomes) ? [...portalUser.mentee_outcomes] : [],
       session_structure: Array.isArray(portalUser?.session_structure) ? [...portalUser.session_structure] : [],
+      mentee_goals: Array.isArray(portalUser?.mentee_goals) ? [...portalUser.mentee_goals] : [],
+      mentee_interests: Array.isArray(portalUser?.mentee_interests) ? [...portalUser.mentee_interests] : [],
+      mentee_challenges: Array.isArray(portalUser?.mentee_challenges) ? [...portalUser.mentee_challenges] : [],
+      mentee_expectations: Array.isArray(portalUser?.mentee_expectations) ? [...portalUser.mentee_expectations] : [],
+      preferred_mentor_style: Array.isArray(portalUser?.preferred_mentor_style) ? [...portalUser.preferred_mentor_style] : [],
+      session_format_preference: Array.isArray(portalUser?.session_format_preference) ? [...portalUser.session_format_preference] : [],
     });
     setProfileEditing(true);
     setProfileMsg('');
     // Start from where user left off, or step 1
-    setMentorStep(Math.max(1, Math.min(4, (portalUser?.mentor_profile_step || 0) + 1)));
+    if (isMentee) {
+      setMentorStep(Math.max(1, Math.min(4, (portalUser?.mentee_profile_step || 0) + 1)));
+    } else {
+      setMentorStep(Math.max(1, Math.min(4, (portalUser?.mentor_profile_step || 0) + 1)));
+    }
   };
 
   const cancelEditProfile = () => {
@@ -2346,9 +2361,13 @@ export default function ParticipantPortalPage() {
     setProfileMsg('');
     try {
       const bodyData: any = { ...profileForm };
-      // When step is completed, update the mentor_profile_step to the highest step completed
+      // When step is completed, update the profile_step for the correct role
       if (stepOverride !== undefined) {
-        bodyData.mentor_profile_step = stepOverride;
+        if (isMentee) {
+          bodyData.mentee_profile_step = stepOverride;
+        } else {
+          bodyData.mentor_profile_step = stepOverride;
+        }
       }
       const res = await fetch(`${API_URL}/api/companies/auth/profile`, {
         method: 'PUT',
@@ -2364,7 +2383,7 @@ export default function ParticipantPortalPage() {
       if (stepOverride !== undefined && stepOverride >= 4) {
         setProfileEditing(false);
         setMentorStep(0);
-        setProfileMsg('ok:¡Perfil de mentor completado exitosamente!');
+        setProfileMsg('ok:¡Perfil completado exitosamente!');
       } else if (stepOverride !== undefined) {
         setProfileMsg('ok:Paso guardado correctamente');
       } else {
@@ -2447,6 +2466,14 @@ export default function ParticipantPortalPage() {
   const MENTEE_OUTCOMES_OPTS = ['Más claridad sobre su camino profesional', 'Mayor confianza en sí misma', 'Un plan de acción concreto', 'Herramientas para liderar mejor', 'Mejor comunicación e influencia', 'Más foco y orden en sus prioridades', 'Una mirada más amplia de su carrera'];
   const SESSION_STRUCTURES = ['Conversación abierta y flexible', 'Sesiones con objetivos claros por encuentro', 'Trabajo sobre casos o situaciones reales del mentee', 'Seguimiento de avances entre sesiones', 'Uso de herramientas y ejercicios prácticos', 'Mixto, según la etapa del proceso'];
 
+  /* ── Mentee multi-step wizard helpers ── */
+  const MENTEE_GOALS = ['Desarrollar mi liderazgo', 'Crecer profesionalmente', 'Explorar un cambio de carrera', 'Mejorar mi comunicación', 'Ampliar mi red de contactos', 'Ganar confianza y seguridad', 'Lograr equilibrio vida-trabajo', 'Definir mi propósito profesional', 'Prepararme para un nuevo rol'];
+  const MENTEE_INTEREST_AREAS = ['Liderazgo', 'Comunicación efectiva', 'Desarrollo de carrera', 'Gestión de equipos', 'Marca personal y posicionamiento', 'Networking y visibilidad', 'Transiciones laborales', 'Bienestar y equilibrio', 'Innovación y emprendimiento'];
+  const MENTEE_CHALLENGE_OPTS = ['Falta de claridad en mi carrera', 'Dificultad para tomar decisiones', 'Baja visibilidad en la organización', 'Gestión del tiempo y prioridades', 'Manejo de equipos o personas', 'Comunicación con stakeholders', 'Transición a nuevo rol o área', 'Síndrome del impostor', 'Falta de red de apoyo profesional'];
+  const MENTEE_EXPECTATION_OPTS = ['Orientación práctica y concreta', 'Escucha activa y empatía', 'Feedback directo y honesto', 'Herramientas y frameworks útiles', 'Acompañamiento emocional', 'Desafío y provocación constructiva', 'Conexión con otros profesionales', 'Un espacio seguro para reflexionar'];
+  const PREFERRED_MENTOR_STYLES = ['Cercano y contenedor', 'Estratégico y orientado a resultados', 'Directo y desafiante', 'Inspirador y motivacional', 'Reflexivo y analítico', 'Práctico y enfocado en la acción', 'Me adapto, no tengo preferencia'];
+  const SESSION_FORMAT_OPTS = ['Conversación abierta y flexible', 'Agenda estructurada por sesión', 'Ejercicios y actividades prácticas', 'Trabajo sobre casos reales míos', 'Seguimiento de compromisos entre sesiones', 'Mixto, según el momento'];
+
   const toggleArrayItem = (field: string, value: string) => {
     setProfileForm(f => {
       const arr = (f as any)[field] as string[];
@@ -2465,7 +2492,9 @@ export default function ParticipantPortalPage() {
     setter('');
   };
 
-  const wizardStepLabels = ['', 'Información Básica', 'Expertise del Mentor', 'Experiencia', 'Expectativas'];
+  const wizardStepLabels = isMentee 
+    ? ['', 'Información Básica', 'Objetivos de Desarrollo', 'Experiencia y Contexto', 'Expectativas del Proceso']
+    : ['', 'Información Básica', 'Expertise del Mentor', 'Experiencia', 'Expectativas'];
 
   const MultiChip = ({ options, field, allowOther, otherValue, onOtherChange, onOtherAdd }: {
     options: string[]; field: string; allowOther?: boolean; otherValue?: string; onOtherChange?: (v: string) => void; onOtherAdd?: () => void;
@@ -2524,7 +2553,7 @@ export default function ParticipantPortalPage() {
       return (
         <>
           <div className="dash-header">
-            <h1 className="dash-title">Completa tu Perfil de Mentor</h1>
+            <h1 className="dash-title">Completa tu Perfil {isMentee ? 'de Mentee' : 'de Mentor'}</h1>
             <p className="dash-subtitle">Paso {mentorStep} de 4 — {wizardStepLabels[mentorStep]}</p>
           </div>
 
@@ -2610,7 +2639,7 @@ export default function ParticipantPortalPage() {
                     <div className="prof-field full">
                       <label>Breve presentación *</label>
                       <textarea value={profileForm.presentation} onChange={e => setProfileForm(f => ({ ...f, presentation: e.target.value }))}
-                        placeholder="Cuéntanos en 3 a 5 líneas quién eres, a qué te dedicas y qué te motiva a ser mentor/a en este programa."
+                        placeholder={isMentee ? "Cuéntanos en 3 a 5 líneas quién eres, a qué te dedicas y qué te motiva a participar como mentee en este programa." : "Cuéntanos en 3 a 5 líneas quién eres, a qué te dedicas y qué te motiva a ser mentor/a en este programa."}
                         maxLength={500} rows={4} />
                       <span className="prof-hint">{profileForm.presentation.length}/500 caracteres</span>
                     </div>
@@ -2618,8 +2647,8 @@ export default function ParticipantPortalPage() {
                 </div>
               )}
 
-              {/* ════ STEP 2: Expertise del Mentor ════ */}
-              {mentorStep === 2 && (
+              {/* ════ STEP 2: Role-specific ════ */}
+              {mentorStep === 2 && !isMentee && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿En qué temas puedes aportar mayor valor como mentor/a?</div>
@@ -2638,9 +2667,23 @@ export default function ParticipantPortalPage() {
                   </div>
                 </div>
               )}
+              {mentorStep === 2 && isMentee && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Qué te gustaría lograr con este proceso de mentoría?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={MENTEE_GOALS} field="mentee_goals" />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿En qué áreas te gustaría desarrollarte o profundizar?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={MENTEE_INTEREST_AREAS} field="mentee_interests" />
+                  </div>
+                </div>
+              )}
 
-              {/* ════ STEP 3: Experiencia ════ */}
-              {mentorStep === 3 && (
+              {/* ════ STEP 3: Role-specific ════ */}
+              {mentorStep === 3 && !isMentee && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Cuál es tu nivel de experiencia profesional?</div>
@@ -2659,9 +2702,28 @@ export default function ParticipantPortalPage() {
                   </div>
                 </div>
               )}
+              {mentorStep === 3 && isMentee && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Cuál es tu nivel de experiencia profesional?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona una opción</div>
+                    <SingleChip options={EXP_LEVELS} field="experience_level" />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿En qué área o función te desempeñas actualmente?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={EXP_AREAS} field="experience_area" allowOther otherValue={otherAreaInput} onOtherChange={setOtherAreaInput} onOtherAdd={() => addOtherItem('experience_area', otherAreaInput, setOtherAreaInput)} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Cuáles son tus principales desafíos actuales?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={MENTEE_CHALLENGE_OPTS} field="mentee_challenges" />
+                  </div>
+                </div>
+              )}
 
-              {/* ════ STEP 4: Expectativas ════ */}
-              {mentorStep === 4 && (
+              {/* ════ STEP 4: Role-specific ════ */}
+              {mentorStep === 4 && !isMentee && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Qué esperas que logre una persona al finalizar un proceso de mentoría contigo?</div>
@@ -2672,6 +2734,25 @@ export default function ParticipantPortalPage() {
                     <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Cómo prefieres estructurar las sesiones de mentoría?</div>
                     <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
                     <MultiChip options={SESSION_STRUCTURES} field="session_structure" />
+                  </div>
+                </div>
+              )}
+              {mentorStep === 4 && isMentee && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Qué esperas de tu mentor/a en este proceso?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={MENTEE_EXPECTATION_OPTS} field="mentee_expectations" />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Qué estilo de mentor/a prefieres?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={PREFERRED_MENTOR_STYLES} field="preferred_mentor_style" />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Cómo prefieres que sean las sesiones?</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>Selecciona todas las que apliquen</div>
+                    <MultiChip options={SESSION_FORMAT_OPTS} field="session_format_preference" />
                   </div>
                 </div>
               )}
@@ -2738,7 +2819,7 @@ export default function ParticipantPortalPage() {
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#92400e', marginBottom: 4 }}>Completa tu perfil para desbloquear la plataforma</div>
               <div style={{ fontSize: '0.78rem', color: '#a16207', lineHeight: 1.5 }}>
-                Necesitas completar los 4 pasos del perfil de mentor para acceder a todas las funcionalidades.
+                Necesitas completar los 4 pasos del perfil para acceder a todas las funcionalidades.
               </div>
               <button onClick={startEditProfile} style={{
                 marginTop: 10, padding: '8px 20px', borderRadius: 10, border: 'none',
@@ -2845,8 +2926,8 @@ export default function ParticipantPortalPage() {
               </div>
             </div>
 
-            {/* Mentor expertise card */}
-            {(portalUser?.mentor_topics?.length > 0 || portalUser?.mentor_objectives?.length > 0 || portalUser?.mentor_style?.length > 0) && (
+            {/* Mentor expertise card (mentor only) */}
+            {!isMentee && (portalUser?.mentor_topics?.length > 0 || portalUser?.mentor_objectives?.length > 0 || portalUser?.mentor_style?.length > 0) && (
               <div className="prof-form-card">
                 <div className="prof-form-head"><span className="prof-form-title">Expertise de Mentoría</span></div>
                 <div className="prof-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -2884,8 +2965,8 @@ export default function ParticipantPortalPage() {
               </div>
             )}
 
-            {/* Experience & preferences card */}
-            {(portalUser?.experience_area?.length > 0 || portalUser?.mentee_preference?.length > 0) && (
+            {/* Experience & preferences card (mentor only) */}
+            {!isMentee && (portalUser?.experience_area?.length > 0 || portalUser?.mentee_preference?.length > 0) && (
               <div className="prof-form-card">
                 <div className="prof-form-head"><span className="prof-form-title">Experiencia y Preferencias</span></div>
                 <div className="prof-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -2913,8 +2994,8 @@ export default function ParticipantPortalPage() {
               </div>
             )}
 
-            {/* Expectations card */}
-            {(portalUser?.mentee_outcomes?.length > 0 || portalUser?.session_structure?.length > 0) && (
+            {/* Expectations card (mentor only) */}
+            {!isMentee && (portalUser?.mentee_outcomes?.length > 0 || portalUser?.session_structure?.length > 0) && (
               <div className="prof-form-card">
                 <div className="prof-form-head"><span className="prof-form-title">Expectativas</span></div>
                 <div className="prof-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -2933,6 +3014,101 @@ export default function ParticipantPortalPage() {
                       <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Estructura de sesiones</div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {portalUser.session_structure.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#f0f9ff', color: '#0369a1', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Mentee-specific profile cards ── */}
+            {isMentee && (portalUser?.mentee_goals?.length > 0 || portalUser?.mentee_interests?.length > 0) && (
+              <div className="prof-form-card">
+                <div className="prof-form-head"><span className="prof-form-title">Objetivos de Desarrollo</span></div>
+                <div className="prof-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {portalUser?.mentee_goals?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Lo que quiero lograr</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.mentee_goals.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#ecfeff', color: '#0e7490', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {portalUser?.mentee_interests?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Áreas de interés</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.mentee_interests.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#f0fdf4', color: '#166534', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {isMentee && (portalUser?.experience_area?.length > 0 || portalUser?.mentee_challenges?.length > 0) && (
+              <div className="prof-form-card">
+                <div className="prof-form-head"><span className="prof-form-title">Experiencia y Contexto</span></div>
+                <div className="prof-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {portalUser?.experience_area?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Área de desempeño</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.experience_area.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#ede9fe', color: '#5b21b6', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {portalUser?.mentee_challenges?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Desafíos actuales</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.mentee_challenges.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#fef3c7', color: '#92400e', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {isMentee && (portalUser?.mentee_expectations?.length > 0 || portalUser?.preferred_mentor_style?.length > 0 || portalUser?.session_format_preference?.length > 0) && (
+              <div className="prof-form-card">
+                <div className="prof-form-head"><span className="prof-form-title">Expectativas del Proceso</span></div>
+                <div className="prof-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {portalUser?.mentee_expectations?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Lo que espero de mi mentor/a</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.mentee_expectations.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#fff7ed', color: '#c2410c', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {portalUser?.preferred_mentor_style?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Estilo de mentor preferido</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.preferred_mentor_style.map((t: string) => (
+                          <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#fce7f3', color: '#9d174d', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {portalUser?.session_format_preference?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>Formato de sesiones preferido</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {portalUser.session_format_preference.map((t: string) => (
                           <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#f0f9ff', color: '#0369a1', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>
                         ))}
                       </div>

@@ -376,6 +376,15 @@ class User(AbstractUser):
     session_structure = models.JSONField(default=list, blank=True)  # Estructura sesiones
     mentor_profile_step = models.PositiveIntegerField(default=0)  # Paso actual del wizard (0=no iniciado, 4=completo)
     
+    # Perfil extendido mentee (multi-step onboarding)
+    mentee_goals = models.JSONField(default=list, blank=True)  # Objetivos de desarrollo
+    mentee_interests = models.JSONField(default=list, blank=True)  # Áreas de interés
+    mentee_challenges = models.JSONField(default=list, blank=True)  # Desafíos actuales
+    mentee_expectations = models.JSONField(default=list, blank=True)  # Expectativas del proceso
+    preferred_mentor_style = models.JSONField(default=list, blank=True)  # Estilo de mentor preferido
+    session_format_preference = models.JSONField(default=list, blank=True)  # Formato preferido sesiones
+    mentee_profile_step = models.PositiveIntegerField(default=0)  # Paso wizard mentee (0=no iniciado, 4=completo)
+    
     # Onboarding
     is_onboarded = models.BooleanField(default=False)
     onboarding_step = models.PositiveIntegerField(default=0)

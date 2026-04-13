@@ -2408,6 +2408,14 @@ class ProfileUpdateRequest(BaseModel):
     mentee_outcomes: Optional[list] = None
     session_structure: Optional[list] = None
     mentor_profile_step: Optional[int] = None
+    # Mentee profile fields
+    mentee_goals: Optional[list] = None
+    mentee_interests: Optional[list] = None
+    mentee_challenges: Optional[list] = None
+    mentee_expectations: Optional[list] = None
+    preferred_mentor_style: Optional[list] = None
+    session_format_preference: Optional[list] = None
+    mentee_profile_step: Optional[int] = None
 
 
 @router.get("/auth/profile")
@@ -2509,6 +2517,28 @@ async def update_profile(payload: ProfileUpdateRequest, authorization: Optional[
     if payload.mentor_profile_step is not None:
         user.mentor_profile_step = max(0, min(4, payload.mentor_profile_step))
         update_fields.append('mentor_profile_step')
+    # Mentee profile fields
+    if payload.mentee_goals is not None:
+        user.mentee_goals = [str(s).strip()[:100] for s in payload.mentee_goals[:15] if str(s).strip()]
+        update_fields.append('mentee_goals')
+    if payload.mentee_interests is not None:
+        user.mentee_interests = [str(s).strip()[:100] for s in payload.mentee_interests[:15] if str(s).strip()]
+        update_fields.append('mentee_interests')
+    if payload.mentee_challenges is not None:
+        user.mentee_challenges = [str(s).strip()[:100] for s in payload.mentee_challenges[:15] if str(s).strip()]
+        update_fields.append('mentee_challenges')
+    if payload.mentee_expectations is not None:
+        user.mentee_expectations = [str(s).strip()[:100] for s in payload.mentee_expectations[:15] if str(s).strip()]
+        update_fields.append('mentee_expectations')
+    if payload.preferred_mentor_style is not None:
+        user.preferred_mentor_style = [str(s).strip()[:100] for s in payload.preferred_mentor_style[:10] if str(s).strip()]
+        update_fields.append('preferred_mentor_style')
+    if payload.session_format_preference is not None:
+        user.session_format_preference = [str(s).strip()[:100] for s in payload.session_format_preference[:10] if str(s).strip()]
+        update_fields.append('session_format_preference')
+    if payload.mentee_profile_step is not None:
+        user.mentee_profile_step = max(0, min(4, payload.mentee_profile_step))
+        update_fields.append('mentee_profile_step')
 
     if update_fields:
         await sync_to_async(user.save)(update_fields=update_fields)
@@ -2534,6 +2564,13 @@ async def update_profile(payload: ProfileUpdateRequest, authorization: Optional[
         "mentee_outcomes": getattr(user, 'mentee_outcomes', []) or [],
         "session_structure": getattr(user, 'session_structure', []) or [],
         "mentor_profile_step": getattr(user, 'mentor_profile_step', 0) or 0,
+        "mentee_goals": getattr(user, 'mentee_goals', []) or [],
+        "mentee_interests": getattr(user, 'mentee_interests', []) or [],
+        "mentee_challenges": getattr(user, 'mentee_challenges', []) or [],
+        "mentee_expectations": getattr(user, 'mentee_expectations', []) or [],
+        "preferred_mentor_style": getattr(user, 'preferred_mentor_style', []) or [],
+        "session_format_preference": getattr(user, 'session_format_preference', []) or [],
+        "mentee_profile_step": getattr(user, 'mentee_profile_step', 0) or 0,
     }
 
 
@@ -2775,6 +2812,13 @@ async def get_portal_data(portal_code: str):
                 "mentee_outcomes": getattr(user, 'mentee_outcomes', []) or [],
                 "session_structure": getattr(user, 'session_structure', []) or [],
                 "mentor_profile_step": getattr(user, 'mentor_profile_step', 0) or 0,
+                "mentee_goals": getattr(user, 'mentee_goals', []) or [],
+                "mentee_interests": getattr(user, 'mentee_interests', []) or [],
+                "mentee_challenges": getattr(user, 'mentee_challenges', []) or [],
+                "mentee_expectations": getattr(user, 'mentee_expectations', []) or [],
+                "preferred_mentor_style": getattr(user, 'preferred_mentor_style', []) or [],
+                "session_format_preference": getattr(user, 'session_format_preference', []) or [],
+                "mentee_profile_step": getattr(user, 'mentee_profile_step', 0) or 0,
             },
             "programs": programs_data,
         }
