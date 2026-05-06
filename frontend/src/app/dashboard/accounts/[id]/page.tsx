@@ -208,6 +208,19 @@ const CHANGE_TYPES: Record<string, { label: string; color: string }> = {
   contract_update: { label: 'Contrato', color: 'bg-indigo-50 text-indigo-600' },
 };
 
+interface TemplateLite {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  category: string;
+  duration: string;
+  status: string;
+  modules: any[];
+  milestones: any[];
+  tags: string[];
+}
+
 export default function AccountDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -224,6 +237,15 @@ export default function AccountDetailPage() {
   const [programs, setPrograms] = useState<CompanyProgram[]>([]);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'bitacora' | 'changelog' | 'programas' | 'ajustes'>('overview');
+
+  // ─── Asignar plantilla (programas vigentes) ───
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [templates, setTemplates] = useState<TemplateLite[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState('');
+  const [assigningTemplateId, setAssigningTemplateId] = useState<string | null>(null);
+  const [assignBanner, setAssignBanner] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+
   const [newNote, setNewNote] = useState('');
   const [newNoteType, setNewNoteType] = useState('general');
   const [noteSubmitting, setNoteSubmitting] = useState(false);
@@ -283,6 +305,47 @@ export default function AccountDetailPage() {
   }, [API, companyId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const openAssignModal = useCallback(async () => {
+    setShowAssignModal(true);
+    setAssignBanner(null);
+    setTemplateSearch('');
+    if (templates.length === 0) {
+      setTemplatesLoading(true);
+      try {
+        const res = await fetch(`${API}/api/program-templates`);
+        if (res.ok) {
+          const data = await res.json();
+          setTemplates(Array.isArray(data) ? data : []);
+        }
+      } catch (e) {
+        console.error('Error cargando plantillas:', e);
+      } finally {
+        setTemplatesLoading(false);
+      }
+    }
+  }, [API, templates.length]);
+
+  const assignTemplate = useCallback(async (templateId: string, name?: string) => {
+    setAssigningTemplateId(templateId);
+    setAssignBanner(null);
+    try {
+      const res = await fetch(`${API}/api/companies/account/${companyId}/assign-template`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template_id: templateId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.detail || 'No fue posible asignar la plantilla');
+      setAssignBanner({ kind: 'ok', text: `Programa "${json?.program?.name || name || ''}" asignado correctamente.` });
+      await fetchAll();
+      setTimeout(() => { setShowAssignModal(false); setAssignBanner(null); }, 1200);
+    } catch (e: any) {
+      setAssignBanner({ kind: 'err', text: e?.message || 'Error inesperado' });
+    } finally {
+      setAssigningTemplateId(null);
+    }
+  }, [API, companyId, fetchAll]);
 
   // ─── Actions ───
   const addNote = async () => {
@@ -1052,6 +1115,21 @@ export default function AccountDetailPage() {
         {/* ═══════════ TAB: Programas ═══════════ */}
         {activeTab === 'programas' && (
           <div className="space-y-6">
+            {/* Toolbar */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h3 className="text-[15px] font-semibold text-gray-900">Programas vigentes</h3>
+                <p className="text-[12px] text-gray-400">Plantillas instanciadas y operando para esta cuenta.</p>
+              </div>
+              <button
+                onClick={openAssignModal}
+                className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-3.5 py-2 text-[13px] font-medium text-white shadow-sm hover:bg-black"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                Asignar programa
+              </button>
+            </div>
+
             {programs.length === 0 ? (
               <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
                 <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
@@ -1120,11 +1198,11 @@ export default function AccountDetailPage() {
                           <button
                             onClick={() => {
                               const slug = detail.slug || 'studio';
-                              window.open(`/studio/${slug}?program=${prog.id}`, '_blank');
+                              window.open(`/studio/${slug}/program/${prog.id}`, '_blank');
                             }}
                             className="shrink-0 px-4 py-2 text-[13px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-colors"
                           >
-                            Ver en Studio
+                            Gestionar
                           </button>
                         </div>
                       </div>
@@ -1551,6 +1629,117 @@ export default function AccountDetailPage() {
         )}
 
       </div>
+
+      {/* ═══ Assign Template Modal ═══ */}
+      {showAssignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-[16px] font-semibold text-gray-900">Asignar programa a {detail?.name}</h3>
+                <p className="text-[12px] text-gray-400 mt-0.5">Selecciona una plantilla del catálogo. Al asignarla se instancia como un programa nuevo para esta cuenta.</p>
+              </div>
+              <button
+                onClick={() => { setShowAssignModal(false); setAssignBanner(null); }}
+                className="text-gray-400 hover:text-gray-700"
+                aria-label="Cerrar"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="px-6 py-3 border-b border-gray-100">
+              <input
+                type="text"
+                value={templateSearch}
+                onChange={(e) => setTemplateSearch(e.target.value)}
+                placeholder="Buscar plantilla por nombre, categoría o tag…"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] focus:ring-2 focus:ring-gray-900/10 focus:border-gray-900 outline-none"
+              />
+            </div>
+
+            {assignBanner && (
+              <div className={`mx-6 mt-3 rounded-lg px-3 py-2 text-[12px] ${assignBanner.kind === 'ok' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                {assignBanner.text}
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {templatesLoading ? (
+                <div className="text-center py-12 text-[13px] text-gray-400">Cargando plantillas…</div>
+              ) : templates.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-[14px] text-gray-500 mb-2">No hay plantillas creadas todavía.</p>
+                  <a href="/dashboard/programs" className="text-[12px] text-gray-900 underline">Crear una en /dashboard/programs →</a>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {templates
+                    .filter(t => {
+                      if (!templateSearch.trim()) return true;
+                      const q = templateSearch.toLowerCase();
+                      return (
+                        t.name.toLowerCase().includes(q) ||
+                        (t.category || '').toLowerCase().includes(q) ||
+                        (t.tags || []).some(tg => (tg || '').toLowerCase().includes(q))
+                      );
+                    })
+                    .map((t) => {
+                      const alreadyAssigned = programs.some(p => (p.name || '').trim().toLowerCase() === t.name.trim().toLowerCase());
+                      const busy = assigningTemplateId === t.id;
+                      return (
+                        <li key={t.id} className="border border-gray-200 rounded-xl p-4 hover:border-gray-900/30 transition-colors">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[14px] font-semibold text-gray-900">{t.name}</span>
+                                <span className={`inline-flex items-center text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${t.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{t.status}</span>
+                                {t.category && (
+                                  <span className="inline-flex items-center text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{t.category}</span>
+                                )}
+                                {t.duration && (
+                                  <span className="text-[11px] text-gray-400">· {t.duration}</span>
+                                )}
+                              </div>
+                              {t.description && (
+                                <p className="text-[12px] text-gray-500 mt-1 line-clamp-2">{t.description}</p>
+                              )}
+                              <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-400">
+                                <span>{(t.modules || []).length} módulos</span>
+                                <span>·</span>
+                                <span>{(t.milestones || []).length} hitos</span>
+                                {(t.tags || []).slice(0, 3).map(tag => (
+                                  <span key={tag} className="px-1.5 py-0.5 rounded bg-gray-50 text-gray-500">#{tag}</span>
+                                ))}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => assignTemplate(t.id, t.name)}
+                              disabled={busy || alreadyAssigned}
+                              className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-black disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            >
+                              {busy ? 'Asignando…' : alreadyAssigned ? 'Ya asignada' : 'Asignar'}
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                </ul>
+              )}
+            </div>
+
+            <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-400">
+              <span>Catálogo en /dashboard/programs · {templates.length} plantillas disponibles</span>
+              <button
+                onClick={() => { setShowAssignModal(false); setAssignBanner(null); }}
+                className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ Delete Confirmation Modal ═══ */}
       {showDeleteModal && (

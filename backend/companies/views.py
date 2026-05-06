@@ -708,6 +708,104 @@ async def assign_program_to_company(payload: AssignProgramRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+class AssignTemplateRequest(BaseModel):
+    template_id: uuid.UUID
+    name_override: Optional[str] = None
+    status: Optional[str] = "designed"
+
+
+@router.post("/account/{company_id}/assign-template")
+async def assign_template_to_company(company_id: uuid.UUID, payload: AssignTemplateRequest):
+    """
+    Instancia una ProgramTemplate como un Program para la company indicada.
+    Crea Activities derivadas de los módulos del template y registra changelog.
+    Operación 100% backend: sólo recibe template_id + company_id.
+    """
+    from programs.models import Program, ProgramTemplate, Activity
+    from .models import AccountChangeLog
+
+    def _assign():
+        try:
+            company = Company.objects.get(id=company_id)
+        except Company.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Empresa no encontrada")
+        if company.status not in ("active", "trial"):
+            raise HTTPException(status_code=400, detail="La empresa debe estar activa o en trial")
+
+        try:
+            template = ProgramTemplate.objects.get(id=payload.template_id)
+        except ProgramTemplate.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+
+        program_name = (payload.name_override or template.name).strip() or template.name
+        program = Program.objects.create(
+            name=program_name,
+            description=template.description or "",
+            theme=template.category or "General",
+            status=payload.status or "designed",
+            company=company,
+        )
+
+        # Derivar activities desde los módulos del template (1 activity por módulo)
+        activities_created: List[dict] = []
+        for module in (template.modules or []):
+            try:
+                act = Activity.objects.create(
+                    program=program,
+                    name=str(module.get("name", "Módulo")),
+                    description=str(module.get("description", ""))[:1000],
+                    activity_type="training",
+                    training_category=template.category or None,
+                    modality="online",
+                    status="created",
+                )
+                activities_created.append({
+                    "id": str(act.id),
+                    "name": act.name,
+                    "type": act.activity_type,
+                })
+            except Exception as exc:  # pragma: no cover
+                print(f"[assign-template] activity error: {exc}")
+
+        author = (
+            User.objects.filter(role__in=["superadmin", "admin_root", "inspiratoria_admin"]).first()
+            or User.objects.filter(is_superuser=True).first()
+        )
+        AccountChangeLog.objects.create(
+            company=company,
+            changed_by=author,
+            change_type="info_update",
+            field_changed="program_assigned",
+            old_value="",
+            new_value=program.name,
+            description=f"Plantilla '{template.name}' instanciada como programa '{program.name}' en {company.name}",
+        )
+
+        try:
+            _send_assignment_email(company, program)
+        except Exception as exc:  # pragma: no cover
+            print(f"[assign-template] email error: {exc}")
+
+        return {
+            "message": f"Plantilla '{template.name}' asignada a '{company.name}'",
+            "program": {
+                "id": str(program.id),
+                "name": program.name,
+                "description": program.description,
+                "theme": program.theme,
+                "status": program.status,
+                "company_id": str(company.id),
+                "company_name": company.name,
+            },
+            "template_id": str(template.id),
+            "template_name": template.name,
+            "activities_count": len(activities_created),
+            "activities": activities_created,
+        }
+
+    return await sync_to_async(_assign)()
+
+
 @router.get("/active-companies")
 async def list_active_companies():
     """
@@ -2661,7 +2759,7 @@ async def login_with_otp(payload: LoginOTPRequest):
     """
     Login con OTP. Verifica el código y retorna token de sesión.
     Si la cuenta no estaba activada, la activa automáticamente.
-    remember=True genera sesión de 72h.
+    remember=True genera sesión de 30 días (1 mes).
     """
     try:
         def _get_fresh_user():
@@ -2698,7 +2796,8 @@ async def login_with_otp(payload: LoginOTPRequest):
     token = await sync_to_async(AuthService.generate_session_token)(user)
 
     # Calcular expiración de sesión
-    session_hours = 72 if payload.remember else 8
+    # remember=True → 30 días (1 mes). Sin remember → 8h.
+    session_hours = 24 * 30 if payload.remember else 8
     expires_at = (timezone.now() + timedelta(hours=session_hours)).isoformat()
 
     # Cargar company + programa de forma segura en contexto sync
@@ -4447,7 +4546,8 @@ async def login_with_totp(payload: TOTPLoginRequest):
 
     token = await sync_to_async(AuthService.generate_session_token)(user)
 
-    session_hours = 72 if payload.remember else 8
+    # remember=True → 30 días (1 mes). Sin remember → 8h.
+    session_hours = 24 * 30 if payload.remember else 8
     expires_at = (timezone.now() + timedelta(hours=session_hours)).isoformat()
 
     def _get_company_data():

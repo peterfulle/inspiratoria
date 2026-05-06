@@ -1409,3 +1409,164 @@ async def get_users_with_programs():
     
     users = await sync_to_async(get_users)()
     return users
+
+
+# ============ PUBLIC SELF-ENROLLMENT ============
+
+class PublicProgramInfo(BaseModel):
+    """Información pública del programa para la página de auto-inscripción"""
+    id: str
+    name: str
+    description: str
+    theme: str
+    status: str
+    company: Optional[str] = None
+    accepting_enrollments: bool
+
+
+class SelfEnrollRequest(BaseModel):
+    """Petición pública de auto-inscripción"""
+    email: EmailStr
+    first_name: str = Field(..., min_length=1, max_length=120)
+    last_name: str = Field(..., min_length=1, max_length=120)
+    role: str = Field(..., pattern="^(facilitator|mentor|mentee|participant_cell)$")
+
+
+class SelfEnrollResponse(BaseModel):
+    ok: bool
+    message: str
+    email: str
+    already_enrolled: bool = False
+
+
+@router.get("/{program_id}/public-info", response_model=PublicProgramInfo)
+async def get_program_public_info(program_id: str):
+    """Devuelve info pública del programa (sin autenticación) para la página /enroll/{id}."""
+    def fetch():
+        try:
+            program = Program.objects.select_related('company').get(id=program_id)
+        except Program.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Programa no encontrado")
+        accepting = program.status in ("designed", "ready_for_execution", "in_execution", "active")
+        return {
+            "id": str(program.id),
+            "name": program.name,
+            "description": program.description or "",
+            "theme": program.theme or "",
+            "status": program.status,
+            "company": program.company.name if program.company else None,
+            "accepting_enrollments": accepting,
+        }
+    return await sync_to_async(fetch)()
+
+
+@router.post("/{program_id}/self-enroll", response_model=SelfEnrollResponse)
+async def self_enroll_in_program(program_id: str, payload: SelfEnrollRequest):
+    """
+    Endpoint público de auto-inscripción.
+    Crea el usuario si no existe, lo enrola en el programa y le envía un email
+    con código OTP + link de activación. No requiere autenticación.
+    """
+    def enroll():
+        try:
+            program = Program.objects.select_related('company').get(id=program_id)
+        except Program.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Programa no encontrado")
+
+        if program.status not in ("designed", "ready_for_execution", "in_execution", "active"):
+            raise HTTPException(
+                status_code=400,
+                detail="Este programa no está aceptando inscripciones en este momento"
+            )
+
+        role = normalize_participant_role(payload.role)
+        if role not in PROGRAM_PARTICIPANT_ROLES:
+            raise HTTPException(status_code=400, detail="Rol inválido")
+
+        email = payload.email.lower().strip()
+        user = User.objects.filter(email__iexact=email).first()
+
+        if not user:
+            base_username = email.split('@')[0]
+            username = base_username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+            user = User.objects.create(
+                email=email,
+                username=username,
+                first_name=payload.first_name.strip(),
+                last_name=payload.last_name.strip(),
+                role=map_participant_role_to_user_role(role),
+                company=program.company,
+                is_onboarded=False,
+            )
+
+        # ¿Ya inscrito (activo)?
+        existing = ProgramParticipant.objects.filter(
+            program=program, user=user, deleted_at__isnull=True
+        ).first()
+        if existing:
+            prepare_user_secure_access(user, True)
+            return {
+                "ok": True,
+                "already_enrolled": True,
+                "email": user.email,
+                "message": "Ya estás inscrito en este programa. Te enviamos un nuevo código de acceso a tu correo.",
+            }
+
+        # Reactivar soft-deleted o crear nuevo
+        deleted = ProgramParticipant.objects.filter(
+            program=program, user=user
+        ).exclude(deleted_at__isnull=True).first()
+
+        if deleted:
+            deleted.role = role
+            deleted.status = 'pending'
+            deleted.deleted_at = None
+            deleted.invitation_sent_at = datetime.now()
+            deleted.save()
+        else:
+            ProgramParticipant.objects.create(
+                program=program,
+                user=user,
+                role=role,
+                status='pending',
+                invitation_sent_at=datetime.now(),
+            )
+
+        # Alinear rol del usuario al rol operativo dentro del programa
+        user_role = map_participant_role_to_user_role(role)
+        if user.role != user_role:
+            user.role = user_role
+            user.save(update_fields=['role'])
+
+        prepare_user_secure_access(user, True)
+
+        return {
+            "ok": True,
+            "already_enrolled": False,
+            "email": user.email,
+            "message": "¡Inscripción exitosa! Revisa tu correo para activar tu cuenta.",
+        }
+    return await sync_to_async(enroll)()
+
+
+@router.post("/{program_id}/participants/{participant_id}/resend-invitation")
+async def resend_participant_invitation(program_id: str, participant_id: str):
+    """Reenvía el email de invitación con un nuevo OTP a un participante existente."""
+    def resend():
+        try:
+            participant = ProgramParticipant.objects.select_related('user').get(
+                id=participant_id, program_id=program_id, deleted_at__isnull=True
+            )
+        except ProgramParticipant.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Participante no encontrado")
+
+        prepare_user_secure_access(participant.user, True)
+        participant.invitation_sent_at = datetime.now()
+        participant.save(update_fields=['invitation_sent_at'])
+
+        return {"ok": True, "email": participant.user.email}
+    return await sync_to_async(resend)()

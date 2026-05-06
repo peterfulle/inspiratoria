@@ -394,7 +394,7 @@ class LoginOTPRequest(BaseModel):
     """Login con OTP"""
     email: EmailStr
     otp: str = Field(..., min_length=4, max_length=4)
-    remember: bool = False  # Sesión persistente 72h
+    remember: bool = False  # Sesión persistente 30 días (1 mes)
 
 
 class TOTPSetupRequest(BaseModel):

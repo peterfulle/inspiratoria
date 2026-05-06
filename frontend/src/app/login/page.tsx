@@ -40,6 +40,47 @@ export default function LoginPage() {
     }
   }, [currentVideoIndex]);
 
+  // Auto-redirect si ya hay sesión válida (mantener autenticador activo)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const token = localStorage.getItem("auth_token");
+    const expiresAt = localStorage.getItem("session_expires_at");
+    const userRaw = localStorage.getItem("user");
+    if (!token || !userRaw) return;
+    if (expiresAt && new Date(expiresAt) <= new Date()) {
+      // Sesión expirada → limpiar y mostrar login
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("company");
+      localStorage.removeItem("program_participant");
+      localStorage.removeItem("session_expires_at");
+      return;
+    }
+    try {
+      const user = JSON.parse(userRaw);
+      const ppRaw = localStorage.getItem("program_participant");
+      const pp = ppRaw ? JSON.parse(ppRaw) : null;
+      const role = user?.role;
+      const portalCode = user?.portal_code;
+      const participantRoles = ['facilitator', 'mentor', 'mentee', 'participant_cell', 'participant', 'facilitator_internal'];
+      if (participantRoles.includes(role) && portalCode) {
+        router.replace(`/p/${portalCode}`);
+      } else if (pp && pp.company_slug && portalCode && participantRoles.includes(role)) {
+        router.replace(`/p/${portalCode}`);
+      } else if (role === "admin_root" || role === "inspiratoria_admin" || role === "superadmin") {
+        router.replace("/dashboard");
+      } else {
+        const company = localStorage.getItem("company");
+        router.replace(company ? "/studio" : "/dashboard");
+      }
+    } catch {
+      // user JSON corrupto → limpiar
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("session_expires_at");
+    }
+  }, [router]);
+
   // Resend cooldown timer
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -636,8 +677,8 @@ export default function LoginPage() {
                       className="h-3.5 w-3.5 rounded border-gray-300 text-primary-500 focus:ring-primary-500/30"
                     />
                     <span className="ml-2 text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
-                      Mantener sesión iniciada
-                      <span className="text-gray-300 ml-1">(72 horas)</span>
+                      Mantener sesión activa
+                      <span className="text-gray-300 ml-1">(1 mes)</span>
                     </span>
                   </label>
                 </div>
@@ -753,8 +794,8 @@ export default function LoginPage() {
                       className="h-3.5 w-3.5 rounded border-gray-300 text-primary-500 focus:ring-primary-500/30"
                     />
                     <span className="ml-2 text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
-                      Mantener sesión iniciada
-                      <span className="text-gray-300 ml-1">(72 horas)</span>
+                      Mantener sesión activa
+                      <span className="text-gray-300 ml-1">(1 mes)</span>
                     </span>
                   </label>
                 </div>

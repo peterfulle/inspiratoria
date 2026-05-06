@@ -74,6 +74,39 @@ function AdminLoginContent() {
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-redirect si hay sesión válida (mantener autenticador activo)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const token = localStorage.getItem("auth_token");
+    const userRaw = localStorage.getItem("user");
+    const expiresAt = localStorage.getItem("session_expires_at");
+    if (!token || !userRaw) return;
+    if (expiresAt && new Date(expiresAt) <= new Date()) return;
+    try {
+      const user = JSON.parse(userRaw);
+      const role = user?.role;
+      const portalCode = user?.portal_code;
+      const ppRaw = localStorage.getItem("program_participant");
+      const pp = ppRaw ? JSON.parse(ppRaw) : null;
+      const participantRoles = ['facilitator', 'mentor', 'mentee', 'participant_cell', 'participant', 'facilitator_internal'];
+      if (participantRoles.includes(role) && portalCode) {
+        router.replace(`/p/${portalCode}`);
+      } else if (pp && pp.company_slug && portalCode && participantRoles.includes(role)) {
+        router.replace(`/p/${portalCode}`);
+      } else if (role === "admin_root" || role === "inspiratoria_admin" || role === "superadmin") {
+        router.replace("/dashboard");
+      } else if (localStorage.getItem("company")) {
+        router.replace("/studio");
+      } else {
+        router.replace("/dashboard");
+      }
+    } catch {
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("session_expires_at");
+    }
+  }, [router]);
+
   // Video
   const handleVideoEnd = useCallback(() => {
     setCurrentVideoIndex((prev) => (prev + 1) % VIDEOS.length);
@@ -313,7 +346,7 @@ function AdminLoginContent() {
             </div>
             <div>
               <p className="text-[13px] text-white/60 leading-relaxed">
-                Tu sesión se mantendrá activa. Si no accedes en 72 horas, se cerrará automáticamente por seguridad.
+                Si marcas «Mantener sesión activa», permanecerás autenticado por 1 mes. De lo contrario, la sesión expira en 8 horas.
               </p>
             </div>
           </div>
@@ -527,9 +560,9 @@ function AdminLoginContent() {
                   </div>
                   <div>
                     <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">
-                      Mantener sesión activa
+                      Mantener sesión activa por 1 mes
                     </span>
-                    <p className="text-[11px] text-gray-400">Se cerrará automáticamente tras 72h de inactividad</p>
+                    <p className="text-[11px] text-gray-400">Recomendado en tu equipo personal. Sin esto la sesión expira en 8h.</p>
                   </div>
                 </label>
 

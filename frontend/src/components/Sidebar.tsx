@@ -324,6 +324,7 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
           },
           { id: "programs", label: "Programas Studio", icon: IconPrograms, path: "/dashboard/programs" },
           { id: "manage-programs", label: "Gestionar Programas", icon: IconGoals, path: "/dashboard/manage-programs" },
+          { id: "intelligent-match", label: "Match Inteligente", icon: IconGoals, path: "/dashboard/intelligent-match" },
           { id: "billing", label: "Facturación", icon: IconBilling, path: "/dashboard/billing" },
           { id: "users", label: "Usuarios", icon: IconUsers, path: "/dashboard/users" },
           { id: "analytics", label: "Analytics", icon: IconAnalytics, path: "/dashboard/analytics", comingSoon: true },

@@ -12,8 +12,8 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Directorio base
-BASE_DIR="/Users/peterfulle/Downloads/INSPIRATORIA 2"
+# Directorio base (auto-detectado)
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Función para limpiar procesos al salir
 cleanup() {

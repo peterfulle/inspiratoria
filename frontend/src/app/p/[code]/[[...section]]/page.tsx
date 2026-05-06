@@ -710,6 +710,8 @@ export default function ParticipantPortalPage() {
 
   // Program detail state
   const [programDetail, setProgramDetail] = useState<any>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [programTemplate, setProgramTemplate] = useState<any>(null);
   const [programParticipants, setProgramParticipants] = useState<any[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -883,30 +885,56 @@ export default function ParticipantPortalPage() {
       .catch(() => { setError('Portal no encontrado'); setLoading(false); });
   }, [portalCode, router]);
 
-  // ── Fetch full program data when a program is selected ──
-  useEffect(() => {
+  // ── Fetch full program data (used on mount + on focus + on manual refresh) ──
+  const reloadProgramData = useCallback(async (opts: { silent?: boolean } = {}) => {
     if (!selectedProgram?.id) return;
-    setLoadingDetail(true);
-    setProgramDetail(null);
-    setProgramTemplate(null);
-    setProgramParticipants([]);
-
     const programId = selectedProgram.id;
-
-    // Fetch all 3 in parallel
-    Promise.all([
-      fetch(`${API_URL}/api/programs/${programId}`).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`${API_URL}/api/program-templates`).then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(`${API_URL}/api/programs/${programId}/participants`).then(r => r.ok ? r.json() : []).catch(() => []),
-    ]).then(([detail, templates, participants]) => {
+    if (opts.silent) setRefreshing(true); else setLoadingDetail(true);
+    try {
+      const [detail, templates, participants, myProgs] = await Promise.all([
+        fetch(`${API_URL}/api/programs/${programId}`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_URL}/api/program-templates`).then(r => r.ok ? r.json() : []).catch(() => []),
+        fetch(`${API_URL}/api/programs/${programId}/participants`).then(r => r.ok ? r.json() : []).catch(() => []),
+        portalUser?.id ? fetch(`${API_URL}/api/programs/my-programs/${portalUser.id}`).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
+      ]);
       if (detail) setProgramDetail(detail);
-      // Match template by name
       const allTemplates = Array.isArray(templates) ? templates : [];
       const matched = allTemplates.find((t: any) => t.name === selectedProgram.name);
       if (matched) setProgramTemplate(matched);
       setProgramParticipants(Array.isArray(participants) ? participants : []);
-    }).finally(() => setLoadingDetail(false));
-  }, [selectedProgram?.id, selectedProgram?.name]);
+      // Refresh my-programs (status, joined_at, etc.)
+      if (Array.isArray(myProgs)) {
+        setMyPrograms(myProgs);
+        const updated = myProgs.find((p: any) => p.id === programId);
+        if (updated) setSelectedProgram(updated);
+      }
+      setLastSyncedAt(new Date());
+    } finally {
+      if (opts.silent) setRefreshing(false); else setLoadingDetail(false);
+    }
+  }, [selectedProgram?.id, selectedProgram?.name, portalUser?.id]);
+
+  // Initial load when program changes
+  useEffect(() => {
+    if (!selectedProgram?.id) return;
+    setProgramDetail(null);
+    setProgramTemplate(null);
+    setProgramParticipants([]);
+    reloadProgramData();
+  }, [selectedProgram?.id, selectedProgram?.name, reloadProgramData]);
+
+  // Auto-refresh on window focus / tab visibility (silent)
+  useEffect(() => {
+    if (!selectedProgram?.id) return;
+    const onFocus = () => reloadProgramData({ silent: true });
+    const onVisible = () => { if (document.visibilityState === 'visible') reloadProgramData({ silent: true }); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [selectedProgram?.id, reloadProgramData]);
 
   const handleLogout = () => {
     localStorage.removeItem('auth_token');
@@ -1575,9 +1603,15 @@ export default function ParticipantPortalPage() {
           {/* ─── TAB: ACTIVITIES ─── */}
           {detailTab === 'activities' && (
             <>
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Actividades del Programa</div>
-                <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 2 }}>{activities.length} actividad{activities.length !== 1 ? 'es' : ''} configurada{activities.length !== 1 ? 's' : ''}</div>
+              <div style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <div>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Actividades del Programa</div>
+                  <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 2 }}>
+                    {activities.length} actividad{activities.length !== 1 ? 'es' : ''} ·{' '}
+                    {activities.filter((a: any) => a.start_date).length} agendada{activities.filter((a: any) => a.start_date).length !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                {lastSyncedAt && <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>Sincronizado {lastSyncedAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</span>}
               </div>
 
               {activities.length === 0 ? (
@@ -1591,7 +1625,7 @@ export default function ParticipantPortalPage() {
                     <table className="data-table">
                       <thead>
                         <tr>
-                          <th>Nombre</th><th>Tipo</th><th>Categoría</th><th>Modalidad</th><th>Dirigido a</th><th>Obligatoria</th><th>Certificado</th><th>Capacidad</th><th>Estado</th>
+                          <th>Nombre</th><th>Tipo</th><th>Modalidad</th><th>Fecha</th><th>Reunión</th><th>Dirigido a</th><th>Obligatoria</th><th>Estado</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1602,12 +1636,24 @@ export default function ParticipantPortalPage() {
                               {a.description && <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: 2 }}>{a.description}</div>}
                             </td>
                             <td>{LABELS.actType[a.activity_type || a.type] || a.activity_type || a.type || '—'}</td>
-                            <td>{LABELS.actCategory[a.category] || a.category || '—'}</td>
                             <td>{LABELS.modality[a.modality] || a.modality || '—'}</td>
+                            <td style={{ fontSize: '0.75rem' }}>
+                              {a.start_date ? (
+                                <span style={{ color: '#0e7490', fontWeight: 600 }}>
+                                  {new Date(a.start_date).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                  <div style={{ color: '#9ca3af', fontSize: '0.7rem', fontWeight: 500 }}>{new Date(a.start_date).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</div>
+                                </span>
+                              ) : (
+                                <span style={{ color: '#d97706', fontStyle: 'italic' }}>Sin agendar</span>
+                              )}
+                            </td>
+                            <td>
+                              {a.meeting_url ? (
+                                <a href={a.meeting_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.75rem', fontWeight: 600 }}>Unirse →</a>
+                              ) : '—'}
+                            </td>
                             <td>{LABELS.targetRole[a.target_role] || a.target_role || '—'}</td>
                             <td>{a.is_mandatory ? 'Sí' : 'No'}</td>
-                            <td>{a.is_certificate_issued ? 'Sí' : 'No'}</td>
-                            <td>{a.capacity || '—'}</td>
                             <td>{getStatusBadge(a.status)}</td>
                           </tr>
                         ))}
@@ -2011,9 +2057,16 @@ export default function ParticipantPortalPage() {
     const durationMonths = durationMatch ? parseInt(durationMatch[1]) : 2;
     const totalWeeks = durationMonths * 4;
 
-    // Simulate a start date (use joined_at or created_at or 30 days ago)
-    const startDate = new Date(mp.joined_at || mp.created_at || Date.now() - 30 * 24 * 3600 * 1000);
-    const endDate = new Date(startDate.getTime() + durationMonths * 30 * 24 * 3600 * 1000);
+    // Use REAL cronograma dates if the PM scheduled them; fall back to joined_at + template duration
+    const scheduledActivities = activities.filter((a: any) => a.start_date).map((a: any) => new Date(a.start_date).getTime()).sort((a: number, b: number) => a - b);
+    const scheduledEnds = activities.filter((a: any) => a.end_date || a.start_date).map((a: any) => new Date(a.end_date || a.start_date).getTime()).sort((a: number, b: number) => a - b);
+    const hasRealSchedule = scheduledActivities.length > 0;
+    const startDate = hasRealSchedule
+      ? new Date(scheduledActivities[0])
+      : new Date(mp.joined_at || mp.created_at || Date.now() - 30 * 24 * 3600 * 1000);
+    const endDate = hasRealSchedule && scheduledEnds.length > 0
+      ? new Date(scheduledEnds[scheduledEnds.length - 1])
+      : new Date(startDate.getTime() + durationMonths * 30 * 24 * 3600 * 1000);
     const now = new Date();
     const elapsedMs = Math.max(0, now.getTime() - startDate.getTime());
     const totalMs = endDate.getTime() - startDate.getTime();
@@ -3476,29 +3529,98 @@ export default function ParticipantPortalPage() {
   // ═══════════════════════════════════════════════════════════════
   const renderPortalActivities = () => {
     if (activitiesLoading) return <div className="empty-state">Cargando actividades...</div>;
+    const total = portalActivities.length;
+    const done = portalActivities.filter((a: any) => a.completed_by_me).length;
+    const scheduled = portalActivities.filter((a: any) => a.start_date).length;
+    const sortedActivities = [...portalActivities].sort((a: any, b: any) => {
+      // Pending first, then by date asc, undated last
+      if (a.completed_by_me !== b.completed_by_me) return a.completed_by_me ? 1 : -1;
+      if (!a.start_date && b.start_date) return 1;
+      if (a.start_date && !b.start_date) return -1;
+      if (a.start_date && b.start_date) return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+      return 0;
+    });
     return (
       <div>
-        <div className="dash-header"><h1 className="dash-title">Mis Actividades</h1><p className="dash-subtitle">{portalActivities.length} actividades en tus programas</p></div>
+        <div className="dash-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div>
+            <h1 className="dash-title">Mis Actividades</h1>
+            <p className="dash-subtitle">{total} actividades en tus programas · {done} completadas · {scheduled} agendadas</p>
+          </div>
+          <button onClick={() => { setActivitiesLoading(true); fetch(`${API_URL}/api/companies/portal/${portalCode}/activities`).then(r => r.ok ? r.json() : { activities: [] }).then(d => setPortalActivities(d.activities || [])).finally(() => setActivitiesLoading(false)); }}
+            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontSize: '0.72rem', fontWeight: 600, color: '#0e7490', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0e7490" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Actualizar
+          </button>
+        </div>
+
+        {/* Progress bar */}
+        {total > 0 && (
+          <div style={{ background: '#fff', borderRadius: 12, padding: '14px 18px', border: '1px solid #f3f4f6', marginBottom: 18 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#374151' }}>Tu avance en actividades</span>
+              <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0e7490' }}>{Math.round((done / total) * 100)}%</span>
+            </div>
+            <div style={{ height: 8, background: '#f3f4f6', borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${(done / total) * 100}%`, background: 'linear-gradient(90deg, #0891b2, #06b6d4)', borderRadius: 999, transition: 'width 0.4s' }} />
+            </div>
+          </div>
+        )}
+
         {portalActivities.length === 0 ? (
-          <div className="empty-state">No hay actividades asignadas aún</div>
+          <div className="empty-state">No hay actividades asignadas aún. Cuando tu Project Manager publique el cronograma, aparecerán aquí.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {portalActivities.map((a: any) => (
-              <div key={a.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{a.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 2 }}>{a.program_name} • {a.activity_type === 'training' ? 'Entrenamiento' : 'Evento'}{a.start_date ? ` • ${new Date(a.start_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}` : ''}</div>
-                  {a.description && <div style={{ fontSize: '0.78rem', color: '#4b5563', marginTop: 4 }}>{a.description.slice(0, 100)}{a.description.length > 100 ? '...' : ''}</div>}
+            {sortedActivities.map((a: any) => {
+              const date = a.start_date ? new Date(a.start_date) : null;
+              const isPast = date && date.getTime() < Date.now();
+              const isToday = date && date.toDateString() === new Date().toDateString();
+              return (
+              <div key={a.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: a.completed_by_me ? '1px solid #d1fae5' : isToday ? '1px solid #fde68a' : '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.92rem', color: '#111827' }}>{a.name}</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 8, background: '#f3f4f6', color: '#6b7280', fontSize: '0.68rem', fontWeight: 600 }}>
+                      {a.activity_type === 'training' ? 'Entrenamiento' : a.activity_type === 'event' ? 'Evento' : a.activity_type || 'Actividad'}
+                    </span>
+                    {isToday && <span style={{ padding: '2px 8px', borderRadius: 8, background: '#fef3c7', color: '#b45309', fontSize: '0.68rem', fontWeight: 700 }}>Hoy</span>}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 6, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <span style={{ fontWeight: 500 }}>{a.program_name}</span>
+                    {date ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: isPast && !a.completed_by_me ? '#dc2626' : '#0e7490', fontWeight: 600 }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        {date.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#d97706', fontStyle: 'italic' }}>Aún no agendada</span>
+                    )}
+                    {a.modality && <span style={{ color: '#9ca3af' }}>· {a.modality === 'online' ? 'Online' : a.modality === 'presencial' ? 'Presencial' : 'Híbrida'}</span>}
+                  </div>
+                  {a.description && <div style={{ fontSize: '0.78rem', color: '#4b5563', lineHeight: 1.5 }}>{a.description}</div>}
+                  {a.meeting_url && (
+                    <a href={a.meeting_url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.78rem', color: '#0891b2', fontWeight: 600 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                      Unirse a la reunión
+                    </a>
+                  )}
                 </div>
-                <div style={{ flexShrink: 0, marginLeft: 16 }}>
+                <div style={{ flexShrink: 0 }}>
                   {a.completed_by_me ? (
-                    <span style={{ padding: '6px 14px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 600 }}>✓ Completada</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 14px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 700 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      Completada
+                    </span>
                   ) : (
-                    <button onClick={() => handleCompleteActivity(a.id)} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #0891b2', background: '#ecfeff', color: '#0891b2', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Completar</button>
+                    <button onClick={() => handleCompleteActivity(a.id)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0891b2, #06b6d4)', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, boxShadow: '0 1px 3px rgba(8,145,178,0.3)' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      Marcar completa
+                    </button>
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -4446,6 +4568,25 @@ export default function ParticipantPortalPage() {
           </div>
 
           <div className="p-topbar-right">
+            {selectedProgram && (
+              <button
+                onClick={() => reloadProgramData({ silent: true })}
+                disabled={refreshing || loadingDetail}
+                title={lastSyncedAt ? `Última sincronización: ${lastSyncedAt.toLocaleTimeString('es-CL')}` : 'Sincronizar con el programa'}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '4px 10px', borderRadius: 8,
+                  background: refreshing ? '#f3f4f6' : '#ecfeff', color: refreshing ? '#9ca3af' : '#0e7490',
+                  border: '1px solid #cffafe', fontSize: '0.7rem', fontWeight: 600,
+                  cursor: refreshing ? 'wait' : 'pointer',
+                }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }}>
+                  <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+                {refreshing ? 'Sincronizando…' : lastSyncedAt ? `Sync ${lastSyncedAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : 'Sincronizar'}
+              </button>
+            )}
             <span className="p-topbar-badge p-topbar-badge-role">{roleLabel}</span>
             <span className="p-topbar-badge p-topbar-badge-portal">Portal: {portalCode}</span>
             <div className="p-topbar-divider" />

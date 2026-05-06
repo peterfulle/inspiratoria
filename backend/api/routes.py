@@ -47,6 +47,7 @@ from api.schemas import (
 )
 from programs.models import Match, Participant, Program, Sentiment, Notification, Goal, KeyResult, GoalUpdate
 from programs.services.matching import create_match_with_score
+from programs.services.intelligent_matching import intelligent_match, score_pair
 from programs.ai_service import GeminiAIService
 
 # Import companies router
@@ -579,14 +580,55 @@ def update_program(program_id: str, payload: ProgramIn) -> dict:
         raise HTTPException(status_code=404, detail="Program not found") from exc
 
 
+class ProgramPatchIn(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    theme: Optional[str] = None
+    requires_certification: Optional[bool] = None
+
+
+@router.patch("/programs/{program_id}")
+def patch_program(program_id: str, payload: ProgramPatchIn) -> dict:
+    """
+    Actualización parcial de un programa (PM console).
+    """
+    import uuid
+    try:
+        program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
+        if payload.name is not None:
+            program.name = payload.name
+        if payload.description is not None:
+            program.description = payload.description
+        if payload.theme is not None:
+            program.theme = payload.theme
+        if payload.requires_certification is not None:
+            program.requires_certification = payload.requires_certification
+        program.save()
+        return {
+            "id": str(program.id),
+            "name": program.name,
+            "description": program.description or "",
+            "theme": program.theme or "General",
+            "status": program.status,
+            "requires_certification": program.requires_certification,
+            "updated_at": program.updated_at.isoformat() if program.updated_at else None,
+        }
+    except Program.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+
+
 @router.patch("/programs/{program_id}/status")
 def update_program_status(program_id: str, status: str) -> dict:
     """
-    Cambiar el estado de un programa
-    Estados válidos: draft, active, paused, completed
+    Cambiar el estado de un programa.
+    Estados válidos (modernos): designed, ready_for_execution, in_execution, under_review, closed
+    Estados legacy soportados: draft, active, paused, completed
     """
     import uuid
-    valid_statuses = ["draft", "active", "paused", "completed"]
+    valid_statuses = [
+        "designed", "ready_for_execution", "in_execution", "under_review", "closed",
+        "draft", "active", "paused", "completed",
+    ]
     if status not in valid_statuses:
         raise HTTPException(
             status_code=400, 
@@ -599,7 +641,7 @@ def update_program_status(program_id: str, status: str) -> dict:
         program.save()
         return {
             "success": True,
-            "program_id": program.id,
+            "program_id": str(program.id),
             "status": program.status,
             "message": f"Programa actualizado a estado: {status}"
         }
@@ -2242,6 +2284,60 @@ def calculate_ai_compatibility_score(mentor: Participant, mentee: Participant) -
     
     # Ensure score is within range
     return min(100, max(0, int(score)))
+
+
+# ═══════════════════════════════════════════════════════════════════
+# INTELLIGENT MATCHING — operates on User profile data
+# ═══════════════════════════════════════════════════════════════════
+
+class IntelligentMatchRequest(BaseModel):
+    program_id: Optional[str] = None
+    company_id: Optional[str] = None
+    mentor_id: Optional[str] = None
+    mentee_id: Optional[str] = None
+    top_k: int = 10
+    min_score: float = 0.0
+    use_ai: bool = False  # If True and GEMINI_API_KEY is set, enrich top results with AI rationale
+
+
+@router.post("/matches/intelligent")
+def intelligent_match_endpoint(payload: IntelligentMatchRequest) -> dict:
+    """
+    Smart mentor↔mentee matching based on rich User profile data:
+    skills, mentor_topics, mentor_style, experience level/area, mentor_objectives,
+    mentee_goals, mentee_interests, mentee_challenges, mentee_expectations,
+    preferred_mentor_style, headline / position / department.
+
+    Returns ranked suggestions with explainable per-dimension breakdown,
+    matched keywords, human-readable reasons, and (optionally) Gemini rationale.
+    """
+    try:
+        result = intelligent_match(
+            program_id=payload.program_id,
+            company_id=payload.company_id,
+            mentor_id=payload.mentor_id,
+            mentee_id=payload.mentee_id,
+            top_k=max(1, min(50, payload.top_k)),
+            min_score=max(0.0, min(100.0, payload.min_score)),
+            use_ai=payload.use_ai,
+        )
+        return result
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Intelligent matching failed: {exc}")
+
+
+@router.get("/matches/intelligent/score")
+def intelligent_match_score(mentor_id: str, mentee_id: str) -> dict:
+    """Score a single (mentor, mentee) pair on demand."""
+    from companies.models import User as _User
+    try:
+        mentor = _User.objects.get(id=mentor_id, role="mentor")
+        mentee = _User.objects.get(id=mentee_id, role="mentee")
+    except _User.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Mentor or mentee not found")
+    return score_pair(mentor, mentee)
 
 
 @router.post("/matches/{match_id}/approve")

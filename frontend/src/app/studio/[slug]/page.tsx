@@ -919,17 +919,13 @@ export default function CoreDashboardPage() {
     f();
   }, [company?.id]);
 
-  // Auto-open program from ?program= query param
+  // Auto-redirect to unified Program Manager Console when ?program= is present
   useEffect(() => {
     const programId = searchParams.get('program');
-    if (programId && programs.length > 0 && !selectedProgram) {
-      const found = programs.find(p => p.id === programId);
-      if (found) {
-        setActiveNav('manage-programs');
-        selectProgram(found);
-      }
+    if (programId) {
+      router.replace(`/studio/${slug}/program/${programId}`);
     }
-  }, [searchParams, programs]);
+  }, [searchParams, router, slug]);
 
   const filteredPrograms = programs.filter(p => {
     const s = p.name.toLowerCase().includes(searchTerm.toLowerCase());
