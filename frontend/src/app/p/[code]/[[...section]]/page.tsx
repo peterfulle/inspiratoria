@@ -413,6 +413,22 @@ const styles = `
   .p-loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #fafafa; }
   .p-loading-spinner { width: 40px; height: 40px; border: 3px solid #e0f2fe; border-top: 3px solid #0891b2; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Skeleton */
+  .skel { background: linear-gradient(90deg, #eef2f7 0%, #f7fafc 50%, #eef2f7 100%); background-size: 200% 100%; animation: skel-shimmer 1.4s ease-in-out infinite; border-radius: 8px; }
+  @keyframes skel-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .skel-line { height: 12px; border-radius: 6px; }
+  .skel-circle { border-radius: 50%; }
+  .skel-card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; background: #fff; }
+
+  /* Portal skeleton (full-page shell) */
+  .p-skel { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; background: #fafafa; }
+  .p-skel-side { background: #fff; border-right: 1px solid #e5e7eb; padding: 18px 14px; }
+  .p-skel-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; border-bottom: 1px solid #e5e7eb; background: #fff; }
+  .p-skel-main { padding: 28px; }
+  .p-skel-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+  .p-skel-grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  @media (max-width: 1024px) { .p-skel { grid-template-columns: 1fr; } .p-skel-side { display: none; } .p-skel-stats { grid-template-columns: repeat(2, 1fr); } .p-skel-grid2 { grid-template-columns: 1fr; } }
   .p-error { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #fafafa; gap: 16px; }
   .p-error-code { font-size: 4rem; font-weight: 800; color: #0891b2; letter-spacing: -0.04em; }
   .p-error-msg { font-size: 1rem; color: #6b7280; }
@@ -666,6 +682,55 @@ const navIcons: Record<string, JSX.Element> = {
 // ============================================================================
 // COMPONENT
 // ============================================================================
+
+// Reusable skeleton primitives
+const SkelBlock = ({ h = 12, w = '100%', mb = 0, r = 6, style = {} }: any) => (
+  <div className="skel" style={{ height: h, width: w, marginBottom: mb, borderRadius: r, ...style }} />
+);
+const SkelCardGrid = ({ count = 4, height = 96 }: { count?: number; height?: number }) => (
+  <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${count >= 4 ? 200 : 260}px, 1fr))`, gap: 14, marginBottom: 22 }}>
+    {[...Array(count)].map((_, i) => (
+      <div key={i} className="skel-card" style={{ minHeight: height }}>
+        <SkelBlock w="60%" h={10} mb={12} />
+        <SkelBlock w="40%" h={22} mb={10} />
+        <SkelBlock w="80%" h={9} />
+      </div>
+    ))}
+  </div>
+);
+const SkelList = ({ rows = 5 }: { rows?: number }) => (
+  <div className="skel-card">
+    {[...Array(rows)].map((_, i) => (
+      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < rows - 1 ? '1px solid #f3f4f6' : 'none' }}>
+        <div className="skel skel-circle" style={{ width: 38, height: 38 }} />
+        <div style={{ flex: 1 }}>
+          <SkelBlock w="55%" h={11} mb={6} />
+          <SkelBlock w="35%" h={9} />
+        </div>
+        <SkelBlock w={60} h={22} r={10} />
+      </div>
+    ))}
+  </div>
+);
+const SkelDetailPage = () => (
+  <>
+    <div style={{ marginBottom: 18 }}>
+      <SkelBlock w={300} h={24} mb={8} />
+      <SkelBlock w={420} h={11} />
+    </div>
+    <SkelCardGrid count={4} />
+    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+      <SkelList rows={6} />
+      <div className="skel-card">
+        <SkelBlock w="50%" h={14} mb={16} />
+        <SkelBlock h={130} mb={12} r={10} />
+        <SkelBlock w="80%" mb={6} />
+        <SkelBlock w="60%" />
+      </div>
+    </div>
+  </>
+);
+
 export default function ParticipantPortalPage() {
   const router = useRouter();
   const params = useParams();
@@ -1162,7 +1227,58 @@ export default function ParticipantPortalPage() {
   if (loading) return (
     <>
       <style suppressHydrationWarning dangerouslySetInnerHTML={{ __html: styles }} />
-      <div className="p-loading"><div className="p-loading-spinner" /></div>
+      <div className="p-skel">
+        <aside className="p-skel-side">
+          <div className="skel" style={{ height: 32, width: '70%', marginBottom: 22 }} />
+          {[...Array(8)].map((_, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <div className="skel skel-circle" style={{ width: 18, height: 18 }} />
+              <div className="skel skel-line" style={{ width: `${50 + (i % 3) * 15}%` }} />
+            </div>
+          ))}
+        </aside>
+        <div>
+          <div className="p-skel-top">
+            <div className="skel skel-line" style={{ width: 220, height: 16 }} />
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div className="skel skel-line" style={{ width: 90, height: 12 }} />
+              <div className="skel skel-circle" style={{ width: 36, height: 36 }} />
+            </div>
+          </div>
+          <div className="p-skel-main">
+            <div className="skel skel-line" style={{ width: 280, height: 22, marginBottom: 8 }} />
+            <div className="skel skel-line" style={{ width: 380, height: 12, marginBottom: 24 }} />
+            <div className="p-skel-stats">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="skel-card">
+                  <div className="skel skel-line" style={{ width: '60%', height: 10, marginBottom: 12 }} />
+                  <div className="skel skel-line" style={{ width: '40%', height: 22 }} />
+                </div>
+              ))}
+            </div>
+            <div className="p-skel-grid2">
+              <div className="skel-card" style={{ minHeight: 240 }}>
+                <div className="skel skel-line" style={{ width: '40%', height: 14, marginBottom: 18 }} />
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                    <div className="skel skel-circle" style={{ width: 36, height: 36 }} />
+                    <div style={{ flex: 1 }}>
+                      <div className="skel skel-line" style={{ width: '70%', marginBottom: 6 }} />
+                      <div className="skel skel-line" style={{ width: '40%', height: 9 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="skel-card" style={{ minHeight: 240 }}>
+                <div className="skel skel-line" style={{ width: '50%', height: 14, marginBottom: 18 }} />
+                <div className="skel" style={{ height: 140, borderRadius: 10, marginBottom: 14 }} />
+                <div className="skel skel-line" style={{ width: '80%', marginBottom: 8 }} />
+                <div className="skel skel-line" style={{ width: '60%' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   );
 
@@ -1189,7 +1305,21 @@ export default function ParticipantPortalPage() {
       </div>
 
       {loadingPrograms ? (
-        <div className="empty-state">Cargando tus programas...</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16, marginBottom: 24 }}>
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="skel-card" style={{ padding: 24, minHeight: 180 }}>
+              <SkelBlock w={80} h={9} mb={12} />
+              <SkelBlock w="75%" h={20} mb={10} />
+              <SkelBlock w="95%" h={10} mb={6} />
+              <SkelBlock w="60%" h={10} mb={20} />
+              <div style={{ display: 'flex', gap: 16 }}>
+                <SkelBlock w={70} h={10} />
+                <SkelBlock w={70} h={10} />
+                <SkelBlock w={70} h={10} />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : myPrograms.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px' }}>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', marginBottom: 8 }}>Aún no estás inscrito en un programa</h3>
@@ -1252,7 +1382,7 @@ export default function ParticipantPortalPage() {
   const renderMyProgram = () => {
     const mp = activeProgram;
     if (!mp) return <div className="empty-state">Selecciona un programa</div>;
-    if (loadingDetail) return <div className="empty-state">Cargando datos del programa...</div>;
+    if (loadingDetail) return <SkelDetailPage />;
 
     const heroGradient = THEME_GRADIENTS[mp.theme] || THEME_GRADIENTS.leadership;
     const activities = programDetail?.activities || mp.activities || [];
@@ -2044,7 +2174,7 @@ export default function ParticipantPortalPage() {
   const renderProgress = () => {
     const mp = activeProgram;
     if (!mp) return <div className="empty-state">Selecciona un programa para ver el progreso</div>;
-    if (loadingDetail) return <div className="empty-state">Cargando progreso...</div>;
+    if (loadingDetail) return <SkelDetailPage />;
 
     const modules = programTemplate?.modules || [];
     const milestones = programTemplate?.milestones || [];
@@ -2366,7 +2496,7 @@ export default function ParticipantPortalPage() {
   // ── Profile helpers ──
   const startEditProfile = () => {
     setProfileForm({
-      full_name: portalUser?.full_name || '',
+      full_name: portalUser?.full_name || [portalUser?.first_name, portalUser?.last_name].filter(Boolean).join(' ').trim() || '',
       phone: portalUser?.phone || '',
       position: portalUser?.position || '',
       department: portalUser?.department || '',
@@ -2660,7 +2790,13 @@ export default function ParticipantPortalPage() {
                   <div className="prof-form-grid">
                     <div className="prof-field">
                       <label>Nombre y apellido *</label>
-                      <input value={profileForm.full_name} onChange={e => setProfileForm(f => ({ ...f, full_name: e.target.value }))} placeholder="Tu nombre completo" />
+                      <input
+                        value={profileForm.full_name}
+                        readOnly
+                        title="Este dato fue recogido al momento de la invitación. Si necesitas modificarlo, contacta a tu coordinador."
+                        style={{ background: '#f3f4f6', color: '#374151', cursor: 'not-allowed' }}
+                      />
+                      <span className="prof-hint" style={{ color: '#6b7280' }}>Recogido al invitarte. Pídele a tu coordinador modificarlo si es necesario.</span>
                     </div>
                     <div className="prof-field">
                       <label>Género</label>
@@ -2674,8 +2810,19 @@ export default function ParticipantPortalPage() {
                       </select>
                     </div>
                     <div className="prof-field">
-                      <label>Mail personal</label>
-                      <input type="email" value={profileForm.personal_email} onChange={e => setProfileForm(f => ({ ...f, personal_email: e.target.value }))} placeholder="tu@correo.com" />
+                      <label>Email de acceso</label>
+                      <input
+                        type="email"
+                        value={portalUser?.email || ''}
+                        readOnly
+                        title="Este es el email con el que accedes al portal."
+                        style={{ background: '#f3f4f6', color: '#374151', cursor: 'not-allowed' }}
+                      />
+                      <span className="prof-hint" style={{ color: '#6b7280' }}>Este es tu email de acceso a la plataforma.</span>
+                    </div>
+                    <div className="prof-field">
+                      <label>Email personal alternativo</label>
+                      <input type="email" value={profileForm.personal_email} onChange={e => setProfileForm(f => ({ ...f, personal_email: e.target.value }))} placeholder="(opcional) otro@correo.com" />
                     </div>
                     <div className="prof-field">
                       <label>Cargo actual *</label>
@@ -3214,7 +3361,7 @@ export default function ParticipantPortalPage() {
   // RENDER: MIS MENTEES
   // ═══════════════════════════════════════════════════════════════
   const renderMentees = () => {
-    if (menteesLoading) return <div className="empty-state">Cargando mentees...</div>;
+    if (menteesLoading) return <SkelList rows={4} />;
     if (myMentees.length === 0) return (
       <div>
         <div className="dash-header"><h1 className="dash-title">Mis Mentees</h1><p className="dash-subtitle">Mentees asignados a ti en tus programas de mentoría</p></div>
@@ -3348,7 +3495,7 @@ export default function ParticipantPortalPage() {
   };
 
   const renderSessions = () => {
-    if (sessionsLoading) return <div className="empty-state">Cargando sesiones...</div>;
+    if (sessionsLoading) return <SkelList rows={5} />;
 
     const upcoming = mySessions.filter(s => s.status === 'scheduled');
     const completed = mySessions.filter(s => s.status === 'completed');
@@ -3492,7 +3639,7 @@ export default function ParticipantPortalPage() {
   // RENDER: MI RED DE INFLUENCIA
   // ═══════════════════════════════════════════════════════════════
   const renderNetwork = () => {
-    if (networkLoading) return <div className="empty-state">Cargando red...</div>;
+    if (networkLoading) return <SkelList rows={5} />;
     return (
       <div>
         <div className="dash-header"><h1 className="dash-title">Mi Red de Influencia</h1><p className="dash-subtitle">Perfiles express de las personas en tus programas</p></div>
@@ -3528,7 +3675,7 @@ export default function ParticipantPortalPage() {
   // RENDER: ACTIVIDADES CON COMPLETAR
   // ═══════════════════════════════════════════════════════════════
   const renderPortalActivities = () => {
-    if (activitiesLoading) return <div className="empty-state">Cargando actividades...</div>;
+    if (activitiesLoading) return <SkelList rows={5} />;
     const total = portalActivities.length;
     const done = portalActivities.filter((a: any) => a.completed_by_me).length;
     const scheduled = portalActivities.filter((a: any) => a.start_date).length;
@@ -3634,7 +3781,7 @@ export default function ParticipantPortalPage() {
   const tierPillText: Record<number, string> = { 0: '#94a3b8', 1: '#b45309', 2: '#475569', 3: '#a16207' };
 
   const renderBadges = () => {
-    if (badgesLoading) return <div className="empty-state">Cargando insignias...</div>;
+    if (badgesLoading) return <SkelCardGrid count={6} height={120} />;
     if (!badgesData) return <div className="empty-state">No se pudieron cargar las insignias</div>;
 
     const { badges, summary } = badgesData;
@@ -4223,7 +4370,7 @@ export default function ParticipantPortalPage() {
   // RENDER: SESIONES MENTEE (vista mentee — sin crear, solo ver)
   // ═══════════════════════════════════════════════════════════════
   const renderMenteeSessions = () => {
-    if (sessionsLoading) return <div className="empty-state">Cargando sesiones...</div>;
+    if (sessionsLoading) return <SkelList rows={5} />;
 
     const upcoming = mySessions.filter(s => s.status === 'scheduled');
     const completed = mySessions.filter(s => s.status === 'completed');
@@ -4313,7 +4460,7 @@ export default function ParticipantPortalPage() {
   // RENDER: MI MENTOR (vista mentee)
   // ═══════════════════════════════════════════════════════════════
   const renderMyMentor = () => {
-    if (mentorLoading) return <div className="empty-state">Cargando información de tu mentor...</div>;
+    if (mentorLoading) return <div className="skel-card"><div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16 }}><div className="skel skel-circle" style={{ width: 64, height: 64 }} /><div style={{ flex: 1 }}><SkelBlock w="55%" h={14} mb={8} /><SkelBlock w="35%" h={10} /></div></div><SkelBlock w="90%" mb={6} /><SkelBlock w="75%" mb={6} /><SkelBlock w="60%" /></div>;
     if (!myMentor) return (
       <div>
         <div className="dash-header"><h1 className="dash-title">Mi Mentor</h1><p className="dash-subtitle">Tu mentor asignado para el programa</p></div>
