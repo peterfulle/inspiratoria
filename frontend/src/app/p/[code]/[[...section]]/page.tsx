@@ -1388,6 +1388,34 @@ export default function ParticipantPortalPage() {
     const activities = programDetail?.activities || mp.activities || [];
     const modulesCount = programTemplate?.modules?.length || 0;
 
+    // Cronograma sync helpers — match scheduled activities (by name + module_id) so the
+    // Módulos tab reflects the dates set in Studio › Cronograma.
+    const norm = (s: any) => (s || '').toString().trim().toLowerCase();
+    const fmtSchedDate = (d: any) => {
+      if (!d) return null;
+      try {
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return null;
+        return dt.toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+      } catch { return null; }
+    };
+    const findScheduled = (act: any, modId?: any) => {
+      const target = norm(act?.name || act?.title);
+      if (!target) return null;
+      return activities.find((sa: any) => {
+        if (!sa?.start_date) return false;
+        if (norm(sa.name || sa.title) !== target) return false;
+        if (modId && sa.module_id && String(sa.module_id) !== String(modId)) return false;
+        return true;
+      }) || null;
+    };
+    // Activities scheduled in Studio that don't belong to any template module
+    const moduleActivityKeys = new Set<string>();
+    (programTemplate?.modules || []).forEach((mod: any) => {
+      (mod.activities || []).forEach((a: any) => moduleActivityKeys.add(norm(a.name || a.title)));
+    });
+    const orphanActivities = activities.filter((sa: any) => sa?.start_date && !moduleActivityKeys.has(norm(sa.name || sa.title)));
+
     const getStatusBadge = (st: string) => (
       <span className={`badge ${st === 'active' || st === 'running' ? 'badge-active' : st === 'completed' ? 'badge-completed' : 'badge-draft'}`}>
         {LABELS.status[st] || st}
@@ -1666,15 +1694,27 @@ export default function ParticipantPortalPage() {
                               <div>
                                 <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 8 }}>Actividades del módulo ({mod.activities.length})</div>
                                 <table className="data-table" style={{ fontSize: '0.78rem' }}>
-                                  <thead><tr><th>Nombre</th><th>Tipo</th><th>Modalidad</th></tr></thead>
+                                  <thead><tr><th>Nombre</th><th>Tipo</th><th>Modalidad</th><th>Fecha programada</th></tr></thead>
                                   <tbody>
-                                    {mod.activities.map((act: any, ai: number) => (
-                                      <tr key={ai}>
-                                        <td style={{ fontWeight: 600 }}>{act.name || act.title || `Actividad ${ai + 1}`}</td>
-                                        <td>{act.type || '—'}</td>
-                                        <td>{act.modality || '—'}</td>
-                                      </tr>
-                                    ))}
+                                    {mod.activities.map((act: any, ai: number) => {
+                                      const sched = findScheduled(act, mod.id);
+                                      const dateStr = sched ? fmtSchedDate(sched.start_date) : null;
+                                      return (
+                                        <tr key={ai}>
+                                          <td style={{ fontWeight: 600 }}>{act.name || act.title || `Actividad ${ai + 1}`}</td>
+                                          <td>{act.type || sched?.type || '—'}</td>
+                                          <td>{act.modality || sched?.modality || '—'}</td>
+                                          <td>{dateStr ? (
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#0891b2', fontWeight: 600 }}>
+                                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                              {dateStr}
+                                            </span>
+                                          ) : (
+                                            <span style={{ fontSize: '0.72rem', color: '#9ca3af', fontStyle: 'italic' }}>Sin agendar</span>
+                                          )}</td>
+                                        </tr>
+                                      );
+                                    })}
                                   </tbody>
                                 </table>
                               </div>
@@ -1684,6 +1724,43 @@ export default function ParticipantPortalPage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Activities scheduled outside of any module (custom activities added in Cronograma) */}
+              {orphanActivities.length > 0 && (
+                <div className="pd-mod" style={{ marginTop: 16, borderColor: '#fde68a', background: '#fffbeb' }}>
+                  <div className="pd-mod-head" style={{ background: 'linear-gradient(135deg, #fef3c7, #fde68a)', cursor: 'default' }}>
+                    <div className="pd-mod-num" style={{ background: '#f59e0b', color: '#fff' }}>+</div>
+                    <div className="pd-mod-info">
+                      <div className="pd-mod-name">Actividades adicionales del cronograma</div>
+                      <div className="pd-mod-meta">
+                        <span>{orphanActivities.length} actividad{orphanActivities.length !== 1 ? 'es' : ''} programada{orphanActivities.length !== 1 ? 's' : ''} fuera de los módulos</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pd-mod-body">
+                    <table className="data-table" style={{ fontSize: '0.78rem' }}>
+                      <thead><tr><th>Nombre</th><th>Modalidad</th><th>Fecha programada</th></tr></thead>
+                      <tbody>
+                        {orphanActivities.map((sa: any, i: number) => {
+                          const dateStr = fmtSchedDate(sa.start_date);
+                          return (
+                            <tr key={i}>
+                              <td style={{ fontWeight: 600 }}>{sa.name || sa.title || `Actividad ${i + 1}`}</td>
+                              <td>{sa.modality || '—'}</td>
+                              <td>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#0891b2', fontWeight: 600 }}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                  {dateStr || '—'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </>
