@@ -2391,6 +2391,119 @@ def approve_match_suggestion(match_id: str) -> dict:
         raise HTTPException(status_code=500, detail=f"Error approving match: {str(e)}")
 
 
+# ─────────────────────────────────────────────────────────────────
+# ACTIVATE INTELLIGENT MATCH → CREATE VINCULATION
+# Bridges the new User-based intelligent_match to ProgramParticipant + Vinculation
+# ─────────────────────────────────────────────────────────────────
+
+class ActivateIntelligentMatchRequest(BaseModel):
+    program_id: str
+    mentor_user_id: str
+    mentee_user_id: str
+    score: Optional[float] = None
+    breakdown: Optional[dict] = None
+    matched_keywords: Optional[List[str]] = None
+    reasons: Optional[List[str]] = None
+    ai_recommendation: Optional[str] = None
+    vinculation_type: str = "mentoria"
+
+
+@router.post("/matches/intelligent/activate")
+def activate_intelligent_match(payload: ActivateIntelligentMatchRequest) -> dict:
+    """
+    Persiste un resultado del intelligent match como Vinculation activa.
+
+    Resuelve los ProgramParticipant del mentor y mentee dentro del programa
+    indicado y crea la Vinculation con metadata enriquecida (score, breakdown,
+    keywords, reasons). A partir de ese momento el portal /p/{code} de cada
+    parte muestra automáticamente al partner.
+    """
+    from programs.models import Program, ProgramParticipant, Vinculation
+    from datetime import datetime, timezone
+
+    if payload.vinculation_type not in ("mentoria", "tutoria", "equipo", "coaching"):
+        raise HTTPException(status_code=400, detail="vinculation_type inválido")
+
+    try:
+        program = Program.objects.get(id=payload.program_id)
+    except Program.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Programa no encontrado")
+
+    try:
+        mentor_pp = ProgramParticipant.objects.select_related("user").get(
+            program=program, user_id=payload.mentor_user_id, deleted_at__isnull=True
+        )
+    except ProgramParticipant.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Mentor no inscrito en este programa")
+
+    try:
+        mentee_pp = ProgramParticipant.objects.select_related("user").get(
+            program=program, user_id=payload.mentee_user_id, deleted_at__isnull=True
+        )
+    except ProgramParticipant.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Mentee no inscrito en este programa")
+
+    if mentor_pp.role not in ("mentor", "participant_cell"):
+        raise HTTPException(status_code=400, detail=f"El usuario mentor tiene rol '{mentor_pp.role}' en el programa")
+    if mentee_pp.role not in ("mentee", "participant_cell"):
+        raise HTTPException(status_code=400, detail=f"El usuario mentee tiene rol '{mentee_pp.role}' en el programa")
+
+    # ¿Ya existe una vinculación activa entre ellos?
+    existing = Vinculation.objects.filter(
+        program=program,
+        status="active",
+    ).filter(
+        django_models.Q(participant1=mentor_pp, participant2=mentee_pp) |
+        django_models.Q(participant1=mentee_pp, participant2=mentor_pp)
+    ).first()
+    if existing:
+        return {
+            "status": "already_exists",
+            "vinculation_id": existing.id,
+            "message": "Ya existe una vinculación activa entre estos participantes",
+        }
+
+    metadata = {
+        "created_via": "intelligent_match_activate",
+        "activated_at": datetime.now(timezone.utc).isoformat(),
+        "score": payload.score,
+        "breakdown": payload.breakdown or {},
+        "matched_keywords": payload.matched_keywords or [],
+        "reasons": payload.reasons or [],
+        "ai_recommendation": payload.ai_recommendation,
+    }
+
+    vinculation = Vinculation.objects.create(
+        program=program,
+        participant1=mentor_pp,
+        participant2=mentee_pp,
+        type=payload.vinculation_type,
+        status="active",
+        metadata=metadata,
+    )
+
+    return {
+        "status": "activated",
+        "vinculation_id": vinculation.id,
+        "program_id": str(program.id),
+        "mentor": {
+            "user_id": str(mentor_pp.user.id),
+            "participant_id": str(mentor_pp.id),
+            "name": f"{mentor_pp.user.first_name} {mentor_pp.user.last_name}".strip(),
+            "email": mentor_pp.user.email,
+        },
+        "mentee": {
+            "user_id": str(mentee_pp.user.id),
+            "participant_id": str(mentee_pp.id),
+            "name": f"{mentee_pp.user.first_name} {mentee_pp.user.last_name}".strip(),
+            "email": mentee_pp.user.email,
+        },
+        "score": payload.score,
+        "type": vinculation.type,
+        "created_at": vinculation.created_at.isoformat() if vinculation.created_at else None,
+    }
+
+
 # ==================== ACTIVITIES ROUTES ====================
 from programs.models import Activity
 

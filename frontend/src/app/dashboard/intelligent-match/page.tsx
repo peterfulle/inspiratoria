@@ -77,6 +77,13 @@ export default function IntelligentMatchPage() {
   const [error, setError] = useState<string>("");
   const [progress, setProgress] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
+  // Activación de match → vinculación. Map por par mentor↔mentee.
+  type ActivationState =
+    | { status: "idle" }
+    | { status: "loading" }
+    | { status: "done"; vinculationId: number; alreadyExisted?: boolean }
+    | { status: "error"; message: string };
+  const [activations, setActivations] = useState<Record<string, ActivationState>>({});
 
   const PROGRESS_STEPS = [
     { p: 12, label: "Cargando perfiles enriquecidos de mentores y mentees…", icon: "📥" },
@@ -170,6 +177,59 @@ export default function IntelligentMatchPage() {
       setError(e?.message || "Error inesperado");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const activatePair = async (r: MatchResult) => {
+    if (!programId) {
+      setActivations((prev) => ({
+        ...prev,
+        [`${r.mentor.id}-${r.mentee.id}`]: {
+          status: "error",
+          message: "Selecciona primero un programa para crear la vinculación",
+        },
+      }));
+      return;
+    }
+    const key = `${r.mentor.id}-${r.mentee.id}`;
+    setActivations((prev) => ({ ...prev, [key]: { status: "loading" } }));
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+      const res = await fetch(`${API}/api/matches/intelligent/activate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          program_id: programId,
+          mentor_user_id: r.mentor.id,
+          mentee_user_id: r.mentee.id,
+          score: r.score,
+          breakdown: r.breakdown,
+          matched_keywords: r.matched_keywords,
+          reasons: r.reasons,
+          ai_recommendation: r.ai_recommendation,
+          vinculation_type: "mentoria",
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body?.detail || `HTTP ${res.status}`);
+      }
+      setActivations((prev) => ({
+        ...prev,
+        [key]: {
+          status: "done",
+          vinculationId: body.vinculation_id,
+          alreadyExisted: body.status === "already_exists",
+        },
+      }));
+    } catch (err: any) {
+      setActivations((prev) => ({
+        ...prev,
+        [key]: { status: "error", message: err?.message || "Error al activar" },
+      }));
     }
   };
 
@@ -400,9 +460,49 @@ export default function IntelligentMatchPage() {
                         </p>
                       </div>
                     </div>
-                    <div className={`rounded-xl ${c.bg} px-4 py-2 text-right`}>
-                      <p className={`text-2xl font-bold ${c.text}`}>{r.score.toFixed(1)}</p>
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">/ 100</p>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className={`rounded-xl ${c.bg} px-4 py-2 text-right`}>
+                        <p className={`text-2xl font-bold ${c.text}`}>{r.score.toFixed(1)}</p>
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">/ 100</p>
+                      </div>
+                      {(() => {
+                        const key = `${r.mentor.id}-${r.mentee.id}`;
+                        const st = activations[key] || { status: "idle" as const };
+                        if (st.status === "done") {
+                          return (
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                              ✓ {st.alreadyExisted ? "Ya vinculados" : "Vinculación activa"}
+                              <span className="text-[10px] font-normal text-emerald-600">#{st.vinculationId}</span>
+                            </span>
+                          );
+                        }
+                        if (st.status === "loading") {
+                          return (
+                            <button disabled className="inline-flex items-center gap-2 rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-600">
+                              <span className="h-2 w-2 animate-pulse rounded-full bg-indigo-500" />
+                              Activando…
+                            </button>
+                          );
+                        }
+                        return (
+                          <button
+                            onClick={() => activatePair(r)}
+                            disabled={!programId}
+                            title={!programId ? "Selecciona un programa primero" : "Crear vinculación activa entre estos participantes"}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                          >
+                            ⚡ Activar match
+                          </button>
+                        );
+                      })()}
+                      {(() => {
+                        const key = `${r.mentor.id}-${r.mentee.id}`;
+                        const st = activations[key];
+                        if (st?.status === "error") {
+                          return <span className="max-w-[180px] text-right text-[11px] text-rose-600">{st.message}</span>;
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
 
