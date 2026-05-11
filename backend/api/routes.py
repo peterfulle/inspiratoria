@@ -2406,6 +2406,7 @@ class ActivateIntelligentMatchRequest(BaseModel):
     reasons: Optional[List[str]] = None
     ai_recommendation: Optional[str] = None
     vinculation_type: str = "mentoria"
+    notify: bool = True
 
 
 @router.post("/matches/intelligent/activate")
@@ -2482,6 +2483,31 @@ def activate_intelligent_match(payload: ActivateIntelligentMatchRequest) -> dict
         metadata=metadata,
     )
 
+    # Notificación por email a ambas partes
+    notifications = {"mentor_sent": False, "mentee_sent": False}
+    if payload.notify:
+        from programs.views import send_match_notification_email
+        notifications["mentor_sent"] = send_match_notification_email(
+            recipient=mentor_pp.user,
+            partner=mentee_pp.user,
+            program=program,
+            role_in_pair="mentor",
+            score=payload.score,
+            matched_keywords=payload.matched_keywords,
+            reasons=payload.reasons,
+            ai_recommendation=payload.ai_recommendation,
+        )
+        notifications["mentee_sent"] = send_match_notification_email(
+            recipient=mentee_pp.user,
+            partner=mentor_pp.user,
+            program=program,
+            role_in_pair="mentee",
+            score=payload.score,
+            matched_keywords=payload.matched_keywords,
+            reasons=payload.reasons,
+            ai_recommendation=payload.ai_recommendation,
+        )
+
     return {
         "status": "activated",
         "vinculation_id": vinculation.id,
@@ -2501,6 +2527,7 @@ def activate_intelligent_match(payload: ActivateIntelligentMatchRequest) -> dict
         "score": payload.score,
         "type": vinculation.type,
         "created_at": vinculation.created_at.isoformat() if vinculation.created_at else None,
+        "notifications": notifications,
     }
 
 

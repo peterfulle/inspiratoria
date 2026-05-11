@@ -157,6 +157,145 @@ def prepare_user_secure_access(user: User, send_invitation: bool):
     send_participant_access_email(user, otp_code, activation_token)
 
 
+def send_match_notification_email(
+    recipient: User,
+    partner: User,
+    program: Program,
+    role_in_pair: str,  # "mentor" o "mentee" (rol del recipient)
+    score: float | None = None,
+    matched_keywords: list[str] | None = None,
+    reasons: list[str] | None = None,
+    ai_recommendation: str | None = None,
+):
+    """Notifica vía email a un participante que tiene una nueva vinculación activa."""
+    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+    portal_url = f"{frontend_url}/dashboard"
+
+    first_name = (recipient.full_name or recipient.first_name or "").split()[0] or "Hola"
+    partner_name = f"{partner.first_name or ''} {partner.last_name or ''}".strip() or partner.email
+    partner_role_label = "mentor/a" if role_in_pair == "mentee" else "mentee"
+    pronoun = "tu mentor/a" if role_in_pair == "mentee" else "tu mentee"
+
+    subject = f"Tienes nuevo match en {program.name} · Inspiratoria"
+
+    # Score badge
+    score_block = ""
+    if score is not None:
+        color = "#10b981" if score >= 70 else "#f59e0b" if score >= 50 else "#ef4444"
+        score_block = (
+            f'<div style="display:inline-block;background:{color}1A;color:{color};'
+            f'padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;'
+            f'letter-spacing:0.4px;text-transform:uppercase;">Match score: {score:.0f}/100</div>'
+        )
+
+    # Keywords
+    kw_block = ""
+    if matched_keywords:
+        chips = "".join(
+            f'<span style="display:inline-block;background:#f3f4f6;color:#374151;'
+            f'padding:4px 10px;border-radius:999px;font-size:11px;margin:2px;">{k}</span>'
+            for k in matched_keywords[:8]
+        )
+        kw_block = (
+            '<div style="margin-top:18px;">'
+            '<p style="margin:0 0 8px 0;color:#9ca3af;font-size:11px;font-weight:600;'
+            'text-transform:uppercase;letter-spacing:1.5px;">Temas en común</p>'
+            f'<div>{chips}</div></div>'
+        )
+
+    # Reasons
+    reasons_block = ""
+    if reasons:
+        items = "".join(f'<li style="margin:4px 0;">{r}</li>' for r in reasons[:4])
+        reasons_block = (
+            '<div style="margin-top:18px;background:#f9fafb;border-radius:10px;padding:14px 18px;">'
+            '<p style="margin:0 0 6px 0;color:#9ca3af;font-size:11px;font-weight:600;'
+            'text-transform:uppercase;letter-spacing:1.5px;">Por qué este match</p>'
+            f'<ul style="margin:0;padding-left:18px;color:#374151;font-size:13px;'
+            f'line-height:1.6;">{items}</ul></div>'
+        )
+
+    # AI recommendation
+    ai_block = ""
+    if ai_recommendation:
+        ai_block = (
+            '<div style="margin-top:14px;border-left:3px solid #8b5cf6;background:#f5f3ff;'
+            'padding:12px 16px;border-radius:8px;">'
+            '<p style="margin:0 0 4px 0;color:#7c3aed;font-size:11px;font-weight:700;'
+            'text-transform:uppercase;letter-spacing:1px;">🤖 Análisis IA</p>'
+            f'<p style="margin:0;color:#4c1d95;font-size:13px;font-style:italic;'
+            f'line-height:1.5;">{ai_recommendation}</p></div>'
+        )
+
+    plain_message = (
+        f"Hola, {first_name}.\n\n"
+        f"Te asignamos {pronoun} en el programa {program.name}.\n\n"
+        f"Tu {partner_role_label}: {partner_name} ({partner.email})\n"
+        + (f"Score de compatibilidad: {score:.0f}/100\n" if score is not None else "")
+        + (f"\nTemas en común: {', '.join(matched_keywords[:8])}\n" if matched_keywords else "")
+        + (f"\nPor qué este match:\n- " + "\n- ".join(reasons[:4]) + "\n" if reasons else "")
+        + f"\nIngresa al portal para conocer más y comenzar a coordinar:\n{portal_url}\n\n"
+        f"Equipo Inspiratoria"
+    )
+
+    html_message = f"""
+    <div style="background-color:#f9fafb;padding:40px 16px;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+      <div style="max-width:560px;margin:0 auto;">
+        <div style="text-align:center;padding-bottom:28px;">
+          <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#0a0a0a;">Inspiratoria</span>
+        </div>
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:40px 36px;">
+          <p style="margin:0 0 8px 0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:2px;">Nuevo match asignado</p>
+          <h1 style="margin:0 0 18px 0;color:#0a0a0a;font-size:22px;font-weight:700;line-height:1.3;">
+            Hola, {first_name}. Conoce a {pronoun}.
+          </h1>
+          <p style="margin:0 0 24px 0;color:#4b5563;font-size:14px;line-height:1.7;">
+            Te hemos asignado un match en el programa <strong>{program.name}</strong>. A partir de hoy puedes coordinar sesiones, definir objetivos y empezar a trabajar con esta persona desde tu portal.
+          </p>
+
+          <div style="background:#0a0a0a;border-radius:14px;padding:24px;color:#ffffff;">
+            <p style="margin:0 0 6px 0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;">Tu {partner_role_label}</p>
+            <p style="margin:0 0 4px 0;color:#ffffff;font-size:18px;font-weight:700;">{partner_name}</p>
+            <p style="margin:0 0 14px 0;color:#FFD902;font-size:13px;">{partner.email}</p>
+            {score_block}
+          </div>
+
+          {kw_block}
+          {reasons_block}
+          {ai_block}
+
+          <div style="text-align:center;margin:32px 0 0 0;">
+            <a href="{portal_url}" style="display:inline-block;background:#0a0a0a;color:#FFD902;padding:14px 36px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.3px;">Ir a mi portal</a>
+          </div>
+
+          <p style="margin:24px 0 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
+            Programa: <strong style="color:#374151;">{program.name}</strong><br/>
+            Estado: vinculación activa
+          </p>
+        </div>
+        <div style="text-align:center;padding-top:24px;">
+          <p style="margin:0;color:#d1d5db;font-size:11px;">Equipo Inspiratoria</p>
+        </div>
+      </div>
+    </div>
+    """
+
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[recipient.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        print(f"[MATCH EMAIL] Enviado a {recipient.email} (partner={partner.email})")
+        return True
+    except Exception as e:
+        print(f"[MATCH EMAIL ERROR] {recipient.email}: {e}")
+        return False
+
+
 # ============ SCHEMAS ============
 
 class UserSearchResult(BaseModel):
