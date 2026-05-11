@@ -85,6 +85,13 @@ export default function IntelligentMatchPage() {
     | { status: "error"; message: string };
   const [activations, setActivations] = useState<Record<string, ActivationState>>({});
 
+  // Manual pairing
+  type ParticipantOpt = { id: string; user_id: string; name: string; email: string; role: string };
+  const [participants, setParticipants] = useState<ParticipantOpt[]>([]);
+  const [manualMentorId, setManualMentorId] = useState<string>("");
+  const [manualMenteeId, setManualMenteeId] = useState<string>("");
+  const [manualState, setManualState] = useState<ActivationState>({ status: "idle" });
+
   const PROGRESS_STEPS = [
     { p: 12, label: "Cargando perfiles enriquecidos de mentores y mentees…", icon: "📥" },
     { p: 28, label: "Tokenizando skills, temas, objetivos y challenges…", icon: "🔤" },
@@ -233,6 +240,82 @@ export default function IntelligentMatchPage() {
     }
   };
 
+  // Cargar participantes cada vez que cambia el programa
+  useEffect(() => {
+    if (!programId) {
+      setParticipants([]);
+      setManualMentorId("");
+      setManualMenteeId("");
+      return;
+    }
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    fetch(`${API}/api/programs/${programId}/participants?limit=500`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: any[]) => {
+        if (!Array.isArray(list)) return;
+        setParticipants(
+          list.map((p) => ({
+            id: p.id,
+            user_id: p.user.id,
+            name: `${p.user.nombre || ""} ${p.user.apellidos || ""}`.trim() || p.user.email,
+            email: p.user.email,
+            role: p.role,
+          })),
+        );
+      })
+      .catch(() => setParticipants([]));
+    setManualMentorId("");
+    setManualMenteeId("");
+    setManualState({ status: "idle" });
+  }, [programId]);
+
+  const manualMentorOptions = useMemo(
+    () => participants.filter((p) => p.role === "mentor" || p.role === "participant_cell"),
+    [participants],
+  );
+  const manualMenteeOptions = useMemo(
+    () => participants.filter((p) => p.role === "mentee" || p.role === "participant_cell"),
+    [participants],
+  );
+
+  const activateManual = async () => {
+    if (!programId || !manualMentorId || !manualMenteeId) return;
+    if (manualMentorId === manualMenteeId) {
+      setManualState({ status: "error", message: "Mentor y mentee no pueden ser la misma persona" });
+      return;
+    }
+    setManualState({ status: "loading" });
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+      const res = await fetch(`${API}/api/matches/intelligent/activate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          program_id: programId,
+          mentor_user_id: manualMentorId,
+          mentee_user_id: manualMenteeId,
+          vinculation_type: "mentoria",
+          breakdown: { manual: true },
+          reasons: ["Vinculación manual creada por el administrador"],
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.detail || `HTTP ${res.status}`);
+      setManualState({
+        status: "done",
+        vinculationId: body.vinculation_id,
+        alreadyExisted: body.status === "already_exists",
+      });
+    } catch (err: any) {
+      setManualState({ status: "error", message: err?.message || "Error al vincular" });
+    }
+  };
+
   const stats = data?.stats;
   const results = data?.results || [];
 
@@ -351,6 +434,78 @@ export default function IntelligentMatchPage() {
               )}
             </button>
           </div>
+        </section>
+
+        {/* Vinculación manual */}
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Vincular manualmente</h2>
+              <p className="text-xs text-gray-500">
+                {programId
+                  ? `Elige un mentor y un mentee del programa para crear una vinculación activa al instante.`
+                  : `Selecciona primero un programa arriba para habilitar el panel manual.`}
+              </p>
+            </div>
+            {manualState.status === "done" && (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                ✓ {manualState.alreadyExisted ? "Ya vinculados" : "Vinculación creada"}
+                <span className="text-[10px] font-normal text-emerald-600">#{manualState.vinculationId}</span>
+              </span>
+            )}
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                Mentor ({manualMentorOptions.length})
+              </label>
+              <select
+                value={manualMentorId}
+                onChange={(e) => { setManualMentorId(e.target.value); setManualState({ status: "idle" }); }}
+                disabled={!programId || manualMentorOptions.length === 0}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-gray-900 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                <option value="">— Elegir mentor —</option>
+                {manualMentorOptions.map((p) => (
+                  <option key={p.user_id} value={p.user_id}>
+                    {p.name} · {p.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                Mentee ({manualMenteeOptions.length})
+              </label>
+              <select
+                value={manualMenteeId}
+                onChange={(e) => { setManualMenteeId(e.target.value); setManualState({ status: "idle" }); }}
+                disabled={!programId || manualMenteeOptions.length === 0}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-gray-900 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                <option value="">— Elegir mentee —</option>
+                {manualMenteeOptions.map((p) => (
+                  <option key={p.user_id} value={p.user_id}>
+                    {p.name} · {p.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={activateManual}
+                disabled={!programId || !manualMentorId || !manualMenteeId || manualState.status === "loading"}
+                className="h-[38px] w-full whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300 md:w-auto"
+              >
+                {manualState.status === "loading" ? "Vinculando…" : "🔗 Crear vinculación"}
+              </button>
+            </div>
+          </div>
+
+          {manualState.status === "error" && (
+            <p className="mt-2 text-xs text-rose-600">{manualState.message}</p>
+          )}
         </section>
 
         {error && (
