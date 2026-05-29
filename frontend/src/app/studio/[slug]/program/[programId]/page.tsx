@@ -393,12 +393,13 @@ export default function ProgramManagerConsole() {
               { id: 'cronograma', label: 'Cronograma', icon: <I.Calendar /> },
               { id: 'actividades', label: 'Actividades', icon: <I.Activity /> },
               { id: 'participantes', label: 'Participantes', icon: <I.Users /> },
+              { id: 'duplas', label: 'Duplas', icon: <I.Bot /> },
               { id: 'gobierno', label: 'Gobierno', icon: <I.Settings /> },
             ].map(t => (
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id as typeof activeTab)}
-                className={`inline-flex items-center gap-2 px-4 py-3 text-[12.5px] font-semibold border-b-2 transition ${
+                className={`inline-flex items-center gap-2 px-4 py-3 text-[12.5px] font-semibold border-b-2 transition whitespace-nowrap ${
                   activeTab === t.id
                     ? 'text-gray-900 border-gray-900'
                     : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-200'
@@ -1710,12 +1711,13 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
 function TabDuplas({ programId, participants, showToast }: { programId: string; participants: Participant[]; showToast: (m: string, t?: 'success' | 'error') => void }) {
   const [vincs, setVincs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
-  // Matching IA inline
   const [matchLoading, setMatchLoading] = React.useState(false);
   const [matchResults, setMatchResults] = React.useState<any[]>([]);
+  const [matchRan, setMatchRan] = React.useState(false);
   const [matchError, setMatchError] = React.useState('');
   const [useAI, setUseAI] = React.useState(true);
   const [activations, setActivations] = React.useState<Record<string, 'loading' | 'done' | 'error'>>({});
+  const [expandedAI, setExpandedAI] = React.useState<Record<string, boolean>>({});
 
   const loadVincs = React.useCallback(async () => {
     setLoading(true);
@@ -1744,6 +1746,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
     setMatchLoading(true);
     setMatchError('');
     setMatchResults([]);
+    setActivations({});
     try {
       const res = await fetch(`${API_URL}/api/matches/intelligent`, {
         method: 'POST',
@@ -1753,6 +1756,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
       setMatchResults(data.results || []);
+      setMatchRan(true);
     } catch (e: any) { setMatchError(e.message || 'Error al generar matches'); }
     setMatchLoading(false);
   };
@@ -1768,140 +1772,181 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
       });
       if (!res.ok) throw new Error();
       setActivations(p => ({ ...p, [key]: 'done' }));
-      showToast('Dupla activada correctamente');
-      loadVincs(); // refresh
+      showToast('Dupla activada');
+      await loadVincs(); // BUG FIX: await para refrescar la lista de inmediato
     } catch { setActivations(p => ({ ...p, [key]: 'error' })); showToast('Error al activar', 'error'); }
   };
 
-  const scoreColor = (s: number) => s >= 70 ? '#16a34a' : s >= 50 ? '#d97706' : '#dc2626';
+  const sc = (s: number) => s >= 65 ? { color: '#16a34a', bg: '#dcfce7' } : s >= 45 ? { color: '#d97706', bg: '#fef3c7' } : { color: '#dc2626', bg: '#fee2e2' };
+  const mentors = participants.filter(p => p.role === 'mentor');
+  const mentees = participants.filter(p => p.role === 'mentee');
 
   return (
-    <div className="space-y-6">
+    <div>
+      {/* ══ SECCIÓN 1: DUPLAS VIGENTES ══ */}
+      <div className="mb-9">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-[18px] font-bold text-gray-900">Duplas vigentes</h2>
+            <p className="text-[12.5px] text-gray-500 mt-0.5">{loading ? '…' : `${vincs.length} ${vincs.length === 1 ? 'dupla activa' : 'duplas activas'}`}</p>
+          </div>
+          <button onClick={loadVincs} disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-500 hover:bg-gray-50 transition disabled:opacity-40">
+            {loading ? '…' : '↺ Actualizar'}
+          </button>
+        </div>
 
-      {/* ── Duplas activas ── */}
-      <Card title="Duplas vigentes" subtitle="Vinculaciones mentor ↔ mentee activas en este programa">
         {loading ? (
-          <div className="flex items-center justify-center py-8"><Spinner /></div>
+          <div className="flex items-center justify-center py-12 rounded-2xl border border-gray-100 bg-white"><Spinner /></div>
         ) : vincs.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-[13px] font-medium text-gray-500">Sin duplas activas</p>
-            <p className="text-[11.5px] text-gray-400 mt-1">Genera matches con IA abajo para crear vinculaciones.</p>
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-white py-12 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+              <I.Bot className="w-6 h-6 text-gray-400" />
+            </div>
+            <p className="text-[14px] font-semibold text-gray-700">Sin duplas activas</p>
+            <p className="text-[12px] text-gray-400 mt-1">Genera matches con IA en la sección de abajo para crear vinculaciones.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
-            {vincs.map((v: any) => {
+          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-2.5 bg-gray-50 border-b border-gray-100">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Mentor</span>
+              <span />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Mentee</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Score</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Origen</span>
+              <span />
+            </div>
+            {vincs.map((v: any, i: number) => {
               const mentorName = v.mentor?.user?.full_name || v.mentor?.user?.email || '—';
+              const mentorEmail = v.mentor?.user?.email || '';
               const menteeName = v.mentee?.user?.full_name || v.mentee?.user?.email || '—';
+              const menteeEmail = v.mentee?.user?.email || '';
               const isAI = !!(v.ai_recommendation || v.metadata?.ai_recommendation);
               const score = v.score || v.match_score;
+              const c = score != null ? sc(Number(score)) : null;
               return (
-                <div key={v.id} className="flex items-center gap-4 py-3.5">
-                  {/* Mentor */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-violet-100 text-violet-700">Mentor</span>
-                      <span className="text-[13px] font-semibold text-gray-900">{mentorName}</span>
-                    </div>
+                <div key={v.id} className={`grid grid-cols-[1fr_auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-4 ${i > 0 ? 'border-t border-gray-50' : ''} hover:bg-gray-50/50 transition`}>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-gray-900 truncate">{mentorName}</p>
+                    <p className="text-[11px] text-gray-400 truncate">{mentorEmail}</p>
                   </div>
-                  <span className="text-gray-300 flex-shrink-0">↔</span>
-                  {/* Mentee */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-sky-100 text-sky-700">Mentee</span>
-                      <span className="text-[13px] font-semibold text-gray-900">{menteeName}</span>
-                    </div>
+                  <span className="text-gray-300 text-[18px] flex-shrink-0">↔</span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-gray-900 truncate">{menteeName}</p>
+                    <p className="text-[11px] text-gray-400 truncate">{menteeEmail}</p>
                   </div>
-                  {/* Score + IA badge */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {score != null && (
-                      <span className="text-[12px] font-bold" style={{ color: scoreColor(Number(score)) }}>
-                        {Number(score).toFixed(0)}pts
-                      </span>
-                    )}
-                    {isAI && (
-                      <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(245,200,0,0.15)', color: '#7a5900' }}>✨ IA</span>
-                    )}
+                  <div className="flex-shrink-0">
+                    {c ? (
+                      <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: c.bg, color: c.color }}>{Number(score).toFixed(0)} pts</span>
+                    ) : <span className="text-[11px] text-gray-300">—</span>}
                   </div>
-                  {/* Remove */}
+                  <div className="flex-shrink-0">
+                    {isAI
+                      ? <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(245,200,0,0.15)', color: '#7a5900' }}>✨ IA</span>
+                      : <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-gray-100 text-gray-500">Manual</span>}
+                  </div>
                   <button onClick={() => removeVinc(v.id)} title="Desvincular"
-                    className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:bg-red-50 hover:text-red-500 transition flex-shrink-0 text-lg">×</button>
+                    className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[17px] text-gray-300 hover:bg-red-50 hover:text-red-500 transition">×</button>
                 </div>
               );
             })}
           </div>
         )}
-      </Card>
+      </div>
 
-      {/* ── Generar matches con IA ── */}
-      <Card
-        title="Generar duplas con IA"
-        subtitle="El motor analiza perfiles de mentores y mentees y sugiere las mejores combinaciones"
-        action={
-          <label className="flex items-center gap-2 text-[12px] cursor-pointer select-none">
-            <input type="checkbox" checked={useAI} onChange={e => setUseAI(e.target.checked)} className="h-3.5 w-3.5 rounded border-gray-300" />
-            <span className="text-gray-600">✨ Análisis Claude</span>
-          </label>
-        }
-      >
-        <button
-          onClick={runMatch}
-          disabled={matchLoading}
-          className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-2.5 text-[13px] font-bold text-white hover:bg-gray-800 transition disabled:opacity-60"
-        >
-          {matchLoading ? (
-            <><svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>Analizando perfiles…</>
-          ) : <>✨ Generar matches</>}
-        </button>
+      {/* Divider */}
+      <div className="relative py-1 mb-7">
+        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
+        <div className="relative flex justify-center"><span className="bg-gray-50 px-4 text-[11px] font-bold uppercase tracking-wider text-gray-400">Generar con IA</span></div>
+      </div>
 
-        {matchError && <p className="mt-3 text-[12px] text-red-600">{matchError}</p>}
+      {/* ══ SECCIÓN 2: SUGERENCIAS ══ */}
+      <div>
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <h2 className="text-[18px] font-bold text-gray-900">Sugerencias de match</h2>
+            <p className="text-[12.5px] text-gray-500 mt-0.5">
+              {mentors.length} mentor{mentors.length !== 1 ? 'es' : ''} · {mentees.length} mentee{mentees.length !== 1 ? 's' : ''} · Motor potenciado con Claude
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <label className="flex items-center gap-2 text-[12px] cursor-pointer select-none text-gray-600">
+              <input type="checkbox" checked={useAI} onChange={e => setUseAI(e.target.checked)} className="h-3.5 w-3.5 rounded border-gray-300" />
+              ✨ Claude
+            </label>
+            <button onClick={runMatch} disabled={matchLoading}
+              className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-2.5 text-[13px] font-bold text-white hover:bg-gray-800 transition disabled:opacity-60">
+              {matchLoading
+                ? <><svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Analizando…</>
+                : <>✨ Generar matches</>}
+            </button>
+          </div>
+        </div>
+
+        {matchError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-700 mb-4">{matchError}</div>}
+
+        {!matchRan && !matchLoading && (
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-white py-12 text-center">
+            <p className="text-[13px] text-gray-500">Pulsa «✨ Generar matches» para ver sugerencias de duplas.</p>
+          </div>
+        )}
 
         {matchResults.length > 0 && (
-          <div className="mt-4 space-y-3">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{matchResults.length} sugerencias rankeadas</p>
+          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <div className="grid grid-cols-[auto_1fr_auto_1fr_auto_auto] items-center gap-3 px-5 py-2.5 bg-gray-50 border-b border-gray-100">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">#</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Mentor</span>
+              <span />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Mentee</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Score</span>
+              <span />
+            </div>
             {matchResults.map((r: any, idx: number) => {
               const key = `${r.mentor?.id}-${r.mentee?.id}`;
               const act = activations[key];
-              const alreadyActive = vincs.some((v: any) =>
-                (v.mentor?.user?.id === r.mentor?.id || v.mentor?.id === r.mentor?.id) &&
-                (v.mentee?.user?.id === r.mentee?.id || v.mentee?.id === r.mentee?.id)
-              );
+              const alreadyActive = vincs.some((v: any) => (v.mentor?.user?.id === r.mentor?.id) && (v.mentee?.user?.id === r.mentee?.id));
+              const c = sc(r.score || 0);
+              const expanded = expandedAI[key];
               return (
-                <div key={key} className="flex items-start gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white transition">
-                  {/* Rank */}
-                  <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[12px] font-bold" style={{ background: '#f3f4f6', color: scoreColor(r.score) }}>#{idx + 1}</div>
-                  {/* Names */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-semibold text-gray-900">{r.mentor?.name}</span>
-                      <span className="text-gray-300 text-[11px]">↔</span>
-                      <span className="text-[13px] font-semibold text-gray-900">{r.mentee?.name}</span>
-                      <span className="text-[12px] font-bold" style={{ color: scoreColor(r.score) }}>{r.score?.toFixed(0)}pts</span>
+                <div key={key} className={`${idx > 0 ? 'border-t border-gray-50' : ''}`}>
+                  <div className="grid grid-cols-[auto_1fr_auto_1fr_auto_auto] items-center gap-3 px-5 py-4 hover:bg-gray-50/40 transition">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: c.bg, color: c.color }}>{idx + 1}</div>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-gray-900 truncate">{r.mentor?.name || '—'}</p>
+                      <p className="text-[11px] text-gray-400 truncate">{r.mentor?.email || ''}</p>
                     </div>
-                    {r.ai_recommendation && (
-                      <p className="mt-1.5 text-[11.5px] text-gray-600 leading-relaxed line-clamp-2">{r.ai_recommendation}</p>
-                    )}
+                    <span className="text-gray-300 flex-shrink-0">↔</span>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-gray-900 truncate">{r.mentee?.name || '—'}</p>
+                      <p className="text-[11px] text-gray-400 truncate">{r.mentee?.email || ''}</p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold flex-shrink-0" style={{ background: c.bg, color: c.color }}>{(r.score || 0).toFixed(0)} pts</span>
+                    <div className="flex-shrink-0">
+                      {alreadyActive || act === 'done' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10.5px] font-bold text-emerald-700 ring-1 ring-emerald-200 whitespace-nowrap">✓ Activa</span>
+                      ) : act === 'loading' ? (
+                        <svg className="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                      ) : (
+                        <button onClick={() => activatePair(r.mentor?.id, r.mentee?.id, r.score, r.ai_recommendation)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-gray-800 transition whitespace-nowrap">⚡ Vincular</button>
+                      )}
+                    </div>
                   </div>
-                  {/* Action */}
-                  <div className="flex-shrink-0">
-                    {alreadyActive || act === 'done' ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10.5px] font-bold text-emerald-700 ring-1 ring-emerald-200">✓ Activa</span>
-                    ) : act === 'loading' ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-400"><svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Activando…</span>
-                    ) : (
-                      <button
-                        onClick={() => activatePair(r.mentor?.id, r.mentee?.id, r.score, r.ai_recommendation)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-gray-800 transition"
-                      >
-                        ⚡ Vincular
-                      </button>
-                    )}
-                  </div>
+                  {r.ai_recommendation && (
+                    <div className="px-5 pb-3">
+                      <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(245,200,0,0.06)', borderLeft: '2.5px solid rgba(245,200,0,0.5)' }}>
+                        <p className={`text-[11.5px] text-gray-600 leading-relaxed ${expanded ? '' : 'line-clamp-1'}`}>{r.ai_recommendation}</p>
+                        <button onClick={() => setExpandedAI(p => ({ ...p, [key]: !p[key] }))}
+                          className="text-[10.5px] font-semibold mt-1" style={{ color: '#7a5900' }}>{expanded ? 'Ver menos ▴' : 'Ver análisis ▾'}</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
-      </Card>
+      </div>
     </div>
   );
 }
