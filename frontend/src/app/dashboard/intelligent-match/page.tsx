@@ -353,11 +353,9 @@ export default function IntelligentMatchPage() {
       <main className="space-y-6 px-8 py-6">
         {/* Controls */}
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-            <div className="md:col-span-2">
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Programa (opcional)
-              </label>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex-1 min-w-[200px]">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Programa (opcional)</label>
               <select
                 value={programId}
                 onChange={(e) => setProgramId(e.target.value)}
@@ -369,58 +367,19 @@ export default function IntelligentMatchPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Top K
-              </label>
+            <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm whitespace-nowrap">
               <input
-                type="number"
-                min={1}
-                max={50}
-                value={topK}
-                onChange={(e) => setTopK(Math.max(1, Math.min(50, Number(e.target.value) || 10)))}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
+                type="checkbox"
+                checked={useAI}
+                onChange={(e) => setUseAI(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Score mínimo
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={minScore}
-                onChange={(e) => setMinScore(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Análisis Claude
-              </label>
-              <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={useAI}
-                  onChange={(e) => setUseAI(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                ✨ Activar IA
-              </label>
-            </div>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between">
-            <p className="text-xs text-gray-500">
-              {stats
-                ? `Universo: ${stats.mentors} mentores × ${stats.mentees} mentees = ${stats.pairs} pares`
-                : "Pulsa «Generar matches» para ranquear todos los pares posibles."}
-            </p>
+              ✨ Análisis Claude
+            </label>
             <button
               onClick={runMatch}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-indigo-700 hover:to-violet-700 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-indigo-700 hover:to-violet-700 disabled:opacity-60"
             >
               {loading ? (
                 <>
@@ -428,85 +387,35 @@ export default function IntelligentMatchPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                   </svg>
-                  Analizando perfiles…
+                  Analizando…
                 </>
-              ) : (
-                <>✨ Generar matches</>
-              )}
+              ) : <>✨ Generar matches</>}
             </button>
           </div>
-        </section>
-
-        {/* Vinculación manual */}
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-gray-900">Vincular manualmente</h2>
-              <p className="text-xs text-gray-500">
-                {programId
-                  ? `Elige un mentor y un mentee del programa para crear una vinculación activa al instante.`
-                  : `Selecciona primero un programa arriba para habilitar el panel manual.`}
-              </p>
-            </div>
-            {manualState.status === "done" && (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                ✓ {manualState.alreadyExisted ? "Ya vinculados" : "Vinculación creada"}
-                <span className="text-[10px] font-normal text-emerald-600">#{manualState.vinculationId}</span>
-              </span>
-            )}
+          <div className="mt-3 flex items-center justify-between">
+            <p className="text-xs text-gray-400">
+              {stats
+                ? `${stats.mentors} mentores × ${stats.mentees} mentees = ${stats.pairs} pares analizados`
+                : "Selecciona un programa o analiza todos los perfiles activos."}
+            </p>
+            <details className="text-xs text-gray-400">
+              <summary className="cursor-pointer hover:text-gray-700">Opciones avanzadas ▾</summary>
+              <div className="mt-2 flex gap-3 flex-wrap">
+                <label className="flex items-center gap-1">
+                  <span>Top K:</span>
+                  <input type="number" min={1} max={50} value={topK}
+                    onChange={(e) => setTopK(Math.max(1, Math.min(50, Number(e.target.value) || 10)))}
+                    className="w-14 rounded border border-gray-200 px-2 py-0.5 text-xs" />
+                </label>
+                <label className="flex items-center gap-1">
+                  <span>Score mín:</span>
+                  <input type="number" min={0} max={100} value={minScore}
+                    onChange={(e) => setMinScore(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                    className="w-14 rounded border border-gray-200 px-2 py-0.5 text-xs" />
+                </label>
+              </div>
+            </details>
           </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
-            <div>
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                Mentor ({manualMentorOptions.length})
-              </label>
-              <select
-                value={manualMentorId}
-                onChange={(e) => { setManualMentorId(e.target.value); setManualState({ status: "idle" }); }}
-                disabled={!programId || manualMentorOptions.length === 0}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-gray-900 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400"
-              >
-                <option value="">— Elegir mentor —</option>
-                {manualMentorOptions.map((p) => (
-                  <option key={p.user_id} value={p.user_id}>
-                    {p.name} · {p.email}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                Mentee ({manualMenteeOptions.length})
-              </label>
-              <select
-                value={manualMenteeId}
-                onChange={(e) => { setManualMenteeId(e.target.value); setManualState({ status: "idle" }); }}
-                disabled={!programId || manualMenteeOptions.length === 0}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-gray-900 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400"
-              >
-                <option value="">— Elegir mentee —</option>
-                {manualMenteeOptions.map((p) => (
-                  <option key={p.user_id} value={p.user_id}>
-                    {p.name} · {p.email}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={activateManual}
-                disabled={!programId || !manualMentorId || !manualMenteeId || manualState.status === "loading"}
-                className="h-[38px] w-full whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300 md:w-auto"
-              >
-                {manualState.status === "loading" ? "Vinculando…" : "🔗 Crear vinculación"}
-              </button>
-            </div>
-          </div>
-
-          {manualState.status === "error" && (
-            <p className="mt-2 text-xs text-rose-600">{manualState.message}</p>
-          )}
         </section>
 
         {error && (
@@ -662,86 +571,41 @@ export default function IntelligentMatchPage() {
                     </div>
                   </div>
 
-                  {/* Breakdown bars */}
-                  <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {Object.entries(r.breakdown).map(([key, b]) => {
-                      const pct = b.weight > 0 ? (b.earned / b.weight) * 100 : 0;
-                      const barColor = scoreColor(pct).bar;
-                      return (
-                        <div key={key}>
-                          <div className="flex justify-between text-xs">
-                            <span className="font-medium text-gray-700">{b.label}</span>
-                            <span className="text-gray-500">{b.earned.toFixed(1)} / {b.weight}</span>
-                          </div>
-                          <div className="mt-1 h-1.5 w-full rounded-full bg-gray-100">
-                            <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${Math.min(100, pct)}%` }} />
-                          </div>
-                          {b.matches && b.matches.length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {b.matches.slice(0, 4).map((m) => (
-                                <Pill key={m}>{m}</Pill>
-                              ))}
-                              {b.matches.length > 4 && (
-                                <span className="text-[11px] text-gray-400">+{b.matches.length - 4}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Reasons */}
-                  {r.reasons && r.reasons.length > 0 && (
-                    <div className="mt-5 rounded-xl bg-gray-50 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Razones</p>
-                      <ul className="mt-1.5 space-y-1 text-xs text-gray-700">
-                        {r.reasons.map((reason, i) => (
-                          <li key={i} className="flex gap-2">
-                            <span className="text-gray-400">•</span>
-                            <span>{reason}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* AI rec */}
+                  {/* Claude AI rec — featured */}
                   {r.ai_recommendation && (
-                    <div className="mt-3 rounded-xl p-3" style={{ background:'rgba(245,200,0,0.08)', border:'1px solid rgba(245,200,0,0.3)', borderLeft:'3px solid #F5C800' }}>
-                      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color:'#7a5900' }}>
-                        ✨ Análisis Claude
-                      </p>
-                      <p className="mt-1 text-xs" style={{ color:'#5a4200', lineHeight:1.6 }}>{r.ai_recommendation}</p>
+                    <div className="mt-3 rounded-xl p-3" style={{ background:'rgba(245,200,0,0.07)', border:'1px solid rgba(245,200,0,0.25)', borderLeft:'3px solid #F5C800' }}>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color:'#7a5900' }}>✨ Análisis Claude</p>
+                      <p className="text-xs" style={{ color:'#5a4200', lineHeight:1.6 }}>{r.ai_recommendation}</p>
                     </div>
                   )}
 
-                  {/* Profile preview */}
-                  <details className="mt-4 group">
-                    <summary className="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-900">
-                      Ver perfiles enfrentados ▾
+                  {/* Score breakdown — collapsed by default */}
+                  <details className="mt-3 group">
+                    <summary className="cursor-pointer text-[11px] font-medium text-gray-400 hover:text-gray-700 select-none">
+                      Ver desglose técnico ▾
                     </summary>
-                    <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <ProfileCard title="Mentor" name={r.mentor.name} headline={r.mentor.headline}
-                        rows={[
-                          { k: "Skills", v: r.mentor.skills },
-                          { k: "Temas", v: r.mentor.topics },
-                          { k: "Estilo", v: r.mentor.style },
-                          { k: "Áreas", v: r.mentor.experience_area },
-                          { k: "Nivel", v: r.mentor.experience_level ? [r.mentor.experience_level] : [] },
-                        ]}
-                      />
-                      <ProfileCard title="Mentee" name={r.mentee.name} headline={r.mentee.headline}
-                        rows={[
-                          { k: "Goals", v: r.mentee.goals },
-                          { k: "Intereses", v: r.mentee.interests },
-                          { k: "Desafíos", v: r.mentee.challenges },
-                          { k: "Expectativas", v: r.mentee.expectations },
-                          { k: "Estilo preferido", v: r.mentee.preferred_style },
-                          { k: "Nivel", v: r.mentee.experience_level ? [r.mentee.experience_level] : [] },
-                        ]}
-                      />
+                    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {Object.entries(r.breakdown).map(([key, b]) => {
+                        const pct = b.weight > 0 ? (b.earned / b.weight) * 100 : 0;
+                        const barColor = scoreColor(pct).bar;
+                        return (
+                          <div key={key}>
+                            <div className="flex justify-between text-xs">
+                              <span className="font-medium text-gray-600">{b.label}</span>
+                              <span className="text-gray-400">{b.earned.toFixed(0)}/{b.weight}</span>
+                            </div>
+                            <div className="mt-1 h-1 w-full rounded-full bg-gray-100">
+                              <div className={`h-1 rounded-full ${barColor}`} style={{ width: `${Math.min(100, pct)}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+                    {r.matched_keywords && r.matched_keywords.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {r.matched_keywords.slice(0, 8).map((m) => <Pill key={m}>{m}</Pill>)}
+                      </div>
+                    )}
                   </details>
                 </div>
               );

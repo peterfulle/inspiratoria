@@ -1,6 +1,6 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -1716,23 +1716,45 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
 }
 
 function TabGobierno({ program, slug, assignedPM, pms, onTransition, onAssignPM }: { program: ProgramDetail; slug: string; assignedPM: AssignedPM | null; pms: PM[]; onTransition: (s: string) => void; onAssignPM: (id: string | null) => void }) {
+  // Vinculaciones activas
+  const [vincs, setVincs] = React.useState<any[]>([]);
+  const [vincsLoading, setVincsLoading] = React.useState(false);
+  const [vincsLoaded, setVincsLoaded] = React.useState(false);
+
+  const loadVincs = React.useCallback(async () => {
+    if (vincsLoading) return;
+    setVincsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/programs/${program.id}/vinculations`);
+      if (res.ok) {
+        const data = await res.json();
+        setVincs(Array.isArray(data) ? data.filter((v: any) => v.status === 'active') : []);
+      }
+    } catch {}
+    setVincsLoading(false);
+    setVincsLoaded(true);
+  }, [program.id, vincsLoading]);
+
+  const deleteVinc = async (vid: number) => {
+    if (!confirm('¿Eliminar esta vinculación?')) return;
+    try {
+      await fetch(`${API_URL}/api/programs/${program.id}/vinculations/${vid}`, { method: 'DELETE' });
+      setVincs(prev => prev.filter((v: any) => v.id !== vid));
+    } catch {}
+  };
+
   return (
     <div className="space-y-5">
+      {/* ── Estado del programa ── */}
       <Card title="Estado del programa" subtitle="Cambia manualmente el estado del programa">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
           {['designed', 'ready_for_execution', 'in_execution', 'under_review', 'closed'].map(s => {
             const meta = STATUS_META[s];
             const active = program.status === s;
             return (
-              <button
-                key={s}
-                onClick={() => onTransition(s)}
-                disabled={active}
-                className={`flex items-center gap-2 px-3 py-3 rounded-xl border text-left transition ${
-                  active ? 'cursor-default' : 'bg-white border-gray-200 hover:border-violet-300 hover:bg-violet-50/30 cursor-pointer'
-                }`}
-                style={active ? { background: meta.bg, borderColor: meta.ring, boxShadow: `0 0 0 2px ${meta.ring}` } : {}}
-              >
+              <button key={s} onClick={() => onTransition(s)} disabled={active}
+                className={`flex items-center gap-2 px-3 py-3 rounded-xl border text-left transition ${active ? 'cursor-default' : 'bg-white border-gray-200 hover:border-violet-300 hover:bg-violet-50/30 cursor-pointer'}`}
+                style={active ? { background: meta.bg, borderColor: meta.ring, boxShadow: `0 0 0 2px ${meta.ring}` } : {}}>
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: meta.dot }} />
                 <span className="text-[12px] font-semibold flex-1" style={{ color: active ? meta.color : '#1f2937' }}>{meta.label}</span>
                 {active && <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: meta.color, color: '#fff' }}>Actual</span>}
@@ -1744,9 +1766,82 @@ function TabGobierno({ program, slug, assignedPM, pms, onTransition, onAssignPM 
 
       <PMCard assignedPM={assignedPM} pms={pms} onAssignPM={onAssignPM} />
 
+      {/* ── Matches activos (vinculaciones) ── */}
+      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="text-[13px] font-bold text-gray-900">Matches activos</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">Vinculaciones mentor ↔ mentee vigentes en este programa</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {vincsLoaded && <span className="text-[11px] text-gray-400">{vincs.length} {vincs.length === 1 ? 'match' : 'matches'}</span>}
+            <a
+              href={`/dashboard/intelligent-match?program=${program.id}`}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-gray-800 transition"
+            >
+              ✨ Generar con IA
+            </a>
+            <button
+              onClick={loadVincs}
+              disabled={vincsLoading}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+            >
+              {vincsLoading ? '…' : vincsLoaded ? '↺' : 'Ver matches'}
+            </button>
+          </div>
+        </div>
+
+        {!vincsLoaded && (
+          <div className="px-5 py-8 text-center text-[12px] text-gray-400">
+            Pulsa «Ver matches» para cargar las vinculaciones activas.
+          </div>
+        )}
+
+        {vincsLoaded && vincs.length === 0 && (
+          <div className="px-5 py-8 text-center">
+            <p className="text-[13px] font-medium text-gray-500">Sin matches activos</p>
+            <p className="text-[11.5px] text-gray-400 mt-1">Usa «Generar con IA» para crear vinculaciones automáticamente.</p>
+          </div>
+        )}
+
+        {vincsLoaded && vincs.length > 0 && (
+          <div className="divide-y divide-gray-50">
+            {vincs.map((v: any) => {
+              const mentorName = v.mentor?.user?.full_name || v.mentor?.user?.email || `Mentor #${v.mentor?.id}`;
+              const menteeName = v.mentee?.user?.full_name || v.mentee?.user?.email || `Mentee #${v.mentee?.id}`;
+              const score = v.score || v.match_score;
+              const isAI = v.ai_recommendation || (v.metadata && v.metadata.ai_recommendation);
+              return (
+                <div key={v.id} className="flex items-center gap-4 px-5 py-3.5">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[13px] font-semibold text-gray-900">{mentorName}</span>
+                      <span className="text-gray-300">↔</span>
+                      <span className="text-[13px] font-semibold text-gray-900">{menteeName}</span>
+                      {isAI && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background:'rgba(245,200,0,0.15)', color:'#7a5900' }}>
+                          ✨ IA
+                        </span>
+                      )}
+                    </div>
+                    {score != null && (
+                      <p className="text-[11px] text-gray-400 mt-0.5">Score: {Number(score).toFixed(1)}/100</p>
+                    )}
+                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10.5px] font-bold text-emerald-700 ring-1 ring-emerald-200 flex-shrink-0">
+                    ● Activo
+                  </span>
+                  <button onClick={() => deleteVinc(v.id)} className="text-gray-300 hover:text-red-500 transition text-[18px] flex-shrink-0" title="Eliminar match">×</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Acciones ── */}
       <Card title="Acciones rápidas" subtitle="Atajos a herramientas relacionadas">
-        <div className="grid md:grid-cols-3 gap-3">
-          <QuickAction href={`/dashboard/intelligent-match?program=${program.id}`} icon={<I.Bot />} title="Matching IA" sub="Vincula mentores y mentees" />
+        <div className="grid md:grid-cols-2 gap-3">
           <QuickAction href={`/studio/${slug}`} icon={<I.Layout />} title="Vista Studio" sub="Ver todos los programas de la cuenta" />
           {program.company_id && (
             <QuickAction href={`/dashboard/accounts/${program.company_id}`} icon={<I.Building />} title="Cuenta cliente" sub={`Ir a ${program.company?.name}`} />
