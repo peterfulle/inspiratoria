@@ -1249,11 +1249,26 @@ async def import_batch(program_id: str, payload: BatchImportRequest):
 
 # ============ VINCULATIONS ENDPOINTS ============
 
-@router.get("/{program_id}/vinculations", response_model=List[VinculationResponse])
+@router.get("/{program_id}/vinculations")
 async def list_vinculations(program_id: str):
     """
     Listar todas las vinculaciones del programa
     """
+    def _serialize_participant(pp):
+        u = pp.user
+        full = f"{u.first_name or ''} {u.last_name or ''}".strip() or u.email
+        return {
+            "id": str(u.id),
+            "participant_id": str(pp.id),
+            "email": u.email,
+            "first_name": u.first_name,
+            "last_name": u.last_name,
+            "full_name": full,
+            "role": pp.role,
+            "company": u.company.name if getattr(u, "company", None) else None,
+            "is_onboarded": u.is_onboarded,
+        }
+
     def get_vinculations():
         try:
             program = Program.objects.get(id=program_id)
@@ -1262,48 +1277,47 @@ async def list_vinculations(program_id: str):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Programa no encontrado"
             )
-        
+
         vinculations = Vinculation.objects.filter(
             program=program,
-            deleted_at__isnull=True
-        ).select_related('mentor__user', 'mentee__user')
-        
+        ).select_related(
+            'participant1__user', 'participant1__user__company',
+            'participant2__user', 'participant2__user__company',
+        )
+
         result = []
         for v in vinculations:
+            # Determinar mentor/mentee según el rol del participante en el programa.
+            # activate_intelligent_match crea participant1=mentor, participant2=mentee,
+            # pero confirmamos por rol para ser robustos ante otras vías de creación.
+            p1, p2 = v.participant1, v.participant2
+            if p2.role == "mentor" and p1.role != "mentor":
+                mentor_pp, mentee_pp = p2, p1
+            else:
+                mentor_pp, mentee_pp = p1, p2
+
+            meta = v.metadata or {}
             result.append({
                 "id": str(v.id),
-                "mentor": {
-                    "id": str(v.mentor.user.id),
-                    "email": v.mentor.user.email,
-                    "first_name": v.mentor.user.first_name,
-                    "last_name": v.mentor.user.last_name,
-                    "role": v.mentor.user.role,
-                    "company": v.mentor.user.company.name if v.mentor.user.company else None,
-                    "is_onboarded": v.mentor.user.is_onboarded,
-                },
-                "mentee": {
-                    "id": str(v.mentee.user.id),
-                    "email": v.mentee.user.email,
-                    "first_name": v.mentee.user.first_name,
-                    "last_name": v.mentee.user.last_name,
-                    "role": v.mentee.user.role,
-                    "company": v.mentee.user.company.name if v.mentee.user.company else None,
-                    "is_onboarded": v.mentee.user.is_onboarded,
-                },
-                "vinculation_type": v.vinculation_type,
+                "mentor": _serialize_participant(mentor_pp),
+                "mentee": _serialize_participant(mentee_pp),
+                "type": v.type,
                 "status": v.status,
-                "start_date": v.start_date,
-                "end_date": v.end_date,
-                "metadata": v.metadata or {},
+                "score": meta.get("score"),
+                "ai_recommendation": meta.get("ai_recommendation"),
+                "matched_keywords": meta.get("matched_keywords", []),
+                "reasons": meta.get("reasons", []),
+                "created_at": v.created_at.isoformat() if v.created_at else None,
+                "metadata": meta,
             })
-        
+
         return result
     
     vinculations = await sync_to_async(get_vinculations)()
     return vinculations
 
 
-@router.post("/{program_id}/vinculations", response_model=VinculationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{program_id}/vinculations", status_code=status.HTTP_201_CREATED)
 async def create_vinculation(program_id: str, payload: VinculationCreateRequest):
     """
     Crear una vinculación entre dos participantes
@@ -1335,55 +1349,58 @@ async def create_vinculation(program_id: str, payload: VinculationCreateRequest)
                 detail="Uno o ambos participantes no encontrados"
             )
         
-        # Verificar que no exista ya una vinculación activa
+        # Verificar que no exista ya una vinculación activa entre ellos (en cualquier orden)
         if Vinculation.objects.filter(
             program=program,
-            mentor=mentor,
-            mentee=mentee,
             status='active',
-            deleted_at__isnull=True
+        ).filter(
+            db_models.Q(participant1=mentor, participant2=mentee) |
+            db_models.Q(participant1=mentee, participant2=mentor)
         ).exists():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Ya existe una vinculación activa entre estos participantes"
             )
-        
-        # Crear vinculación
+
+        # Crear vinculación (participant1=mentor, participant2=mentee)
+        vinc_type = payload.vinculation_type if payload.vinculation_type in (
+            "mentoria", "tutoria", "equipo", "coaching"
+        ) else "mentoria"
         vinculation = Vinculation.objects.create(
             program=program,
-            mentor=mentor,
-            mentee=mentee,
-            vinculation_type=payload.vinculation_type,
+            participant1=mentor,
+            participant2=mentee,
+            type=vinc_type,
             status='active',
-            start_date=datetime.now(),
-            metadata=payload.metadata or {}
+            metadata=payload.metadata or {},
         )
-        
+
+        def _serialize(pp):
+            u = pp.user
+            full = f"{u.first_name or ''} {u.last_name or ''}".strip() or u.email
+            return {
+                "id": str(u.id),
+                "participant_id": str(pp.id),
+                "email": u.email,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "full_name": full,
+                "role": pp.role,
+                "company": u.company.name if getattr(u, "company", None) else None,
+                "is_onboarded": u.is_onboarded,
+            }
+
+        meta = vinculation.metadata or {}
         return {
             "id": str(vinculation.id),
-            "mentor": {
-                "id": str(mentor.user.id),
-                "email": mentor.user.email,
-                "first_name": mentor.user.first_name,
-                "last_name": mentor.user.last_name,
-                "role": mentor.user.role,
-                "company": mentor.user.company.name if mentor.user.company else None,
-                "is_onboarded": mentor.user.is_onboarded,
-            },
-            "mentee": {
-                "id": str(mentee.user.id),
-                "email": mentee.user.email,
-                "first_name": mentee.user.first_name,
-                "last_name": mentee.user.last_name,
-                "role": mentee.user.role,
-                "company": mentee.user.company.name if mentee.user.company else None,
-                "is_onboarded": mentee.user.is_onboarded,
-            },
-            "vinculation_type": vinculation.vinculation_type,
+            "mentor": _serialize(mentor),
+            "mentee": _serialize(mentee),
+            "type": vinculation.type,
             "status": vinculation.status,
-            "start_date": vinculation.start_date,
-            "end_date": vinculation.end_date,
-            "metadata": vinculation.metadata or {},
+            "score": meta.get("score"),
+            "ai_recommendation": meta.get("ai_recommendation"),
+            "created_at": vinculation.created_at.isoformat() if vinculation.created_at else None,
+            "metadata": meta,
         }
     
     result = await sync_to_async(create)()
@@ -1401,18 +1418,18 @@ async def delete_vinculation(program_id: str, vinculation_id: str):
             vinculation = Vinculation.objects.get(
                 id=vinculation_id,
                 program=program,
-                deleted_at__isnull=True
             )
         except (Program.DoesNotExist, Vinculation.DoesNotExist):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Vinculación no encontrada"
             )
-        
-        vinculation.is_deleted = True
+
+        # Desvincular = marcar inactiva (soft) y registrar fin
+        from django.utils import timezone as dj_timezone
         vinculation.status = 'inactive'
-        vinculation.end_date = datetime.now()
-        vinculation.save()
+        vinculation.ended_at = dj_timezone.now()
+        vinculation.save(update_fields=["status", "ended_at"])
     
     await sync_to_async(delete)()
     return None

@@ -1817,12 +1817,12 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
               <span />
             </div>
             {vincs.map((v: any, i: number) => {
-              const mentorName = v.mentor?.user?.full_name || v.mentor?.user?.email || '—';
-              const mentorEmail = v.mentor?.user?.email || '';
-              const menteeName = v.mentee?.user?.full_name || v.mentee?.user?.email || '—';
-              const menteeEmail = v.mentee?.user?.email || '';
+              const mentorName = v.mentor?.full_name || v.mentor?.email || '—';
+              const mentorEmail = v.mentor?.email || '';
+              const menteeName = v.mentee?.full_name || v.mentee?.email || '—';
+              const menteeEmail = v.mentee?.email || '';
               const isAI = !!(v.ai_recommendation || v.metadata?.ai_recommendation);
-              const score = v.score || v.match_score;
+              const score = v.score ?? v.metadata?.score ?? v.match_score;
               const c = score != null ? sc(Number(score)) : null;
               return (
                 <div key={v.id} className={`grid grid-cols-[1fr_auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-4 ${i > 0 ? 'border-t border-gray-50' : ''} hover:bg-gray-50/50 transition`}>
@@ -1904,7 +1904,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
             {matchResults.map((r: any, idx: number) => {
               const key = `${r.mentor?.id}-${r.mentee?.id}`;
               const act = activations[key];
-              const alreadyActive = vincs.some((v: any) => (v.mentor?.user?.id === r.mentor?.id) && (v.mentee?.user?.id === r.mentee?.id));
+              const alreadyActive = vincs.some((v: any) => (v.mentor?.id === r.mentor?.id) && (v.mentee?.id === r.mentee?.id));
               const c = sc(r.score || 0);
               const expanded = expandedAI[key];
               return (
