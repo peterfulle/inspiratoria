@@ -137,7 +137,7 @@ export default function ProgramManagerConsole() {
   const [pms, setPms] = useState<PM[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'gobierno'>('resumen');
+  const [activeTab, setActiveTab] = useState<'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno'>('resumen');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   // ── Auth gate ──
@@ -417,6 +417,7 @@ export default function ProgramManagerConsole() {
           {activeTab === 'cronograma' && <TabCronograma programId={programId} activities={program.activities} onChange={fetchProgram} showToast={showToast} />}
           {activeTab === 'actividades' && <TabActividades programId={programId} activities={program.activities} onChange={fetchProgram} showToast={showToast} />}
           {activeTab === 'participantes' && <TabParticipantes participants={participants} programId={programId} onChange={fetchProgram} showToast={showToast} />}
+          {activeTab === 'duplas' && <TabDuplas programId={programId} participants={participants} showToast={showToast} />}
           {activeTab === 'gobierno' && <TabGobierno program={program} slug={slug} assignedPM={assignedPM} pms={pms} onTransition={transitionStatus} onAssignPM={assignPM} />}
         </div>
       </main>
@@ -447,20 +448,15 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab }: {
   program: ProgramDetail;
   slug: string;
   activeTab: string;
-  onTab: (t: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'gobierno') => void;
+  onTab: (t: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno') => void;
 }) {
-  const navTop = [
-    { id: 'home', label: 'Inicio admin', icon: <I.Home />, href: '/dashboard' },
-    { id: 'accounts', label: 'Cuentas', icon: <I.Building />, href: '/dashboard/accounts' },
-    { id: 'programs', label: 'Plantillas', icon: <I.Layers />, href: '/dashboard/programs' },
-    { id: 'matching', label: 'Matching IA', icon: <I.Bot />, href: `/dashboard/intelligent-match?program=${program.id}` },
-  ];
-  const tabsNav: { id: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'gobierno'; label: string; icon: React.ReactNode }[] = [
+  const tabsNav: { id: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno'; label: string; icon: React.ReactNode }[] = [
     { id: 'resumen', label: 'Resumen', icon: <I.Sparkles /> },
     { id: 'info', label: 'Información', icon: <I.Edit /> },
     { id: 'cronograma', label: 'Cronograma', icon: <I.Calendar /> },
     { id: 'actividades', label: 'Actividades', icon: <I.Activity /> },
     { id: 'participantes', label: 'Participantes', icon: <I.Users /> },
+    { id: 'duplas', label: 'Duplas', icon: <I.Bot /> },
     { id: 'gobierno', label: 'Gobierno', icon: <I.Settings /> },
   ];
 
@@ -499,21 +495,7 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab }: {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3">
-        <p className="px-5 py-2 text-[10px] text-gray-400 uppercase tracking-wider font-bold">Navegación</p>
-        <div className="px-3 space-y-0.5">
-          {navTop.map(n => (
-            <Link
-              key={n.id}
-              href={n.href}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-[12.5px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition"
-            >
-              <span className="w-4 h-4 text-gray-400">{n.icon}</span>
-              {n.label}
-            </Link>
-          ))}
-        </div>
-
-        <p className="px-5 pt-5 pb-2 text-[10px] text-gray-400 uppercase tracking-wider font-bold">Programa actual</p>
+        <p className="px-5 pt-2 pb-2 text-[10px] text-gray-400 uppercase tracking-wider font-bold">Programa actual</p>
         <div className="mx-3 mb-2 px-3 py-2.5 rounded-lg bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100">
           <p className="text-[10px] font-bold uppercase tracking-wider text-violet-600 truncate">{program.company?.name || slug}</p>
           <p className="text-[12.5px] font-semibold text-gray-900 truncate mt-0.5">{program.name}</p>
@@ -545,6 +527,13 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab }: {
         >
           <I.Layout className="w-4 h-4" />
           Vista de Studio
+        </Link>
+        <Link
+          href="/dashboard"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[12px] font-semibold text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition"
+        >
+          <I.Home className="w-4 h-4" />
+          Inicio admin
         </Link>
         <button
           onClick={onLogout}
@@ -1715,34 +1704,209 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
   );
 }
 
-function TabGobierno({ program, slug, assignedPM, pms, onTransition, onAssignPM }: { program: ProgramDetail; slug: string; assignedPM: AssignedPM | null; pms: PM[]; onTransition: (s: string) => void; onAssignPM: (id: string | null) => void }) {
-  // Vinculaciones activas
+// ============================================================================
+// TAB DUPLAS — vinculaciones activas con matching IA inline
+// ============================================================================
+function TabDuplas({ programId, participants, showToast }: { programId: string; participants: Participant[]; showToast: (m: string, t?: 'success' | 'error') => void }) {
   const [vincs, setVincs] = React.useState<any[]>([]);
-  const [vincsLoading, setVincsLoading] = React.useState(false);
-  const [vincsLoaded, setVincsLoaded] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
+  // Matching IA inline
+  const [matchLoading, setMatchLoading] = React.useState(false);
+  const [matchResults, setMatchResults] = React.useState<any[]>([]);
+  const [matchError, setMatchError] = React.useState('');
+  const [useAI, setUseAI] = React.useState(true);
+  const [activations, setActivations] = React.useState<Record<string, 'loading' | 'done' | 'error'>>({});
 
   const loadVincs = React.useCallback(async () => {
-    if (vincsLoading) return;
-    setVincsLoading(true);
+    setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/programs/${program.id}/vinculations`);
+      const res = await fetch(`${API_URL}/api/programs/${programId}/vinculations`);
       if (res.ok) {
         const data = await res.json();
         setVincs(Array.isArray(data) ? data.filter((v: any) => v.status === 'active') : []);
       }
     } catch {}
-    setVincsLoading(false);
-    setVincsLoaded(true);
-  }, [program.id, vincsLoading]);
+    setLoading(false);
+  }, [programId]);
 
-  const deleteVinc = async (vid: number) => {
-    if (!confirm('¿Eliminar esta vinculación?')) return;
+  React.useEffect(() => { loadVincs(); }, [loadVincs]);
+
+  const removeVinc = async (vid: number) => {
+    if (!confirm('¿Desvincular esta dupla?')) return;
     try {
-      await fetch(`${API_URL}/api/programs/${program.id}/vinculations/${vid}`, { method: 'DELETE' });
+      await fetch(`${API_URL}/api/programs/${programId}/vinculations/${vid}`, { method: 'DELETE' });
       setVincs(prev => prev.filter((v: any) => v.id !== vid));
-    } catch {}
+      showToast('Dupla desvinculada');
+    } catch { showToast('Error al desvincular', 'error'); }
   };
 
+  const runMatch = async () => {
+    setMatchLoading(true);
+    setMatchError('');
+    setMatchResults([]);
+    try {
+      const res = await fetch(`${API_URL}/api/matches/intelligent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ program_id: programId, top_k: 20, min_score: 0, use_ai: useAI }),
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const data = await res.json();
+      setMatchResults(data.results || []);
+    } catch (e: any) { setMatchError(e.message || 'Error al generar matches'); }
+    setMatchLoading(false);
+  };
+
+  const activatePair = async (mentor_user_id: string, mentee_user_id: string, score: number, ai_rec?: string) => {
+    const key = `${mentor_user_id}-${mentee_user_id}`;
+    setActivations(p => ({ ...p, [key]: 'loading' }));
+    try {
+      const res = await fetch(`${API_URL}/api/matches/intelligent/activate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ program_id: programId, mentor_user_id, mentee_user_id, score, ai_recommendation: ai_rec, vinculation_type: 'mentoria' }),
+      });
+      if (!res.ok) throw new Error();
+      setActivations(p => ({ ...p, [key]: 'done' }));
+      showToast('Dupla activada correctamente');
+      loadVincs(); // refresh
+    } catch { setActivations(p => ({ ...p, [key]: 'error' })); showToast('Error al activar', 'error'); }
+  };
+
+  const scoreColor = (s: number) => s >= 70 ? '#16a34a' : s >= 50 ? '#d97706' : '#dc2626';
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── Duplas activas ── */}
+      <Card title="Duplas vigentes" subtitle="Vinculaciones mentor ↔ mentee activas en este programa">
+        {loading ? (
+          <div className="flex items-center justify-center py-8"><Spinner /></div>
+        ) : vincs.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-[13px] font-medium text-gray-500">Sin duplas activas</p>
+            <p className="text-[11.5px] text-gray-400 mt-1">Genera matches con IA abajo para crear vinculaciones.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {vincs.map((v: any) => {
+              const mentorName = v.mentor?.user?.full_name || v.mentor?.user?.email || '—';
+              const menteeName = v.mentee?.user?.full_name || v.mentee?.user?.email || '—';
+              const isAI = !!(v.ai_recommendation || v.metadata?.ai_recommendation);
+              const score = v.score || v.match_score;
+              return (
+                <div key={v.id} className="flex items-center gap-4 py-3.5">
+                  {/* Mentor */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-violet-100 text-violet-700">Mentor</span>
+                      <span className="text-[13px] font-semibold text-gray-900">{mentorName}</span>
+                    </div>
+                  </div>
+                  <span className="text-gray-300 flex-shrink-0">↔</span>
+                  {/* Mentee */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-sky-100 text-sky-700">Mentee</span>
+                      <span className="text-[13px] font-semibold text-gray-900">{menteeName}</span>
+                    </div>
+                  </div>
+                  {/* Score + IA badge */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {score != null && (
+                      <span className="text-[12px] font-bold" style={{ color: scoreColor(Number(score)) }}>
+                        {Number(score).toFixed(0)}pts
+                      </span>
+                    )}
+                    {isAI && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(245,200,0,0.15)', color: '#7a5900' }}>✨ IA</span>
+                    )}
+                  </div>
+                  {/* Remove */}
+                  <button onClick={() => removeVinc(v.id)} title="Desvincular"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:bg-red-50 hover:text-red-500 transition flex-shrink-0 text-lg">×</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      {/* ── Generar matches con IA ── */}
+      <Card
+        title="Generar duplas con IA"
+        subtitle="El motor analiza perfiles de mentores y mentees y sugiere las mejores combinaciones"
+        action={
+          <label className="flex items-center gap-2 text-[12px] cursor-pointer select-none">
+            <input type="checkbox" checked={useAI} onChange={e => setUseAI(e.target.checked)} className="h-3.5 w-3.5 rounded border-gray-300" />
+            <span className="text-gray-600">✨ Análisis Claude</span>
+          </label>
+        }
+      >
+        <button
+          onClick={runMatch}
+          disabled={matchLoading}
+          className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-2.5 text-[13px] font-bold text-white hover:bg-gray-800 transition disabled:opacity-60"
+        >
+          {matchLoading ? (
+            <><svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>Analizando perfiles…</>
+          ) : <>✨ Generar matches</>}
+        </button>
+
+        {matchError && <p className="mt-3 text-[12px] text-red-600">{matchError}</p>}
+
+        {matchResults.length > 0 && (
+          <div className="mt-4 space-y-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{matchResults.length} sugerencias rankeadas</p>
+            {matchResults.map((r: any, idx: number) => {
+              const key = `${r.mentor?.id}-${r.mentee?.id}`;
+              const act = activations[key];
+              const alreadyActive = vincs.some((v: any) =>
+                (v.mentor?.user?.id === r.mentor?.id || v.mentor?.id === r.mentor?.id) &&
+                (v.mentee?.user?.id === r.mentee?.id || v.mentee?.id === r.mentee?.id)
+              );
+              return (
+                <div key={key} className="flex items-start gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white transition">
+                  {/* Rank */}
+                  <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[12px] font-bold" style={{ background: '#f3f4f6', color: scoreColor(r.score) }}>#{idx + 1}</div>
+                  {/* Names */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[13px] font-semibold text-gray-900">{r.mentor?.name}</span>
+                      <span className="text-gray-300 text-[11px]">↔</span>
+                      <span className="text-[13px] font-semibold text-gray-900">{r.mentee?.name}</span>
+                      <span className="text-[12px] font-bold" style={{ color: scoreColor(r.score) }}>{r.score?.toFixed(0)}pts</span>
+                    </div>
+                    {r.ai_recommendation && (
+                      <p className="mt-1.5 text-[11.5px] text-gray-600 leading-relaxed line-clamp-2">{r.ai_recommendation}</p>
+                    )}
+                  </div>
+                  {/* Action */}
+                  <div className="flex-shrink-0">
+                    {alreadyActive || act === 'done' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10.5px] font-bold text-emerald-700 ring-1 ring-emerald-200">✓ Activa</span>
+                    ) : act === 'loading' ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-400"><svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Activando…</span>
+                    ) : (
+                      <button
+                        onClick={() => activatePair(r.mentor?.id, r.mentee?.id, r.score, r.ai_recommendation)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-gray-800 transition"
+                      >
+                        ⚡ Vincular
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function TabGobierno({ program, slug, assignedPM, pms, onTransition, onAssignPM }: { program: ProgramDetail; slug: string; assignedPM: AssignedPM | null; pms: PM[]; onTransition: (s: string) => void; onAssignPM: (id: string | null) => void }) {
   return (
     <div className="space-y-5">
       {/* ── Estado del programa ── */}
@@ -1765,79 +1929,6 @@ function TabGobierno({ program, slug, assignedPM, pms, onTransition, onAssignPM 
       </Card>
 
       <PMCard assignedPM={assignedPM} pms={pms} onAssignPM={onAssignPM} />
-
-      {/* ── Matches activos (vinculaciones) ── */}
-      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div>
-            <h3 className="text-[13px] font-bold text-gray-900">Matches activos</h3>
-            <p className="text-[11px] text-gray-500 mt-0.5">Vinculaciones mentor ↔ mentee vigentes en este programa</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {vincsLoaded && <span className="text-[11px] text-gray-400">{vincs.length} {vincs.length === 1 ? 'match' : 'matches'}</span>}
-            <a
-              href={`/dashboard/intelligent-match?program=${program.id}`}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-gray-800 transition"
-            >
-              ✨ Generar con IA
-            </a>
-            <button
-              onClick={loadVincs}
-              disabled={vincsLoading}
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
-            >
-              {vincsLoading ? '…' : vincsLoaded ? '↺' : 'Ver matches'}
-            </button>
-          </div>
-        </div>
-
-        {!vincsLoaded && (
-          <div className="px-5 py-8 text-center text-[12px] text-gray-400">
-            Pulsa «Ver matches» para cargar las vinculaciones activas.
-          </div>
-        )}
-
-        {vincsLoaded && vincs.length === 0 && (
-          <div className="px-5 py-8 text-center">
-            <p className="text-[13px] font-medium text-gray-500">Sin matches activos</p>
-            <p className="text-[11.5px] text-gray-400 mt-1">Usa «Generar con IA» para crear vinculaciones automáticamente.</p>
-          </div>
-        )}
-
-        {vincsLoaded && vincs.length > 0 && (
-          <div className="divide-y divide-gray-50">
-            {vincs.map((v: any) => {
-              const mentorName = v.mentor?.user?.full_name || v.mentor?.user?.email || `Mentor #${v.mentor?.id}`;
-              const menteeName = v.mentee?.user?.full_name || v.mentee?.user?.email || `Mentee #${v.mentee?.id}`;
-              const score = v.score || v.match_score;
-              const isAI = v.ai_recommendation || (v.metadata && v.metadata.ai_recommendation);
-              return (
-                <div key={v.id} className="flex items-center gap-4 px-5 py-3.5">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-semibold text-gray-900">{mentorName}</span>
-                      <span className="text-gray-300">↔</span>
-                      <span className="text-[13px] font-semibold text-gray-900">{menteeName}</span>
-                      {isAI && (
-                        <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background:'rgba(245,200,0,0.15)', color:'#7a5900' }}>
-                          ✨ IA
-                        </span>
-                      )}
-                    </div>
-                    {score != null && (
-                      <p className="text-[11px] text-gray-400 mt-0.5">Score: {Number(score).toFixed(1)}/100</p>
-                    )}
-                  </div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10.5px] font-bold text-emerald-700 ring-1 ring-emerald-200 flex-shrink-0">
-                    ● Activo
-                  </span>
-                  <button onClick={() => deleteVinc(v.id)} className="text-gray-300 hover:text-red-500 transition text-[18px] flex-shrink-0" title="Eliminar match">×</button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* ── Acciones ── */}
       <Card title="Acciones rápidas" subtitle="Atajos a herramientas relacionadas">
