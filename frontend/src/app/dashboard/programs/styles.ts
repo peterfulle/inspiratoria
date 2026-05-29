@@ -5,9 +5,29 @@
 export const pageStyles = `
   .programs-page {
     min-height: 100vh;
-    background: #fafafa;
+    background: #ffffff;
     color: #1a1a1a;
   }
+  .programs-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #b08a00;
+    margin-bottom: 0.4rem;
+  }
+
+  .programs-eyebrow::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #F5C800;
+    display: inline-block;
+  }
+
   .programs-header {
     background: white;
     border-bottom: 1px solid #f0f0f0;

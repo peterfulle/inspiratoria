@@ -351,7 +351,6 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
         title: "Sistema",
         roles: ["superadmin", "inspiratoria_admin", "admin", "admin_root"],
         items: [
-          { id: "configuration", label: "Configuración", icon: IconSettings, path: "/dashboard/configuration" },
           { id: "notifications", label: "Notificaciones", icon: IconNotification, path: "/dashboard/notifications" },
         ],
       });

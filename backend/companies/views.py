@@ -2774,14 +2774,19 @@ async def login_with_otp(payload: LoginOTPRequest):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Cuenta desactivada")
 
-    if not user.otp_code:
-        raise HTTPException(status_code=400, detail="No hay código OTP pendiente. Solicita uno nuevo.")
+    # Bypass local: en DEBUG, el código 0000 siempre pasa
+    from django.conf import settings
+    is_debug_bypass = settings.DEBUG and payload.otp == "0000"
 
-    if user.otp_expires_at and timezone.now() > user.otp_expires_at:
-        raise HTTPException(status_code=400, detail="El código ha expirado. Solicita uno nuevo.")
+    if not is_debug_bypass:
+        if not user.otp_code:
+            raise HTTPException(status_code=400, detail="No hay código OTP pendiente. Solicita uno nuevo.")
 
-    if user.otp_code != payload.otp:
-        raise HTTPException(status_code=400, detail="Código incorrecto")
+        if user.otp_expires_at and timezone.now() > user.otp_expires_at:
+            raise HTTPException(status_code=400, detail="El código ha expirado. Solicita uno nuevo.")
+
+        if user.otp_code != payload.otp:
+            raise HTTPException(status_code=400, detail="Código incorrecto")
 
     # Limpiar OTP y activar cuenta si no lo estaba
     def _consume_otp():

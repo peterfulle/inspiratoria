@@ -98,7 +98,7 @@ export default function IntelligentMatchPage() {
     { p: 45, label: "Cruzando skills × goals y topics × challenges…", icon: "🔗" },
     { p: 62, label: "Evaluando estilo de mentoría y nivel de experiencia…", icon: "🎯" },
     { p: 78, label: "Aplicando ponderación multi-dimensional (6 ejes)…", icon: "⚖️" },
-    { p: 90, label: useAI ? "Generando explicación con Gemini…" : "Atenuando por completitud de perfil…", icon: useAI ? "🤖" : "📊" },
+    { p: 90, label: useAI ? "Generando análisis semántico con Claude…" : "Atenuando por completitud de perfil…", icon: useAI ? "✨" : "📊" },
     { p: 100, label: "Ranking final listo", icon: "✅" },
   ];
 
@@ -330,26 +330,27 @@ export default function IntelligentMatchPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Match Inteligente</h1>
-            <p className="text-xs text-gray-500">
-              Algoritmo multi-dimensional sobre perfiles enriquecidos · skills, temas, estilo, experiencia, objetivos
-            </p>
+    <div className="min-h-screen bg-white">
+      <div className="px-8 pt-8 pb-2 flex items-end justify-between">
+        <div>
+          <div style={{ display:'inline-flex', alignItems:'center', gap:'0.4rem', fontSize:'0.7rem', fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', color:'#b08a00', marginBottom:'0.4rem' }}>
+            <span style={{ width:6, height:6, borderRadius:'50%', background:'#F5C800', display:'inline-block' }} />
+            IA · Matching
           </div>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            ← Volver al dashboard
-          </button>
+          <h1 style={{ fontSize:'1.75rem', fontWeight:800, color:'#0f0f0f', letterSpacing:'-0.02em', lineHeight:1.15, margin:0 }}>Match Inteligente</h1>
+          <p style={{ fontSize:'0.82rem', color:'#9a9a9a', marginTop:'0.25rem' }}>
+            Motor multi-dimensional · skills, temas, estilo, experiencia y objetivos · potenciado con Claude
+          </p>
         </div>
-      </header>
+        <button
+          onClick={() => router.push("/dashboard")}
+          style={{ padding:'0.45rem 0.9rem', fontSize:'0.78rem', fontWeight:600, color:'#555', background:'#f5f5f5', border:'none', borderRadius:10, cursor:'pointer' }}
+        >
+          ← Dashboard
+        </button>
+      </div>
 
-      <main className="mx-auto max-w-7xl space-y-6 px-6 py-6">
+      <main className="space-y-6 px-8 py-6">
         {/* Controls */}
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
@@ -396,7 +397,7 @@ export default function IntelligentMatchPage() {
             </div>
             <div className="flex flex-col">
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                IA Gemini
+                Análisis Claude
               </label>
               <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm">
                 <input
@@ -405,7 +406,7 @@ export default function IntelligentMatchPage() {
                   onChange={(e) => setUseAI(e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300"
                 />
-                Explicación IA
+                ✨ Activar IA
               </label>
             </div>
           </div>
@@ -707,11 +708,11 @@ export default function IntelligentMatchPage() {
 
                   {/* AI rec */}
                   {r.ai_recommendation && (
-                    <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-700">
-                        🤖 Análisis IA (Gemini)
+                    <div className="mt-3 rounded-xl p-3" style={{ background:'rgba(245,200,0,0.08)', border:'1px solid rgba(245,200,0,0.3)', borderLeft:'3px solid #F5C800' }}>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color:'#7a5900' }}>
+                        ✨ Análisis Claude
                       </p>
-                      <p className="mt-1 text-xs italic text-violet-900">{r.ai_recommendation}</p>
+                      <p className="mt-1 text-xs" style={{ color:'#5a4200', lineHeight:1.6 }}>{r.ai_recommendation}</p>
                     </div>
                   )}
 

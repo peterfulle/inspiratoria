@@ -118,6 +118,7 @@ export default function ConfigurationPage() {
       <div className="config-container">
         {/* Header */}
         <div className="config-header">
+          <div className="config-eyebrow">Sistema</div>
           <h1 className="config-title">Configuración</h1>
           <p className="config-subtitle">Gestión y mantenimiento del sistema.</p>
         </div>

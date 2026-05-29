@@ -4,7 +4,7 @@
 export const configStyles = `
   .config-container {
     min-height: 100vh;
-    background: #fafafa;
+    background: #ffffff;
     padding: 2rem;
   }
 
@@ -12,89 +12,117 @@ export const configStyles = `
     margin-bottom: 2rem;
   }
 
+  .config-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #b08a00;
+    margin-bottom: 0.4rem;
+  }
+
+  .config-eyebrow::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #F5C800;
+    display: inline-block;
+  }
+
   .config-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #1a1a1a;
-    margin-bottom: 0.25rem;
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #0f0f0f;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-bottom: 0;
   }
 
   .config-subtitle {
-    font-size: 0.875rem;
-    color: #6b7280;
+    font-size: 0.82rem;
+    color: #9a9a9a;
+    margin-top: 0.25rem;
   }
 
   /* Tabs */
   .config-tabs {
     display: flex;
-    gap: 0.25rem;
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 0.25rem;
-    margin-bottom: 1.5rem;
+    gap: 0.2rem;
+    background: #f5f5f5;
+    border: 1px solid #ebebeb;
+    border-radius: 10px;
+    padding: 0.2rem;
+    margin-bottom: 2rem;
     overflow-x: auto;
+    width: fit-content;
   }
 
   .config-tab {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1rem;
+    gap: 0.45rem;
+    padding: 0.4rem 0.9rem;
     background: transparent;
     border: none;
-    border-radius: 0.5rem;
-    font-size: 0.8125rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
     font-weight: 500;
-    color: #6b7280;
+    color: #999;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.12s ease;
     white-space: nowrap;
   }
 
   .config-tab:hover {
-    background: #f3f4f6;
-    color: #374151;
+    background: #ebebeb;
+    color: #0f0f0f;
   }
 
   .config-tab.active {
-    background: #1a1a1a;
+    background: #0f0f0f;
     color: white;
+    font-weight: 700;
   }
 
   /* Section */
   .section {
     background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
+    border: 1px solid #ebebeb;
+    border-radius: 16px;
     margin-bottom: 1.5rem;
+    overflow: hidden;
   }
 
   .section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1.25rem;
-    border-bottom: 1px solid #e5e7eb;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #f0f0f0;
+    background: #fafaf8;
   }
 
   .section-title {
     font-size: 0.875rem;
-    font-weight: 600;
-    color: #1a1a1a;
+    font-weight: 700;
+    color: #0f0f0f;
     display: flex;
     align-items: center;
     gap: 0.5rem;
   }
 
   .section-body {
-    padding: 1.25rem;
+    padding: 1.5rem;
   }
 
   .section-desc {
-    font-size: 0.75rem;
-    color: #6b7280;
-    margin-bottom: 1rem;
+    font-size: 0.78rem;
+    color: #9a9a9a;
+    margin-bottom: 1.25rem;
+    line-height: 1.5;
   }
 
   /* Setting Row */
@@ -102,8 +130,9 @@ export const configStyles = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 0;
-    border-bottom: 1px solid #f3f4f6;
+    padding: 1.1rem 0;
+    border-bottom: 1px solid #f5f5f5;
+    transition: background 0.1s;
   }
 
   .setting-row:last-child {
@@ -112,18 +141,20 @@ export const configStyles = `
 
   .setting-row-info {
     flex: 1;
+    padding-right: 1.5rem;
   }
 
   .setting-row-label {
     font-size: 0.875rem;
-    font-weight: 500;
-    color: #1a1a1a;
-    margin-bottom: 0.125rem;
+    font-weight: 600;
+    color: #0f0f0f;
+    margin-bottom: 0.2rem;
   }
 
   .setting-row-desc {
     font-size: 0.75rem;
-    color: #6b7280;
+    color: #9a9a9a;
+    line-height: 1.4;
   }
 
   /* Toggle */
@@ -160,23 +191,25 @@ export const configStyles = `
   /* Input */
   .input-field {
     width: 100%;
-    padding: 0.625rem 0.875rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
+    padding: 0.6rem 0.9rem;
+    border: 1.5px solid #ebebeb;
+    border-radius: 10px;
+    font-size: 0.82rem;
     background: #fafafa;
+    color: #0f0f0f;
     transition: all 0.15s ease;
+    font-family: inherit;
   }
 
   .input-field:focus {
     outline: none;
-    border-color: #1a1a1a;
+    border-color: #0f0f0f;
     background: white;
   }
 
   .input-field:disabled {
-    background: #f3f4f6;
-    color: #9ca3af;
+    background: #f5f5f5;
+    color: #bbb;
     cursor: not-allowed;
   }
 
@@ -184,35 +217,37 @@ export const configStyles = `
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
-    margin-bottom: 1rem;
+    margin-bottom: 1.1rem;
   }
 
   .input-group {
-    margin-bottom: 1rem;
+    margin-bottom: 1.1rem;
   }
 
   .input-label {
     display: block;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #374151;
-    margin-bottom: 0.375rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #888;
+    margin-bottom: 0.4rem;
   }
 
   /* Select */
   .select-field {
     width: 100%;
-    padding: 0.625rem 0.875rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
+    padding: 0.6rem 0.9rem;
+    border: 1.5px solid #ebebeb;
+    border-radius: 10px;
+    font-size: 0.82rem;
     background: #fafafa;
+    color: #0f0f0f;
     cursor: pointer;
+    font-family: inherit;
   }
 
   .select-field:focus {
     outline: none;
-    border-color: #1a1a1a;
+    border-color: #0f0f0f;
     background: white;
   }
 
@@ -220,57 +255,58 @@ export const configStyles = `
   .btn-primary {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
     padding: 0.5rem 1rem;
-    background: #1a1a1a;
+    background: #0f0f0f;
     color: white;
     border: none;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.15s ease;
   }
 
   .btn-primary:hover {
-    background: #2d2d2d;
+    background: #222;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   }
 
   .btn-primary:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 
   .btn-secondary {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
     padding: 0.5rem 1rem;
-    background: #f3f4f6;
-    color: #374151;
+    background: #f5f5f5;
+    color: #555;
     border: none;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.15s ease;
   }
 
   .btn-secondary:hover {
-    background: #e5e7eb;
+    background: #ebebeb;
   }
 
   .btn-danger {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
     padding: 0.5rem 1rem;
     background: #dc2626;
     color: white;
     border: none;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.15s ease;
   }
@@ -280,28 +316,28 @@ export const configStyles = `
   }
 
   .btn-danger:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 
   .btn-outline {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
     padding: 0.5rem 1rem;
     background: transparent;
-    color: #374151;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
+    color: #555;
+    border: 1.5px solid #ebebeb;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.15s ease;
   }
 
   .btn-outline:hover {
-    background: #f3f4f6;
-    border-color: #d1d5db;
+    background: #f5f5f5;
+    border-color: #ccc;
   }
 
   /* Danger Zone */

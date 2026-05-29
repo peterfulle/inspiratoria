@@ -672,7 +672,8 @@ export default function ProgramsPage() {
           <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h1 className="text-lg sm:text-xl font-semibold text-neutral-900">Plantillas de Programas</h1>
+                <div className="programs-eyebrow">Gestión</div>
+                <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f0f0f', letterSpacing: '-0.02em', lineHeight: 1.15 }}>Plantillas de Programas</h1>
                 <p className="text-neutral-500 text-sm mt-0.5">Catálogo de programas disponibles</p>
               </div>
               
@@ -700,7 +701,7 @@ export default function ProgramsPage() {
           </div>
         </header>
 
-        <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+        <main className="p-4 sm:p-6 lg:p-8 w-full">
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="stat-card">

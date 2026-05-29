@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import TopNavbar from "@/components/TopNavbar";
 import PushNotificationPrompt from "@/components/PushNotificationPrompt";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
+import UIPrefsLoader from "@/components/UIPrefsLoader";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 export default function DashboardLayout({
@@ -101,6 +102,7 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen h-full bg-white overflow-x-hidden">
+      <UIPrefsLoader />
       {!isInClientRoute && (
         <>
           <Sidebar

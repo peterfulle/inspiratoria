@@ -434,78 +434,98 @@ def intelligent_match(
     }
 
 
-# ────────────────────────────── optional Gemini explanation ──────────────────────────────
+# ────────────────────────────── AI explanation (Claude) ──────────────────────────────
 
 def _fallback_recommendation(result: Dict[str, Any]) -> str:
+    """Rule-based fallback when Claude is unavailable."""
     score = result["score"]
-    mentor = result["mentor"]["name"]
-    mentee = result["mentee"]["name"]
+    mentor_name = result["mentor"]["name"]
+    mentee_name = result["mentee"]["name"]
+    top_matches = result.get("matched_keywords", [])[:4]
+    kw = f" Afinidad en: {', '.join(top_matches)}." if top_matches else ""
+
     if score >= 75:
         return (
-            f"Match altamente recomendado entre {mentor} y {mentee}. "
-            "Hay fuerte alineación en skills, temas y estilo de mentoring."
+            f"Excelente match entre {mentor_name} y {mentee_name}.{kw} "
+            "Alta compatibilidad en habilidades, objetivos y estilo de mentoring."
         )
     if score >= 55:
         return (
-            f"Match prometedor entre {mentor} y {mentee}. "
-            "Existe buena base — recomendamos sesión inicial para alinear expectativas."
+            f"Buen match entre {mentor_name} y {mentee_name}.{kw} "
+            "Base sólida — se recomienda sesión inicial para alinear expectativas."
         )
     return (
-        f"Match viable entre {mentor} y {mentee} con potencial de crecimiento. "
-        "La compatibilidad es moderada; conviene reforzar el perfil del mentee."
+        f"Match viable entre {mentor_name} y {mentee_name}.{kw} "
+        "Compatibilidad moderada; reforzar el perfil del mentee maximizará el impacto."
     )
 
 
 def _ai_explain(result: Dict[str, Any]) -> Optional[str]:
-    """Optional Gemini call for natural-language explanation. Silent if no key."""
-    api_key = os.getenv("GEMINI_API_KEY", "")
+    """
+    Claude-powered match explanation.
+    Uses claude-haiku-4-5 for speed and cost efficiency at scale.
+    Falls back silently if ANTHROPIC_API_KEY is not set.
+    """
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
         return None
 
     mentor = result["mentor"]
     mentee = result["mentee"]
-    breakdown_brief = {
-        k: {"earned": v["earned"], "weight": v["weight"], "matches": v.get("matches", [])[:5]}
-        for k, v in result["breakdown"].items()
-    }
-    prompt = f"""Eres un experto en programas de mentoring. Explica en 2-3 frases por qué este match es bueno o no, en español, tono profesional y directo.
+    score = result["score"]
 
-MENTOR:
-  Nombre: {mentor['name']}
-  Headline: {mentor.get('headline','')}
-  Skills: {', '.join(mentor.get('skills', [])) or '—'}
-  Temas: {', '.join(mentor.get('topics', [])) or '—'}
-  Estilo: {', '.join(mentor.get('style', [])) or '—'}
-  Experiencia: {mentor.get('experience_level','')} en {', '.join(mentor.get('experience_area', [])) or '—'}
+    # Build compact breakdown for context
+    top_dimensions = sorted(
+        result.get("breakdown", {}).items(),
+        key=lambda x: x[1].get("earned", 0),
+        reverse=True,
+    )[:3]
+    dim_summary = "; ".join(
+        f"{v.get('label', k)}: {v.get('earned', 0):.0f}/{v.get('weight', 0):.0f}"
+        for k, v in top_dimensions
+    )
+    matched_kw = ", ".join(result.get("matched_keywords", [])[:6]) or "—"
 
-MENTEE:
-  Nombre: {mentee['name']}
-  Headline: {mentee.get('headline','')}
-  Goals: {', '.join(mentee.get('goals', [])) or '—'}
-  Intereses: {', '.join(mentee.get('interests', [])) or '—'}
-  Desafíos: {', '.join(mentee.get('challenges', [])) or '—'}
-  Estilo preferido: {', '.join(mentee.get('preferred_style', [])) or '—'}
+    system = (
+        "Eres un experto en programas de mentoría corporativa. "
+        "Analizas perfiles de mentores y mentees para explicar por qué un match "
+        "es valioso o qué limitaciones tiene. Respondes en español, tono profesional "
+        "y directo, máximo 3 oraciones."
+    )
 
-SCORE FINAL: {result['score']}/100
-BREAKDOWN: {json.dumps(breakdown_brief, ensure_ascii=False)}
+    user_msg = f"""Analiza este match mentor-mentee y explica su calidad:
 
-Responde solo con el texto explicativo, sin encabezados ni JSON."""
+MENTOR: {mentor['name']}
+• Headline: {mentor.get('headline') or '—'}
+• Skills: {', '.join(mentor.get('skills', [])) or '—'}
+• Temas que puede enseñar: {', '.join(mentor.get('topics', [])) or '—'}
+• Estilo de mentoring: {', '.join(mentor.get('style', [])) or '—'}
+• Nivel/área de experiencia: {mentor.get('experience_level', '')} — {', '.join(mentor.get('experience_area', [])) or '—'}
+
+MENTEE: {mentee['name']}
+• Headline: {mentee.get('headline') or '—'}
+• Objetivos: {', '.join(mentee.get('goals', [])) or '—'}
+• Intereses: {', '.join(mentee.get('interests', [])) or '—'}
+• Desafíos: {', '.join(mentee.get('challenges', [])) or '—'}
+• Estilo preferido: {', '.join(mentee.get('preferred_style', [])) or '—'}
+
+SCORE: {score}/100
+Dimensiones destacadas: {dim_summary}
+Keywords en común: {matched_kw}
+
+Responde SOLO con el análisis explicativo (sin encabezados, sin JSON, sin listas)."""
+
     try:
-        resp = requests.post(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-            headers={"Content-Type": "application/json", "X-goog-api-key": api_key},
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.5, "maxOutputTokens": 256},
-            },
-            timeout=20,
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=300,
+            system=system,
+            messages=[{"role": "user", "content": user_msg}],
         )
-        if resp.status_code == 200:
-            data = resp.json()
-            cand = (data.get("candidates") or [{}])[0]
-            parts = cand.get("content", {}).get("parts") or []
-            if parts:
-                return parts[0].get("text", "").strip() or None
+        text = message.content[0].text.strip() if message.content else ""
+        return text or None
     except Exception as exc:  # noqa: BLE001
-        print(f"[intelligent_matching] Gemini error: {exc}")
+        print(f"[intelligent_matching] Claude error: {exc}")
     return None

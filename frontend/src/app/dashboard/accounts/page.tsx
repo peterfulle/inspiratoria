@@ -98,7 +98,7 @@ const Icons = {
 const styles = `
   .acc-container {
     min-height: 100vh;
-    background: #fafafa;
+    background: #ffffff;
     padding: 2rem;
   }
 
@@ -109,28 +109,73 @@ const styles = `
     margin-bottom: 2rem;
   }
 
+  .acc-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #b08a00;
+    margin-bottom: 0.4rem;
+  }
+
+  .acc-eyebrow-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #F5C800;
+    display: inline-block;
+  }
+
   .acc-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #1a1a1a;
-    margin-bottom: 0.25rem;
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #0f0f0f;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-bottom: 0;
   }
 
   .acc-subtitle {
-    font-size: 0.875rem;
-    color: #6b7280;
+    font-size: 0.82rem;
+    color: #9a9a9a;
+    margin-top: 0.25rem;
   }
 
   .acc-title-badge {
     display: inline-flex;
     align-items: center;
-    padding: 0.125rem 0.5rem;
-    background: #f3f4f6;
-    color: #6b7280;
-    font-size: 0.75rem;
-    font-weight: 500;
-    border-radius: 9999px;
-    margin-left: 0.75rem;
+    padding: 0.15rem 0.6rem;
+    background: rgba(245,200,0,0.12);
+    color: #7a5900;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-radius: 999px;
+    border: 1px solid rgba(245,200,0,0.3);
+    margin-left: 0.6rem;
+    vertical-align: middle;
+  }
+
+  .acc-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    background: #0f0f0f;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .acc-btn-primary:hover {
+    background: #222;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
   }
 
   /* Stats Cards - same as dashboard */
@@ -379,24 +424,7 @@ const styles = `
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
-  .acc-btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: #1a1a1a;
-    color: white;
-    border: none;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
 
-  .acc-btn-primary:hover {
-    background: #2d2d2d;
-  }
 
   .acc-solicitudes-link {
     display: inline-flex;
@@ -1066,7 +1094,7 @@ const styles = `
   /* Loading */
   .acc-loading {
     min-height: 100vh;
-    background: #fafafa;
+    background: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1882,6 +1910,7 @@ export default function AccountsPage() {
         {/* Header */}
         <div className="acc-header">
           <div>
+            <div className="acc-eyebrow"><span className="acc-eyebrow-dot" /> Gestión</div>
             <h1 className="acc-title">
               Cuentas Studio
               <span className="acc-title-badge">{stats.studio}</span>
@@ -2161,212 +2190,286 @@ export default function AccountsPage() {
       </div>
 
       {/* ═══ MODAL: Nueva Cuenta Studio ═══ */}
-      {showModal && (
-        <div className="acc-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) resetStudioModal(); }}>
-          <div className="acc-modal-body">
-            {/* Header */}
-            <div className="acc-modal-header">
-              <div className="acc-modal-title">
-                Nueva Cuenta Studio
-                <span className="acc-modal-badge">Studio</span>
+      {showModal && (() => {
+        const inp: React.CSSProperties = { width:'100%', padding:'0.55rem 0.8rem', border:'1.5px solid #ebebeb', borderRadius:10, fontSize:'0.82rem', background:'#fafafa', color:'#0f0f0f', outline:'none', boxSizing:'border-box' as const, transition:'border 0.15s, background 0.15s', fontFamily:'inherit' };
+        const lbl: React.CSSProperties = { display:'block', fontSize:'0.72rem', fontWeight:600, color:'#888', marginBottom:'0.4rem' };
+        const field: React.CSSProperties = { display:'flex', flexDirection:'column' as const, gap:0 };
+        const steps = ['Contacto', 'Empresa', 'Programa'];
+        return (
+        <div
+          style={{ position:'fixed', inset:0, zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.45)', backdropFilter:'blur(6px)', padding:'1rem' }}
+          onClick={(e) => { if (e.target === e.currentTarget) resetStudioModal(); }}
+        >
+          <style>{`@keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}} @keyframes spin2{to{transform:rotate(360deg)}}`}</style>
+          <div style={{ background:'#fff', borderRadius:22, boxShadow:'0 32px 72px rgba(0,0,0,0.18)', width:'100%', maxWidth:530, maxHeight:'92vh', overflowY:'auto', animation:'modalIn 0.22s ease' }}>
+
+            {/* ── Header ── */}
+            <div style={{ padding:'1.5rem 1.5rem 1rem', borderBottom:'1px solid #f0f0f0' }}>
+              <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+                <div>
+                  <div style={{ fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase' as const, color:'#b08a00', marginBottom:'0.15rem' }}>Nueva cuenta</div>
+                  <h2 style={{ fontSize:'1.1rem', fontWeight:800, color:'#0f0f0f', letterSpacing:'-0.01em', margin:0, display:'flex', alignItems:'center', gap:'0.5rem' }}>
+                    Cuenta Studio
+                    <span style={{ fontSize:'0.6rem', fontWeight:700, padding:'0.15rem 0.5rem', background:'rgba(245,200,0,0.15)', color:'#7a5900', borderRadius:999, border:'1px solid rgba(245,200,0,0.3)', letterSpacing:'0.05em', textTransform:'uppercase' as const }}>Studio</span>
+                  </h2>
+                </div>
+                <button onClick={resetStudioModal} style={{ width:32, height:32, borderRadius:8, border:'1px solid #ebebeb', background:'#fafafa', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#999', flexShrink:0 }}>
+                  <svg style={{ width:13, height:13 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
               </div>
-              <button className="acc-modal-close" onClick={resetStudioModal}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+
+              {/* Step indicators */}
+              {modalStep < 4 && (
+                <div style={{ display:'flex', alignItems:'center', gap:'0.35rem', marginTop:'1.1rem' }}>
+                  {steps.map((s, i) => {
+                    const n = i + 1;
+                    const done = modalStep > n;
+                    const active = modalStep === n;
+                    return (
+                      <div key={n} style={{ display:'flex', alignItems:'center', gap:'0.35rem', flex: i < 2 ? 1 : 'none' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:'0.4rem', flexShrink:0 }}>
+                          <div style={{ width:24, height:24, borderRadius:'50%', background: done ? '#22c55e' : active ? '#0f0f0f' : '#f0f0f0', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s' }}>
+                            {done ? (
+                              <svg style={{ width:11, height:11, color:'#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            ) : (
+                              <span style={{ fontSize:'0.65rem', fontWeight:700, color: active ? '#fff' : '#bbb' }}>{n}</span>
+                            )}
+                          </div>
+                          <span style={{ fontSize:'0.72rem', fontWeight: active ? 700 : 500, color: active ? '#0f0f0f' : done ? '#22c55e' : '#bbb', transition:'color 0.2s' }}>{s}</span>
+                        </div>
+                        {i < 2 && <div style={{ flex:1, height:1, background: done ? '#22c55e' : '#ebebeb', transition:'background 0.3s' }} />}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            <div className="acc-modal-content">
-              {/* Progress */}
-              {modalStep < 4 && (
-                <div className="acc-modal-progress">
-                  <div className={`acc-modal-progress-bar ${modalStep >= 1 ? 'active' : ''}`} />
-                  <div className={`acc-modal-progress-bar ${modalStep >= 2 ? 'active' : ''}`} />
-                  <div className={`acc-modal-progress-bar ${modalStep >= 3 ? 'active' : ''}`} />
-                </div>
-              )}
+            {/* ── Body ── */}
+            <div style={{ padding:'1.5rem', display:'flex', flexDirection:'column' as const, gap:'1.1rem' }}>
 
               {/* Error */}
-              {modalError && <div className="acc-modal-error">{modalError}</div>}
-
-              {/* ── Step 1: Datos Personales ── */}
-              {modalStep === 1 && (
-                <div>
-                  <div className="acc-modal-subtitle">Datos del contacto principal</div>
-                  <div className="acc-modal-row">
-                    <div className="acc-modal-field">
-                      <label className="acc-modal-label">Nombre</label>
-                      <input className="acc-modal-input" placeholder="Nombre" value={modalForm.nombre} onChange={e => setModalForm({ ...modalForm, nombre: e.target.value })} />
-                    </div>
-                    <div className="acc-modal-field">
-                      <label className="acc-modal-label">Apellido</label>
-                      <input className="acc-modal-input" placeholder="Apellido" value={modalForm.apellido} onChange={e => setModalForm({ ...modalForm, apellido: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="acc-modal-field">
-                    <label className="acc-modal-label">Cargo</label>
-                    <input className="acc-modal-input" placeholder="Ej: Gerente de RRHH" value={modalForm.cargo} onChange={e => setModalForm({ ...modalForm, cargo: e.target.value })} />
-                  </div>
-                  <button className="acc-modal-btn" disabled={!modalForm.nombre || !modalForm.apellido || !modalForm.cargo} onClick={() => setModalStep(2)}>
-                    Continuar
-                  </button>
+              {modalError && (
+                <div style={{ padding:'0.7rem 0.9rem', background:'#fef2f2', border:'1px solid #fecaca', borderRadius:10, fontSize:'0.8rem', color:'#dc2626', display:'flex', alignItems:'center', gap:'0.5rem' }}>
+                  <svg style={{ width:14, height:14, flexShrink:0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  {modalError}
                 </div>
               )}
 
-              {/* ── Step 2: Empresa y Contacto ── */}
+              {/* ── Step 1 ── */}
+              {modalStep === 1 && (
+                <>
+                  <p style={{ fontSize:'0.78rem', color:'#aaa', margin:0 }}>Datos del contacto principal de la empresa cliente.</p>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem' }}>
+                    <div style={field}>
+                      <label style={lbl}>Nombre <span style={{ color:'#F5C800' }}>*</span></label>
+                      <input style={inp} placeholder="Ana" value={modalForm.nombre} onChange={e => setModalForm({ ...modalForm, nombre: e.target.value })}
+                        onFocus={e => { e.target.style.borderColor='#0f0f0f'; e.target.style.background='#fff'; }}
+                        onBlur={e => { e.target.style.borderColor='#ebebeb'; e.target.style.background='#fafafa'; }} />
+                    </div>
+                    <div style={field}>
+                      <label style={lbl}>Apellido <span style={{ color:'#F5C800' }}>*</span></label>
+                      <input style={inp} placeholder="García" value={modalForm.apellido} onChange={e => setModalForm({ ...modalForm, apellido: e.target.value })}
+                        onFocus={e => { e.target.style.borderColor='#0f0f0f'; e.target.style.background='#fff'; }}
+                        onBlur={e => { e.target.style.borderColor='#ebebeb'; e.target.style.background='#fafafa'; }} />
+                    </div>
+                  </div>
+                  <div style={field}>
+                    <label style={lbl}>Cargo <span style={{ color:'#F5C800' }}>*</span></label>
+                    <input style={inp} placeholder="Gerente de RRHH, Director de Personas..." value={modalForm.cargo} onChange={e => setModalForm({ ...modalForm, cargo: e.target.value })}
+                      onFocus={e => { e.target.style.borderColor='#0f0f0f'; e.target.style.background='#fff'; }}
+                      onBlur={e => { e.target.style.borderColor='#ebebeb'; e.target.style.background='#fafafa'; }} />
+                  </div>
+                  <button
+                    disabled={!modalForm.nombre || !modalForm.apellido || !modalForm.cargo}
+                    onClick={() => setModalStep(2)}
+                    style={{ width:'100%', padding:'0.65rem', fontSize:'0.82rem', fontWeight:700, color:'#fff', background: (!modalForm.nombre || !modalForm.apellido || !modalForm.cargo) ? '#ccc' : '#0f0f0f', border:'none', borderRadius:12, cursor: (!modalForm.nombre || !modalForm.apellido || !modalForm.cargo) ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.4rem', transition:'background 0.15s' }}>
+                    Continuar
+                    <svg style={{ width:13, height:13 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                  </button>
+                </>
+              )}
+
+              {/* ── Step 2 ── */}
               {modalStep === 2 && (
-                <div>
-                  <button className="acc-modal-btn-back" onClick={() => setModalStep(1)}>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                <>
+                  <button onClick={() => setModalStep(1)} style={{ display:'inline-flex', alignItems:'center', gap:'0.3rem', fontSize:'0.75rem', color:'#aaa', background:'none', border:'none', cursor:'pointer', padding:0, width:'fit-content' }}>
+                    <svg style={{ width:12, height:12 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
                     Volver
                   </button>
-                  <div className="acc-modal-subtitle">Datos de la empresa</div>
+                  <p style={{ fontSize:'0.78rem', color:'#aaa', margin:0 }}>Información de la empresa que será dada de alta.</p>
 
-                  <div className="acc-modal-field">
-                    <label className="acc-modal-label">Empresa</label>
-                    <input className="acc-modal-input" placeholder="Mi Empresa S.A." value={modalForm.empresa} onChange={e => setModalForm({ ...modalForm, empresa: e.target.value })} />
-                  </div>
-
-                  <div className="acc-modal-field">
-                    <label className="acc-modal-label">Email corporativo</label>
-                    <input
-                      className={`acc-modal-input ${modalEmailError ? 'error' : modalForm.email && !modalEmailError && modalForm.email.includes('@') && modalForm.email.split('@')[1]?.length > 2 ? 'valid' : ''}`}
-                      placeholder="tu@empresa.com"
-                      type="email"
-                      value={modalForm.email}
-                      onChange={e => handleModalEmailChange(e.target.value)}
-                    />
-                    {modalEmailError && <div className="acc-modal-email-hint err">{modalEmailError}</div>}
-                    {!modalEmailError && modalForm.email && modalForm.email.includes('@') && modalForm.email.split('@')[1]?.length > 2 && (
-                      <div className="acc-modal-email-hint ok">{Icons.check} Email corporativo válido</div>
-                    )}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem' }}>
+                    <div style={{ ...field, gridColumn:'1 / -1' }}>
+                      <label style={lbl}>Empresa <span style={{ color:'#F5C800' }}>*</span></label>
+                      <input style={inp} placeholder="Empresa S.A." value={modalForm.empresa} onChange={e => setModalForm({ ...modalForm, empresa: e.target.value })}
+                        onFocus={e => { e.target.style.borderColor='#0f0f0f'; e.target.style.background='#fff'; }}
+                        onBlur={e => { e.target.style.borderColor='#ebebeb'; e.target.style.background='#fafafa'; }} />
+                    </div>
+                    <div style={{ ...field, gridColumn:'1 / -1' }}>
+                      <label style={lbl}>Email corporativo <span style={{ color:'#F5C800' }}>*</span></label>
+                      <input
+                        style={{ ...inp, borderColor: modalEmailError ? '#fca5a5' : (!modalEmailError && modalForm.email && modalForm.email.includes('@') && modalForm.email.split('@')[1]?.length > 2) ? '#86efac' : '#ebebeb' }}
+                        placeholder="contacto@empresa.com" type="email"
+                        value={modalForm.email} onChange={e => handleModalEmailChange(e.target.value)}
+                        onFocus={e => { e.target.style.background='#fff'; }}
+                        onBlur={e => { e.target.style.background='#fafafa'; }} />
+                      {modalEmailError && <span style={{ fontSize:'0.7rem', color:'#ef4444', marginTop:'0.25rem' }}>{modalEmailError}</span>}
+                      {!modalEmailError && modalForm.email && modalForm.email.includes('@') && modalForm.email.split('@')[1]?.length > 2 && (
+                        <span style={{ fontSize:'0.7rem', color:'#16a34a', marginTop:'0.25rem', display:'flex', alignItems:'center', gap:'0.25rem' }}>
+                          <svg style={{ width:10, height:10 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                          Email corporativo válido
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* País */}
-                  <div className="acc-modal-field" ref={countryDropdownRef} style={{ position: 'relative' }}>
-                    <label className="acc-modal-label">País</label>
-                    <button className="acc-modal-country-btn" type="button" onClick={() => setCountryDropdownOpen(!countryDropdownOpen)}>
-                      <span>{modalCountry ? modalCountry.name : 'Selecciona tu país'}</span>
-                      <svg className="w-4 h-4" style={{ color: '#9ca3af', transform: countryDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-                    {countryDropdownOpen && (
-                      <div className="acc-modal-country-list">
-                        {COUNTRIES.map(c => (
-                          <button
-                            key={c.code}
-                            className={`acc-modal-country-option ${modalCountry?.code === c.code ? 'selected' : ''}`}
-                            onClick={() => { setModalCountry(c); setModalForm({ ...modalForm, pais: c.name, whatsapp: '' }); setCountryDropdownOpen(false); }}
-                          >
-                            {c.name}
-                            <span className="acc-modal-country-dial">{c.dial}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  <div style={field} ref={countryDropdownRef}>
+                    <label style={lbl}>País <span style={{ color:'#F5C800' }}>*</span></label>
+                    <div style={{ position:'relative' }}>
+                      <button type="button" onClick={() => setCountryDropdownOpen(!countryDropdownOpen)}
+                        style={{ ...inp, display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer', textAlign:'left' as const }}>
+                        <span style={{ color: modalCountry ? '#0f0f0f' : '#aaa' }}>{modalCountry ? modalCountry.name : 'Selecciona tu país'}</span>
+                        <svg style={{ width:14, height:14, color:'#aaa', transform: countryDropdownOpen ? 'rotate(180deg)' : 'none', transition:'transform 0.15s', flexShrink:0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                      </button>
+                      {countryDropdownOpen && (
+                        <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:'#fff', border:'1px solid #ebebeb', borderRadius:12, boxShadow:'0 8px 24px rgba(0,0,0,0.1)', zIndex:100, maxHeight:200, overflowY:'auto' as const }}>
+                          {COUNTRIES.map(c => (
+                            <button key={c.code} type="button"
+                              onClick={() => { setModalCountry(c); setModalForm({ ...modalForm, pais: c.name, whatsapp: '' }); setCountryDropdownOpen(false); }}
+                              style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', padding:'0.55rem 0.85rem', border:'none', background: modalCountry?.code === c.code ? 'rgba(245,200,0,0.1)' : 'transparent', fontSize:'0.82rem', cursor:'pointer', color:'#0f0f0f', textAlign:'left' as const }}>
+                              <span>{c.name}</span>
+                              <span style={{ fontSize:'0.72rem', color:'#aaa' }}>{c.dial}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* WhatsApp */}
-                  <div className="acc-modal-field">
-                    <label className="acc-modal-label">WhatsApp</label>
-                    <div className="acc-modal-whatsapp-row">
-                      <div className="acc-modal-dial-display">
+                  <div style={field}>
+                    <label style={lbl}>WhatsApp <span style={{ color:'#F5C800' }}>*</span></label>
+                    <div style={{ display:'flex', gap:'0.5rem' }}>
+                      <div style={{ padding:'0.55rem 0.75rem', border:'1.5px solid #ebebeb', borderRadius:10, background:'#f5f5f5', fontSize:'0.82rem', color:'#555', fontWeight:600, minWidth:70, textAlign:'center' as const, flexShrink:0 }}>
                         {modalCountry ? modalCountry.dial : '+--'}
                       </div>
-                      <input
-                        className="acc-modal-input"
+                      <input style={{ ...inp, flex:1 }}
                         placeholder={modalCountry?.phonePlaceholder || 'Selecciona un país primero'}
                         value={modalForm.whatsapp}
                         onChange={e => setModalForm({ ...modalForm, whatsapp: e.target.value.replace(/[^0-9\s]/g, '') })}
                         disabled={!modalCountry}
-                      />
+                        onFocus={e => { e.target.style.borderColor='#0f0f0f'; e.target.style.background='#fff'; }}
+                        onBlur={e => { e.target.style.borderColor='#ebebeb'; e.target.style.background='#fafafa'; }} />
                     </div>
                   </div>
 
                   <button
-                    className="acc-modal-btn"
                     disabled={!modalForm.empresa || !modalForm.email || !modalCountry || !modalForm.whatsapp || !!modalEmailError || !validateCorporateEmail(modalForm.email)}
                     onClick={() => setModalStep(3)}
-                  >
+                    style={{ width:'100%', padding:'0.65rem', fontSize:'0.82rem', fontWeight:700, color:'#fff', background: (!modalForm.empresa || !modalForm.email || !modalCountry || !modalForm.whatsapp || !!modalEmailError || !validateCorporateEmail(modalForm.email)) ? '#ccc' : '#0f0f0f', border:'none', borderRadius:12, cursor: (!modalForm.empresa || !modalForm.email || !modalCountry || !modalForm.whatsapp || !!modalEmailError || !validateCorporateEmail(modalForm.email)) ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.4rem', transition:'background 0.15s' }}>
                     Continuar
+                    <svg style={{ width:13, height:13 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
                   </button>
-                </div>
+                </>
               )}
 
-              {/* ── Step 3: Tu idea ── */}
+              {/* ── Step 3 ── */}
               {modalStep === 3 && (
-                <div>
-                  <button className="acc-modal-btn-back" onClick={() => setModalStep(2)}>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                <>
+                  <button onClick={() => setModalStep(2)} style={{ display:'inline-flex', alignItems:'center', gap:'0.3rem', fontSize:'0.75rem', color:'#aaa', background:'none', border:'none', cursor:'pointer', padding:0, width:'fit-content' }}>
+                    <svg style={{ width:12, height:12 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
                     Volver
                   </button>
-                  <div className="acc-modal-subtitle">¿Qué programa necesita?</div>
-
-                  <div className="acc-modal-field">
-                    <label className="acc-modal-label">Descripción del proyecto</label>
+                  <div style={field}>
+                    <label style={lbl}>¿Qué programa necesita? <span style={{ color:'#F5C800' }}>*</span></label>
                     <textarea
-                      className="acc-modal-textarea"
                       rows={4}
                       placeholder="Ej: Queremos implementar un programa de mentoría para nuestros líderes..."
                       value={modalForm.idea}
                       onChange={e => setModalForm({ ...modalForm, idea: e.target.value })}
+                      style={{ ...inp, resize:'vertical' as const, lineHeight:1.6 }}
+                      onFocus={e => { (e.target as HTMLTextAreaElement).style.borderColor='#0f0f0f'; (e.target as HTMLTextAreaElement).style.background='#fff'; }}
+                      onBlur={e => { (e.target as HTMLTextAreaElement).style.borderColor='#ebebeb'; (e.target as HTMLTextAreaElement).style.background='#fafafa'; }}
                     />
                   </div>
 
                   {/* Summary */}
-                  <div className="acc-modal-summary">
-                    <div className="acc-modal-summary-title">Resumen de la solicitud</div>
-                    <div className="acc-modal-summary-grid">
-                      <div><div className="acc-modal-summary-label">Nombre</div><div className="acc-modal-summary-value">{modalForm.nombre} {modalForm.apellido}</div></div>
-                      <div><div className="acc-modal-summary-label">Cargo</div><div className="acc-modal-summary-value">{modalForm.cargo}</div></div>
-                      <div><div className="acc-modal-summary-label">Empresa</div><div className="acc-modal-summary-value">{modalForm.empresa}</div></div>
-                      <div><div className="acc-modal-summary-label">Email</div><div className="acc-modal-summary-value">{modalForm.email}</div></div>
-                      <div><div className="acc-modal-summary-label">País</div><div className="acc-modal-summary-value">{modalForm.pais}</div></div>
-                      <div><div className="acc-modal-summary-label">WhatsApp</div><div className="acc-modal-summary-value">{modalCountry?.dial} {modalForm.whatsapp}</div></div>
-                    </div>
+                  <div style={{ background:'#fafafa', border:'1px solid #ebebeb', borderRadius:14, padding:'1rem', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.65rem 1rem' }}>
+                    <div style={{ gridColumn:'1 / -1', fontSize:'0.68rem', fontWeight:700, color:'#aaa', textTransform:'uppercase' as const, letterSpacing:'0.07em', marginBottom:'0.25rem' }}>Resumen</div>
+                    {[
+                      ['Contacto', `${modalForm.nombre} ${modalForm.apellido}`],
+                      ['Cargo',    modalForm.cargo],
+                      ['Empresa',  modalForm.empresa],
+                      ['Email',    modalForm.email],
+                      ['País',     modalForm.pais],
+                      ['WhatsApp', `${modalCountry?.dial ?? ''} ${modalForm.whatsapp}`],
+                    ].map(([k, v]) => (
+                      <div key={k}>
+                        <div style={{ fontSize:'0.68rem', color:'#bbb', marginBottom:'0.1rem' }}>{k}</div>
+                        <div style={{ fontSize:'0.8rem', fontWeight:600, color:'#0f0f0f', wordBreak:'break-word' as const }}>{v || '—'}</div>
+                      </div>
+                    ))}
                   </div>
 
-                  <button
-                    className="acc-modal-btn"
-                    disabled={modalLoading || !modalForm.idea}
-                    onClick={handleModalSubmit}
-                  >
-                    {modalLoading ? 'Enviando...' : 'Crear Cuenta Studio'}
-                  </button>
-                  <div className="acc-modal-hint">Un ejecutivo PM contactará al cliente en menos de 24 horas</div>
-                </div>
+                  <div style={{ display:'flex', flexDirection:'column' as const, gap:'0.5rem' }}>
+                    <button
+                      disabled={modalLoading || !modalForm.idea}
+                      onClick={handleModalSubmit}
+                      style={{ width:'100%', padding:'0.65rem', fontSize:'0.82rem', fontWeight:700, color:'#fff', background: (modalLoading || !modalForm.idea) ? '#ccc' : '#0f0f0f', border:'none', borderRadius:12, cursor: (modalLoading || !modalForm.idea) ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', transition:'background 0.15s' }}>
+                      {modalLoading ? (
+                        <>
+                          <svg style={{ width:14, height:14, animation:'spin2 0.7s linear infinite' }} viewBox="0 0 24 24"><circle style={{ opacity:0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path style={{ opacity:0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                          Creando cuenta...
+                        </>
+                      ) : (
+                        <>
+                          <svg style={{ width:13, height:13 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+                          Crear Cuenta Studio
+                        </>
+                      )}
+                    </button>
+                    <p style={{ textAlign:'center' as const, fontSize:'0.7rem', color:'#bbb', margin:0 }}>Un PM contactará al cliente en menos de 24 horas</p>
+                  </div>
+                </>
               )}
 
-              {/* ── Step 4: Confirmación ── */}
+              {/* ── Step 4: Éxito ── */}
               {modalStep === 4 && (
-                <div className="acc-modal-success">
-                  <div className="acc-modal-success-icon">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
+                <div style={{ textAlign:'center' as const, padding:'1rem 0' }}>
+                  <div style={{ width:56, height:56, borderRadius:'50%', background:'#dcfce7', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 1rem' }}>
+                    <svg style={{ width:26, height:26, color:'#16a34a' }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                   </div>
-                  <h3>¡Solicitud enviada!</h3>
-                  <p>Se notificará al ejecutivo PM para contactar a {modalForm.empresa}</p>
+                  <h3 style={{ fontSize:'1.1rem', fontWeight:800, color:'#0f0f0f', marginBottom:'0.35rem' }}>¡Cuenta creada!</h3>
+                  <p style={{ fontSize:'0.82rem', color:'#888', marginBottom:'1.5rem' }}>Se notificará al PM para contactar a <strong style={{ color:'#0f0f0f' }}>{modalForm.empresa}</strong></p>
 
-                  <div className="acc-modal-summary" style={{ textAlign: 'left', marginTop: '1.25rem' }}>
-                    <div className="acc-modal-summary-title">Datos enviados</div>
-                    <div className="acc-modal-summary-grid">
-                      <div><div className="acc-modal-summary-label">Contacto</div><div className="acc-modal-summary-value">{modalForm.nombre} {modalForm.apellido}</div></div>
-                      <div><div className="acc-modal-summary-label">Empresa</div><div className="acc-modal-summary-value">{modalForm.empresa}</div></div>
-                      <div><div className="acc-modal-summary-label">Email</div><div className="acc-modal-summary-value">{modalForm.email}</div></div>
-                      <div><div className="acc-modal-summary-label">WhatsApp</div><div className="acc-modal-summary-value">{modalCountry?.dial} {modalForm.whatsapp}</div></div>
-                    </div>
+                  <div style={{ background:'#fafafa', border:'1px solid #ebebeb', borderRadius:14, padding:'1rem', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.65rem 1rem', textAlign:'left' as const, marginBottom:'1.25rem' }}>
+                    {[
+                      ['Contacto', `${modalForm.nombre} ${modalForm.apellido}`],
+                      ['Empresa',  modalForm.empresa],
+                      ['Email',    modalForm.email],
+                      ['WhatsApp', `${modalCountry?.dial ?? ''} ${modalForm.whatsapp}`],
+                    ].map(([k, v]) => (
+                      <div key={k}>
+                        <div style={{ fontSize:'0.68rem', color:'#bbb', marginBottom:'0.1rem' }}>{k}</div>
+                        <div style={{ fontSize:'0.8rem', fontWeight:600, color:'#0f0f0f' }}>{v || '—'}</div>
+                      </div>
+                    ))}
                   </div>
 
-                  <button className="acc-modal-btn" onClick={resetStudioModal} style={{ marginTop: '1rem' }}>
+                  <button onClick={resetStudioModal}
+                    style={{ width:'100%', padding:'0.65rem', fontSize:'0.82rem', fontWeight:700, color:'#fff', background:'#0f0f0f', border:'none', borderRadius:12, cursor:'pointer' }}>
                     Cerrar
                   </button>
                 </div>
               )}
+
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ═══ MODAL: PM Detail ═══ */}
       {pmModalOpen && (

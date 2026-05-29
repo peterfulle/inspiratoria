@@ -9,51 +9,82 @@ import { useState, useEffect } from "react";
 const pageStyles = `
   .bill-page {
     min-height: 100vh;
-    background: #fafafa;
-    color: #1a1a1a;
+    background: #ffffff;
+    color: #0f0f0f;
   }
   .bill-header {
-    background: white;
-    border-bottom: 1px solid #e5e7eb;
-    position: sticky;
-    top: 0;
-    z-index: 20;
+    background: #ffffff;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .bill-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #b08a00;
+    margin-bottom: 0.4rem;
+  }
+  .bill-eyebrow::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #F5C800;
+    display: inline-block;
   }
   .bill-stat {
     background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 20px 24px;
-    transition: box-shadow 0.2s ease;
+    border: 1px solid #ebebeb;
+    border-radius: 14px;
+    padding: 20px 22px;
+    transition: box-shadow 0.18s, transform 0.18s;
+    position: relative;
+    overflow: hidden;
   }
   .bill-stat:hover {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.07);
+    transform: translateY(-2px);
+  }
+  .bill-stat.featured {
+    border-color: rgba(245,200,0,0.4);
+    background: linear-gradient(145deg, #fffdf0 0%, #fffbe8 100%);
+  }
+  .bill-stat.featured::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: #F5C800;
+    border-radius: 14px 14px 0 0;
   }
   .bill-card {
     background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
+    border: 1px solid #ebebeb;
+    border-radius: 16px;
     overflow: hidden;
   }
   .bill-tab {
-    padding: 10px 20px;
-    font-size: 13px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.78rem;
     font-weight: 500;
-    border-bottom: 2px solid transparent;
-    transition: all 0.15s ease;
-    color: #6b7280;
+    border-radius: 8px;
+    transition: all 0.12s ease;
+    color: #999;
     cursor: pointer;
     background: none;
-    border-top: none;
-    border-left: none;
-    border-right: none;
+    border: none;
+    white-space: nowrap;
   }
   .bill-tab.active {
-    color: #1a1a1a;
-    border-bottom-color: #1a1a1a;
+    background: #0f0f0f;
+    color: #ffffff;
+    font-weight: 700;
   }
   .bill-tab:hover:not(.active) {
-    color: #374151;
+    color: #0f0f0f;
+    background: #f5f5f5;
   }
   .bill-row {
     border-bottom: 1px solid #f3f4f6;
@@ -83,32 +114,38 @@ const pageStyles = `
   .bill-badge-enterprise { background: #f3e8ff; color: #7c3aed; }
   .bill-badge-trial-plan { background: #fef3c7; color: #d97706; }
   .bill-btn {
-    padding: 8px 18px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
+    padding: 0.45rem 0.9rem;
+    border-radius: 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.15s ease;
     border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
   }
   .bill-btn-primary {
-    background: #1a1a1a;
+    background: #0f0f0f;
     color: white;
   }
   .bill-btn-primary:hover {
-    background: #333;
+    background: #222;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   }
   .bill-btn-secondary {
     background: white;
-    color: #1a1a1a;
-    border: 1px solid #e5e7eb;
+    color: #0f0f0f;
+    border: 1px solid #e8e8e8;
   }
   .bill-btn-secondary:hover {
-    background: #f9fafb;
+    background: #f5f5f5;
+    border-color: #ccc;
   }
   .bill-btn-sm {
-    padding: 5px 12px;
-    font-size: 12px;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.72rem;
+    border-radius: 8px;
   }
   .bill-modal-overlay {
     position: fixed;
@@ -598,38 +635,37 @@ export default function BillingPage() {
       <style dangerouslySetInnerHTML={{ __html: pageStyles }} />
       <div className="bill-page">
         {/* ── HEADER ── */}
-        <header className="bill-header">
-          <div style={{ padding: "20px 32px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <h1 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>Facturación</h1>
-                <p style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>Suite completa de gestión de pagos, facturación y suscripciones</p>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="bill-btn bill-btn-secondary" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {Icons.download} Exportar
-                </button>
-                <button className="bill-btn bill-btn-primary" onClick={loadBilling} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  ↻ Actualizar
-                </button>
-              </div>
+        <div className="bill-header" style={{ padding: "1.75rem 2rem 1rem" }}>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "1rem" }}>
+            <div>
+              <div className="bill-eyebrow">Finanzas</div>
+              <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0f0f0f", letterSpacing: "-0.02em", lineHeight: 1.15, margin: 0 }}>Facturación</h1>
+              <p style={{ fontSize: "0.82rem", color: "#9a9a9a", marginTop: "0.25rem" }}>Gestión de pagos, suscripciones y planes</p>
             </div>
-            {/* Tabs */}
-            <div style={{ display: "flex", gap: 4, marginTop: 20, borderBottom: "1px solid #f3f4f6" }}>
-              {([
-                { id: "overview" as const, label: "Resumen" },
-                { id: "invoices" as const, label: "Facturas" },
-                { id: "plans" as const, label: "Catálogo de Planes" },
-              ]).map(t => (
-                <button key={t.id} className={`bill-tab ${activeTab === t.id ? "active" : ""}`} onClick={() => setActiveTab(t.id)}>
-                  {t.label}
-                </button>
-              ))}
+            <div style={{ display: "flex", gap: "0.5rem", paddingBottom: 4 }}>
+              <button className="bill-btn bill-btn-secondary">
+                {Icons.download} Exportar
+              </button>
+              <button className="bill-btn bill-btn-primary" onClick={loadBilling}>
+                ↻ Actualizar
+              </button>
             </div>
           </div>
-        </header>
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: "0.25rem", background: "#f5f5f5", padding: "0.2rem", borderRadius: 10, width: "fit-content", border: "1px solid #eee" }}>
+            {([
+              { id: "overview" as const, label: "Resumen" },
+              { id: "invoices" as const, label: "Facturas" },
+              { id: "plans" as const, label: "Catálogo de Planes" },
+            ]).map(t => (
+              <button key={t.id} className={`bill-tab ${activeTab === t.id ? "active" : ""}`} onClick={() => setActiveTab(t.id)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        <main style={{ padding: "24px 32px", maxWidth: 1280, margin: "0 auto" }}>
+        <main style={{ padding: "1.75rem 2rem" }}>
           {loading && (
             <div style={{ textAlign: "center", padding: 60, color: "#9ca3af" }}>
               <div style={{ fontSize: 14 }}>Cargando datos de facturación...</div>
@@ -651,47 +687,47 @@ export default function BillingPage() {
               {activeTab === "overview" && (
                 <>
                   {/* Stats Grid */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
-                    <div className="bill-stat">
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af" }}>MRR</span>
-                        <span style={{ color: "#16a34a", display: "flex", alignItems: "center", gap: 2, fontSize: 11, fontWeight: 600 }}>{Icons.trendUp}</span>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(185px, 1fr))", gap: 14, marginBottom: 24 }}>
+                    <div className="bill-stat featured">
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                        <span style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.07em", color: "#b08a00" }}>MRR</span>
+                        <span style={{ color: "#16a34a", display: "flex", alignItems: "center", gap: 2, fontSize: 11 }}>{Icons.trendUp}</span>
                       </div>
-                      <p style={{ fontSize: 28, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>{stats ? fmtCurrency(stats.mrr) : "—"}</p>
-                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Ingresos mensuales recurrentes</p>
+                      <p style={{ fontSize: "2rem", fontWeight: 800, color: "#6a4f00", margin: 0, letterSpacing: "-0.02em", lineHeight: 1 }}>{stats ? fmtCurrency(stats.mrr) : "—"}</p>
+                      <p style={{ fontSize: "0.7rem", color: "#b08a00", marginTop: 4 }}>Ingresos mensuales recurrentes</p>
                     </div>
 
                     <div className="bill-stat">
-                      <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", display: "block", marginBottom: 8 }}>ARR</span>
-                      <p style={{ fontSize: 28, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>{stats ? fmtCurrency(stats.arr) : "—"}</p>
-                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Ingresos anuales recurrentes</p>
+                      <span style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.07em", color: "#aaa", display: "block", marginBottom: 10 }}>ARR</span>
+                      <p style={{ fontSize: "2rem", fontWeight: 800, color: "#0f0f0f", margin: 0, letterSpacing: "-0.02em", lineHeight: 1 }}>{stats ? fmtCurrency(stats.arr) : "—"}</p>
+                      <p style={{ fontSize: "0.7rem", color: "#aaa", marginTop: 4 }}>Ingresos anuales recurrentes</p>
                     </div>
 
                     <div className="bill-stat">
-                      <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", display: "block", marginBottom: 8 }}>CLIENTES ACTIVOS</span>
-                      <p style={{ fontSize: 28, fontWeight: 600, color: "#16a34a", margin: 0 }}>{stats?.active ?? 0}</p>
-                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>de {stats?.total_clients ?? 0} totales</p>
+                      <span style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.07em", color: "#aaa", display: "block", marginBottom: 10 }}>Clientes Activos</span>
+                      <p style={{ fontSize: "2rem", fontWeight: 800, color: "#16a34a", margin: 0, letterSpacing: "-0.02em", lineHeight: 1 }}>{stats?.active ?? 0}</p>
+                      <p style={{ fontSize: "0.7rem", color: "#aaa", marginTop: 4 }}>de {stats?.total_clients ?? 0} totales</p>
                     </div>
 
                     <div className="bill-stat">
-                      <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", display: "block", marginBottom: 8 }}>SUSCRIPCIONES ACTIVAS</span>
-                      <p style={{ fontSize: 28, fontWeight: 600, color: "#16a34a", margin: 0 }}>{(stats?.active ?? 0) + (stats?.trial ?? 0)}</p>
-                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>incluye cuentas migradas desde trial</p>
+                      <span style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.07em", color: "#aaa", display: "block", marginBottom: 10 }}>Suscripciones</span>
+                      <p style={{ fontSize: "2rem", fontWeight: 800, color: "#16a34a", margin: 0, letterSpacing: "-0.02em", lineHeight: 1 }}>{(stats?.active ?? 0) + (stats?.trial ?? 0)}</p>
+                      <p style={{ fontSize: "0.7rem", color: "#aaa", marginTop: 4 }}>incluye trials activos</p>
                     </div>
 
                     <div className="bill-stat">
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af" }}>VENCIDAS</span>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                        <span style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.07em", color: "#aaa" }}>Vencidas</span>
                         {(stats?.overdue ?? 0) > 0 && <span style={{ color: "#dc2626" }}>{Icons.alert}</span>}
                       </div>
-                      <p style={{ fontSize: 28, fontWeight: 600, color: (stats?.overdue ?? 0) > 0 ? "#dc2626" : "#1a1a1a", margin: 0 }}>{stats?.overdue ?? 0}</p>
-                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>requieren atención</p>
+                      <p style={{ fontSize: "2rem", fontWeight: 800, color: (stats?.overdue ?? 0) > 0 ? "#dc2626" : "#0f0f0f", margin: 0, letterSpacing: "-0.02em", lineHeight: 1 }}>{stats?.overdue ?? 0}</p>
+                      <p style={{ fontSize: "0.7rem", color: "#aaa", marginTop: 4 }}>requieren atención</p>
                     </div>
 
                     <div className="bill-stat">
-                      <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", display: "block", marginBottom: 8 }}>USUARIOS TOTALES</span>
-                      <p style={{ fontSize: 28, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>{stats?.total_users ?? 0}</p>
-                      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{stats?.total_programs ?? 0} programas activos</p>
+                      <span style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.07em", color: "#aaa", display: "block", marginBottom: 10 }}>Usuarios Totales</span>
+                      <p style={{ fontSize: "2rem", fontWeight: 800, color: "#0f0f0f", margin: 0, letterSpacing: "-0.02em", lineHeight: 1 }}>{stats?.total_users ?? 0}</p>
+                      <p style={{ fontSize: "0.7rem", color: "#aaa", marginTop: 4 }}>{stats?.total_programs ?? 0} programas activos</p>
                     </div>
                   </div>
 
