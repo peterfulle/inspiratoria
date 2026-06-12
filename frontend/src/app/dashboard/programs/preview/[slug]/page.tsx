@@ -93,7 +93,7 @@ export default function ProgramPreviewPage() {
   const slug = params.slug as string;
 
   const [template, setTemplate] = useState<ProgramTemplate | null>(null);
-  const [assignedPrograms, setAssignedPrograms] = useState<Array<{ id: string; name: string; status: string; company?: { name: string } | null }>>([]);
+  const [assignedPrograms, setAssignedPrograms] = useState<Array<{ id: string; name: string; status: string; company?: { name: string; slug?: string } | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<"overview" | "modules" | "config">("overview");
@@ -305,7 +305,11 @@ export default function ProgramPreviewPage() {
               {assignedPrograms.map(p => (
                 <button
                   key={p.id}
-                  onClick={() => router.push(`/dashboard/programs/${p.id}/manage`)}
+                  onClick={() => router.push(
+                    p.company?.slug
+                      ? `/studio/${p.company.slug}/program/${p.id}`
+                      : `/dashboard/programs/${p.id}/manage`
+                  )}
                   style={{ display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left", padding: "10px 12px", background: "#fafafa", border: "1px solid #efefef", borderRadius: 10, cursor: "pointer" }}
                 >
                   <div>

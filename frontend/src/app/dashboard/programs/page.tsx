@@ -929,7 +929,11 @@ export default function ProgramsPage() {
                               </button>
                             )}
                             <button
-                              onClick={() => router.push(`/dashboard/programs/${p.id}/manage`)}
+                              onClick={() => router.push(
+                                p.company?.slug
+                                  ? `/studio/${p.company.slug}/program/${p.id}`
+                                  : `/dashboard/programs/${p.id}/manage`
+                              )}
                               className="btn-primary flex items-center gap-2 text-sm py-2 px-4"
                             >
                               <Icon.Link className="w-4 h-4" />
