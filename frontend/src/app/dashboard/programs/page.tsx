@@ -158,6 +158,12 @@ export default function ProgramsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+
+  // Pestaña principal: Plantillas (diseño) | Programas (instancias por empresa)
+  const [mainTab, setMainTab] = useState<"templates" | "programs">("templates");
+  const [programs, setPrograms] = useState<Array<{ id: string; name: string; status: string; company?: { name: string; slug?: string } | null; template?: { name: string } | null; activities_count?: number; participants_count?: number; cohort_year?: number | null }>>([]);
+  const [programsLoading, setProgramsLoading] = useState(false);
+  const [programsSearch, setProgramsSearch] = useState("");
   
   // Modals
   const [selectedTemplate, setSelectedTemplate] = useState<ProgramTemplate | null>(null);
@@ -173,7 +179,9 @@ export default function ProgramsPage() {
   const [assignSuccess, setAssignSuccess] = useState(false);
   const [assignError, setAssignError] = useState("");
   const [activeCompanies, setActiveCompanies] = useState<Array<{id: string; name: string; account_type?: string; plan: string; status?: string}>>([]);
-  const [assignForm, setAssignForm] = useState({ programId: "", companyId: "" });
+  const [assignForm, setAssignForm] = useState({ programId: "", companyId: "", cohortYear: String(new Date().getFullYear()) });
+  // Aviso de duplicado devuelto por el backend (409)
+  const [assignDuplicate, setAssignDuplicate] = useState<{ message: string; existingId: string } | null>(null);
   
   // Edit tabs
   const [editTab, setEditTab] = useState<ConfigTab>("general");
@@ -254,6 +262,35 @@ export default function ProgramsPage() {
     };
     fetchTemplates();
   }, []);
+
+  // ─── PROGRAMAS (instancias) ───
+  const fetchPrograms = async () => {
+    setProgramsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/programs`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setPrograms(data);
+      }
+    } catch (e) {
+      console.warn("Could not fetch programs", e);
+    } finally {
+      setProgramsLoading(false);
+    }
+  };
+
+  // Pestaña inicial desde ?tab=programs y carga al entrar a la pestaña
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "programs") setMainTab("programs");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mainTab === "programs" && programs.length === 0) fetchPrograms();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mainTab]);
 
   // Stats
   const publishedCount = templates.filter(t => t.status === "published").length;
@@ -595,7 +632,8 @@ export default function ProgramsPage() {
     setShowAssignModal(true);
     setAssignSuccess(false);
     setAssignError("");
-    setAssignForm({ programId: "", companyId: "" });
+    setAssignDuplicate(null);
+    setAssignForm({ programId: "", companyId: "", cohortYear: String(new Date().getFullYear()) });
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/api/companies/active-companies`, {
@@ -609,42 +647,49 @@ export default function ProgramsPage() {
     } catch {}
   };
 
-  const handleAssignProgram = async () => {
+  const handleAssignProgram = async (force = false) => {
     if (!assignForm.programId || !assignForm.companyId) {
-      setAssignError("Selecciona un programa y una empresa");
+      setAssignError("Selecciona una plantilla y una empresa");
       return;
     }
     setAssignLoading(true);
     setAssignError("");
+    if (!force) setAssignDuplicate(null);
     try {
       const token = localStorage.getItem("token");
-      // Find the selected template
       const selectedTemplate = templates.find(t => t.id === assignForm.programId);
       if (!selectedTemplate) throw new Error("Plantilla no encontrada");
 
-      // Step 1: Create program in Django DB from template
+      // El backend autoconstruye el nombre ({plantilla} · {empresa} {año}),
+      // congela el diseño completo (design_snapshot) y vincula la plantilla.
       const createRes = await fetch(`${API_URL}/api/programs`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          name: selectedTemplate.name,
-          description: selectedTemplate.description || "",
-          theme: selectedTemplate.category || "General",
+          template_id: selectedTemplate.id,
           company_id: assignForm.companyId,
+          cohort_year: assignForm.cohortYear ? Number(assignForm.cohortYear) : undefined,
           status: "designed",
-          activities: (selectedTemplate.modules || []).flatMap(m =>
-            (m.activities || []).map(a => ({
-              type: a.type || "training",
-              name: (a as any).title || a.name || "Actividad",
-              description: a.description || "",
-              modality: (a as any).modality || "online",
-            }))
-          ),
+          force,
         }),
       });
       const createData = await createRes.json();
-      if (!createRes.ok) throw new Error(createData.detail || createData.error || "Error al crear programa");
 
+      if (createRes.status === 409) {
+        // Plantilla ya asignada a esa empresa: ofrecer confirmar
+        const d = createData.detail || {};
+        setAssignDuplicate({
+          message: d.message || "Esta plantilla ya está asignada a esa empresa.",
+          existingId: d.existing_program_id || "",
+        });
+        return;
+      }
+      if (!createRes.ok) {
+        const detail = createData.detail;
+        throw new Error(typeof detail === "string" ? detail : (detail?.message || createData.error || "Error al crear programa"));
+      }
+
+      setAssignDuplicate(null);
       setAssignSuccess(true);
     } catch (err: any) {
       setAssignError(err.message);
@@ -673,8 +718,12 @@ export default function ProgramsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <div className="programs-eyebrow">Gestión</div>
-                <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f0f0f', letterSpacing: '-0.02em', lineHeight: 1.15 }}>Plantillas de Programas</h1>
-                <p className="text-neutral-500 text-sm mt-0.5">Catálogo de programas disponibles</p>
+                <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f0f0f', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+                  {mainTab === "templates" ? "Plantillas de Programas" : "Programas"}
+                </h1>
+                <p className="text-neutral-500 text-sm mt-0.5">
+                  {mainTab === "templates" ? "Catálogo de diseños reutilizables" : "Instancias asignadas a empresas"}
+                </p>
               </div>
               
               <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -698,10 +747,99 @@ export default function ProgramsPage() {
                 </button>
               </div>
             </div>
+
+            {/* Tabs: Plantillas (diseño) vs Programas (instancias) */}
+            <div className="flex items-center gap-1 mt-4 border-b border-neutral-200">
+              {([
+                { k: "templates" as const, l: "Plantillas" },
+                { k: "programs" as const, l: "Programas" },
+              ]).map(t => (
+                <button
+                  key={t.k}
+                  onClick={() => setMainTab(t.k)}
+                  className="px-4 py-2.5 text-[13px] font-semibold -mb-px border-b-2 transition-colors"
+                  style={{
+                    borderColor: mainTab === t.k ? "#0f0f0f" : "transparent",
+                    color: mainTab === t.k ? "#0f0f0f" : "#9a9a9a",
+                  }}
+                >
+                  {t.l}
+                  <span style={{ marginLeft: 6, fontSize: 11, color: "#b5b5b5" }}>
+                    {t.k === "templates" ? templates.length : (programs.length || "")}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </header>
 
-        <main className="p-4 sm:p-6 lg:p-8 w-full">
+        {/* ── VISTA PROGRAMAS (instancias) ── */}
+        {mainTab === "programs" && (
+          <main className="p-4 sm:p-6 lg:p-8 w-full">
+            <div className="glass-card p-3 sm:p-4 mb-6">
+              <div className="relative flex-1">
+                <Icon.Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar programas por nombre o empresa..."
+                  value={programsSearch}
+                  onChange={(e) => setProgramsSearch(e.target.value)}
+                  className="input-field pl-11"
+                />
+              </div>
+            </div>
+
+            {programsLoading ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "30vh", gap: 12 }}>
+                <div style={{ width: 22, height: 22, border: "3px solid #e5e7eb", borderTopColor: "#111", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                <span className="text-neutral-500 text-sm">Cargando programas...</span>
+              </div>
+            ) : (() => {
+              const q = programsSearch.toLowerCase();
+              const list = programs.filter(p =>
+                p.name.toLowerCase().includes(q) || (p.company?.name || "").toLowerCase().includes(q)
+              );
+              if (list.length === 0) {
+                return (
+                  <div className="glass-card p-10 text-center">
+                    <p className="text-neutral-500 text-sm mb-3">No hay programas asignados todavía.</p>
+                    <button onClick={openAssignModal} className="btn-primary px-4 py-2 text-[13px] inline-flex items-center gap-2">
+                      <Icon.Link className="w-4 h-4" /> Asignar una plantilla a una empresa
+                    </button>
+                  </div>
+                );
+              }
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {list.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => router.push(`/dashboard/programs/${p.id}/manage`)}
+                      className="glass-card p-4 text-left hover:shadow-md transition-shadow"
+                      style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-[14px] font-semibold text-neutral-900 leading-snug">{p.name}</span>
+                        <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: "#555", background: "#f4f4f4", borderRadius: 999, padding: "3px 9px" }}>{p.status}</span>
+                      </div>
+                      <div className="text-[12px] text-neutral-500">
+                        {p.company?.name || "Sin empresa"}
+                      </div>
+                      <div className="flex items-center gap-3 text-[11.5px] text-neutral-400 mt-1">
+                        <span>{p.activities_count ?? 0} actividades</span>
+                        <span>·</span>
+                        <span>{p.participants_count ?? 0} participantes</span>
+                        {p.template?.name && (<><span>·</span><span className="truncate">desde «{p.template.name}»</span></>)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+          </main>
+        )}
+
+        <main className="p-4 sm:p-6 lg:p-8 w-full" style={{ display: mainTab === "templates" ? undefined : "none" }}>
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="stat-card">
@@ -2241,7 +2379,55 @@ export default function ProgramsPage() {
                         <p className="text-[11px] text-neutral-400 mt-1.5">No hay empresas activas. Crea una cuenta Studio primero.</p>
                       )}
                     </div>
+
+                    <div>
+                      <label className="block text-[12px] text-neutral-500 mb-1.5 font-medium">Año de la cohorte</label>
+                      <input
+                        type="number"
+                        value={assignForm.cohortYear}
+                        onChange={e => { setAssignForm(p => ({ ...p, cohortYear: e.target.value })); setAssignDuplicate(null); }}
+                        className="w-full px-3.5 py-2.5 bg-white border border-neutral-200 rounded-xl text-[14px] text-neutral-900 focus:outline-none focus:border-neutral-300 focus:ring-2 focus:ring-neutral-100"
+                        placeholder="2026"
+                      />
+                    </div>
+
+                    {/* Preview del nombre que se generará */}
+                    {assignForm.programId && assignForm.companyId && (() => {
+                      const t = templates.find(x => x.id === assignForm.programId);
+                      const c = activeCompanies.find(x => x.id === assignForm.companyId);
+                      if (!t || !c) return null;
+                      const yr = assignForm.cohortYear ? ` ${assignForm.cohortYear}` : "";
+                      return (
+                        <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-100">
+                          <p className="text-[11px] text-neutral-400 mb-0.5">Se creará el programa</p>
+                          <p className="text-[13px] font-semibold text-neutral-900">{t.name} · {c.name}{yr}</p>
+                        </div>
+                      );
+                    })()}
                   </div>
+
+                  {assignDuplicate && (
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-[12px] text-amber-800 font-medium mb-2">{assignDuplicate.message}</p>
+                      <div className="flex items-center gap-2">
+                        {assignDuplicate.existingId && (
+                          <button
+                            onClick={() => router.push(`/dashboard/programs/${assignDuplicate.existingId}/manage`)}
+                            className="text-[12px] font-semibold text-amber-800 underline"
+                          >
+                            Ver el existente
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleAssignProgram(true)}
+                          disabled={assignLoading}
+                          className="text-[12px] font-semibold text-neutral-700 underline"
+                        >
+                          Crear otro igual de todos modos
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {assignError && (
                     <div className="mt-4 p-3 bg-red-50 rounded-lg">
@@ -2254,7 +2440,7 @@ export default function ProgramsPage() {
                       Cancelar
                     </button>
                     <button
-                      onClick={handleAssignProgram}
+                      onClick={() => handleAssignProgram(false)}
                       disabled={assignLoading}
                       className="btn-primary px-5 py-2.5 text-[13px] flex items-center gap-2"
                     >
@@ -2279,10 +2465,13 @@ export default function ProgramsPage() {
                   </div>
                   <h3 className="text-[18px] font-semibold text-neutral-900 mb-2">Programa asignado</h3>
                   <p className="text-[13px] text-neutral-400 mb-6">
-                    El programa ha sido asignado a la empresa. Ahora aparecerá en su Studio Dashboard.
+                    El programa ha sido asignado a la empresa. Ya aparece en la pestaña «Programas» y en su Studio Dashboard.
                   </p>
-                  <button onClick={() => setShowAssignModal(false)} className="btn-primary px-5 py-2.5 text-[13px]">
-                    Cerrar
+                  <button
+                    onClick={() => { setShowAssignModal(false); setMainTab("programs"); fetchPrograms(); }}
+                    className="btn-primary px-5 py-2.5 text-[13px]"
+                  >
+                    Ver programas
                   </button>
                 </div>
               )}

@@ -26,6 +26,8 @@ interface CompanyLite { id: string; name: string; slug: string; }
 interface ProgramDetail {
   id: string; name: string; description: string; theme: string; status: string;
   company_id: string | null; company: CompanyLite | null;
+  template?: { id: string; name: string; slug: string } | null;
+  cohort_year?: number | null;
   activities: ProgramActivity[]; activities_count: number; participants_count: number;
   requires_certification: boolean; created_at: string | null; updated_at: string | null;
 }
@@ -1981,6 +1983,9 @@ function TabGobierno({ program, slug, assignedPM, pms, onTransition, onAssignPM 
           <QuickAction href={`/studio/${slug}`} icon={<I.Layout />} title="Vista Studio" sub="Ver todos los programas de la cuenta" />
           {program.company_id && (
             <QuickAction href={`/dashboard/accounts/${program.company_id}`} icon={<I.Building />} title="Cuenta cliente" sub={`Ir a ${program.company?.name}`} />
+          )}
+          {program.template?.slug && (
+            <QuickAction href={`/dashboard/programs/preview/${program.template.slug}`} icon={<I.Layout />} title="Plantilla de origen" sub={program.template.name} />
           )}
         </div>
       </Card>

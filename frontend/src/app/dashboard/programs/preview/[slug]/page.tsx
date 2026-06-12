@@ -93,6 +93,7 @@ export default function ProgramPreviewPage() {
   const slug = params.slug as string;
 
   const [template, setTemplate] = useState<ProgramTemplate | null>(null);
+  const [assignedPrograms, setAssignedPrograms] = useState<Array<{ id: string; name: string; status: string; company?: { name: string } | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<"overview" | "modules" | "config">("overview");
@@ -105,7 +106,18 @@ export default function ProgramPreviewPage() {
     (async () => {
       try {
         const r = await fetch(`${API_URL}/api/program-templates`);
-        if (r.ok) { const all: ProgramTemplate[] = await r.json(); setTemplate(all.find(t => t.slug === slug) || null); }
+        if (r.ok) {
+          const all: ProgramTemplate[] = await r.json();
+          const found = all.find(t => t.slug === slug) || null;
+          setTemplate(found);
+          // Programas reales instanciados desde esta plantilla
+          if (found?.id) {
+            try {
+              const pr = await fetch(`${API_URL}/api/programs?template_id=${found.id}`);
+              if (pr.ok) setAssignedPrograms(await pr.json());
+            } catch {}
+          }
+        }
       } catch (e) { console.warn("Fetch error", e); }
       finally { setLoading(false); }
     })();
@@ -269,6 +281,40 @@ export default function ProgramPreviewPage() {
           {template.tags.length > 0 && (
             <div className="tags-row">
               {template.tags.map(t => <span key={t} className="tag">#{t}</span>)}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* PROGRAMAS ASIGNADOS (instancias reales de esta plantilla) */}
+      <section className="no-print" style={{ maxWidth: 1100, margin: "16px auto 0", padding: "0 24px" }}>
+        <div style={{ background: "#fff", border: "1px solid #ececec", borderRadius: 14, padding: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: assignedPrograms.length ? 12 : 0 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0f0f0f" }}>Programas asignados</div>
+              <div style={{ fontSize: 12, color: "#8a8a8a" }}>
+                {assignedPrograms.length === 0
+                  ? "Esta plantilla todavía no se asignó a ninguna empresa."
+                  : `${assignedPrograms.length} programa(s) instanciado(s) desde este diseño.`}
+              </div>
+            </div>
+            <span style={{ fontSize: 11, color: "#8a8a8a" }}>Plantilla = diseño · Programa = instancia por empresa</span>
+          </div>
+          {assignedPrograms.length > 0 && (
+            <div style={{ display: "grid", gap: 8 }}>
+              {assignedPrograms.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => router.push(`/dashboard/programs/${p.id}/manage`)}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left", padding: "10px 12px", background: "#fafafa", border: "1px solid #efefef", borderRadius: 10, cursor: "pointer" }}
+                >
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f0f0f" }}>{p.name}</div>
+                    <div style={{ fontSize: 11.5, color: "#8a8a8a" }}>{p.company?.name || "Sin empresa"}</div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#555", background: "#fff", border: "1px solid #e6e6e6", borderRadius: 999, padding: "3px 10px" }}>{p.status}</span>
+                </button>
+              ))}
             </div>
           )}
         </div>

@@ -25,11 +25,24 @@ class Program(models.Model):
     theme = models.CharField(max_length=120, default="General")
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="designed")
     company = models.ForeignKey("companies.Company", null=True, blank=True, on_delete=models.SET_NULL, related_name="programs")
-    
+
+    # Trazabilidad plantilla -> programa (de qué diseño se instanció)
+    template = models.ForeignKey(
+        "programs.ProgramTemplate",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="programs",
+    )
+    # Copia congelada del diseño completo de la plantilla al momento de asignar
+    # (módulos, hitos, requisitos, reglas de matching/sesiones). Así el programa
+    # conserva TODO el diseño aunque la plantilla cambie o se borre después.
+    design_snapshot = models.JSONField(default=dict, blank=True)
+    cohort_year = models.PositiveIntegerField(null=True, blank=True)
+
     # Reglas de avance y certificación
     requires_certification = models.BooleanField(default=False)
     certification_rules = models.JSONField(default=dict, blank=True)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     last_follow_up = models.DateTimeField(null=True, blank=True)  # Último seguimiento

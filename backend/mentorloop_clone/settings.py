@@ -66,7 +66,9 @@ ASGI_APPLICATION = "mentorloop_clone.asgi.application"
 DATABASES = {
     "default": dj_database_url.config(
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
+        # En local (DB remota de Render) conviene CONN_MAX_AGE=0 para no reutilizar
+        # conexiones que Render cierra por inactividad. En prod se mantiene 600.
+        conn_max_age=int(os.environ.get("CONN_MAX_AGE", "600")),
         conn_health_checks=True,
     )
 }

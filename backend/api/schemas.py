@@ -15,13 +15,18 @@ class CompanyBasic(BaseModel):
 
 
 class ProgramIn(BaseModel):
-    name: str
+    name: Optional[str] = None  # opcional: si no llega, se autoconstruye desde plantilla + empresa
     description: Optional[str] = None
     theme: Optional[str] = None
     # company_id may arrive as a UUID object (from DB) or as a string from clients
     company_id: Optional[Union[str, UUID]] = None
     status: Optional[str] = "designed"
     activities: Optional[List[Dict[str, Any]]] = None  # Actividades al crear programa
+    # Trazabilidad / diseño
+    template_id: Optional[Union[str, UUID]] = None  # plantilla de origen
+    cohort_year: Optional[int] = None  # año de la cohorte (para el nombre)
+    design_snapshot: Optional[Dict[str, Any]] = None  # diseño completo congelado
+    force: Optional[bool] = False  # crear aunque ya exista esa plantilla en la empresa
 
 
 class ProgramOut(ProgramIn):
@@ -31,6 +36,7 @@ class ProgramOut(ProgramIn):
     activities: Optional[List[Dict[str, Any]]] = None  # Lista de actividades
     activities_count: Optional[int] = 0
     participants_count: Optional[int] = 0
+    template: Optional[Dict[str, Any]] = None  # plantilla de origen (id, name, slug)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

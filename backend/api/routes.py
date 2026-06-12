@@ -273,17 +273,17 @@ def health_check() -> dict[str, str]:
 
 
 @router.get("/programs", response_model=List[ProgramOut])
-def list_programs(company_id: Optional[str] = None) -> List[dict]:
+def list_programs(company_id: Optional[str] = None, template_id: Optional[str] = None) -> List[dict]:
     from programs.models import Activity, ProgramParticipant
-    
-    # Filtrar por company_id si se proporciona
+
+    programs = Program.objects.select_related('company', 'template').all()
     if company_id:
-        programs = Program.objects.select_related('company').filter(company_id=company_id)
-    else:
-        programs = Program.objects.select_related('company').all()
-    
+        programs = programs.filter(company_id=company_id)
+    if template_id:
+        programs = programs.filter(template_id=template_id)
+
     result = []
-    
+
     for p in programs:
         # Obtener actividades del programa
         activities = Activity.objects.filter(program=p)
@@ -320,13 +320,19 @@ def list_programs(company_id: Optional[str] = None) -> List[dict]:
                 "slug": p.company.slug,
             } if p.company else None,
             "status": p.status,
+            "template": {
+                "id": str(p.template.id),
+                "name": p.template.name,
+                "slug": p.template.slug,
+            } if p.template else None,
+            "cohort_year": p.cohort_year,
             "activities": activities_data,
             "activities_count": len(activities_data),
             "participants_count": participants_count,
             "created_at": p.created_at.isoformat() if p.created_at else None,
             "updated_at": p.updated_at.isoformat() if p.updated_at else None,
         })
-    
+
     return result
 
 
@@ -382,40 +388,95 @@ def _send_program_assignment_email(company, program):
 @router.post("/programs", response_model=ProgramOut, status_code=201)
 def create_program(payload: ProgramIn) -> dict:
     from companies.models import Company
-    from programs.models import Activity
+    from programs.models import Activity, ProgramTemplate
     import uuid
-    
-    # Debug logging
-    print(f"[DEBUG] Payload recibido: {payload}")
-    print(f"[DEBUG] company_id del payload: {payload.company_id}")
-    print(f"[DEBUG] activities del payload: {payload.activities}")
-    
-    # Get company if provided
+
+    # ─── Resolver empresa ───
     company = None
     if payload.company_id:
         try:
-            company_uuid = uuid.UUID(str(payload.company_id))
-            print(f"[DEBUG] Buscando company con UUID: {company_uuid}")
-            company = Company.objects.get(id=company_uuid)
-            print(f"[DEBUG] Company encontrada: {company.name} (ID: {company.id})")
+            company = Company.objects.get(id=uuid.UUID(str(payload.company_id)))
         except (Company.DoesNotExist, ValueError) as e:
-            print(f"[ERROR] Company no encontrada: {e}")
             raise HTTPException(status_code=404, detail=f"Company not found: {str(e)}")
-    
-    print(f"[DEBUG] Creando programa con company: {company}")
+
+    # ─── Resolver plantilla de origen (opcional) ───
+    template = None
+    if payload.template_id:
+        try:
+            template = ProgramTemplate.objects.get(id=uuid.UUID(str(payload.template_id)))
+        except (ProgramTemplate.DoesNotExist, ValueError):
+            raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+
+    # ─── Guard anti-duplicado: misma plantilla ya asignada a la misma empresa ───
+    if template and company and not payload.force:
+        existing = Program.objects.filter(template=template, company=company).first()
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "duplicate_assignment",
+                    "message": f"'{template.name}' ya está asignado a {company.name}.",
+                    "existing_program_id": str(existing.id),
+                    "existing_program_name": existing.name,
+                },
+            )
+
+    # ─── Snapshot del diseño completo (congelado al momento de asignar) ───
+    design_snapshot = payload.design_snapshot
+    if design_snapshot is None and template is not None:
+        design_snapshot = {
+            "template_id": str(template.id),
+            "template_slug": template.slug,
+            "category": template.category,
+            "duration": template.duration,
+            "modules": template.modules,
+            "milestones": template.milestones,
+            "tags": template.tags,
+            "mentor_requirements": template.mentor_requirements,
+            "mentee_requirements": template.mentee_requirements,
+            "matching_rules": template.matching_rules,
+            "session_rules": template.session_rules,
+        }
+    design_snapshot = design_snapshot or {}
+
+    # ─── Nombre: explícito, o autoconstruido desde plantilla + empresa (+ año) ───
+    name = (payload.name or "").strip()
+    if not name and template:
+        name = template.name
+        if company:
+            name = f"{template.name} · {company.name}"
+        if payload.cohort_year:
+            name = f"{name} {payload.cohort_year}"
+    if not name:
+        name = "Programa sin título"
+
     program = Program.objects.create(
-        name=payload.name,
-        description=payload.description or "",
-        theme=payload.theme or "General",
+        name=name,
+        description=payload.description or (template.description if template else "") or "",
+        theme=payload.theme or (template.category if template else "General") or "General",
         company=company,
         status=payload.status or "designed",
+        template=template,
+        design_snapshot=design_snapshot,
+        cohort_year=payload.cohort_year,
     )
-    
-    # Crear actividades si fueron enviadas
-    if payload.activities:
-        print(f"[DEBUG] Creando {len(payload.activities)} actividades")
-        for act_data in payload.activities:
-            activity = Activity.objects.create(
+
+    # ─── Actividades: las enviadas, o derivadas del diseño de la plantilla ───
+    activities_in = payload.activities
+    if not activities_in and design_snapshot.get("modules"):
+        activities_in = []
+        for m in design_snapshot["modules"]:
+            for a in (m.get("activities") or []):
+                activities_in.append({
+                    "type": a.get("type") or "training",
+                    "name": a.get("title") or a.get("name") or "Actividad",
+                    "description": a.get("description") or "",
+                    "modality": a.get("modality") or "online",
+                })
+
+    if activities_in:
+        for act_data in activities_in:
+            Activity.objects.create(
                 program=program,
                 name=act_data.get('name', ''),
                 description=act_data.get('description', ''),
@@ -425,15 +486,11 @@ def create_program(payload: ProgramIn) -> dict:
                 modality=act_data.get('modality'),
                 status='created',
             )
-            print(f"[DEBUG] Actividad creada: {activity.name} (ID: {activity.id})")
-    
-    print(f"[DEBUG] Programa creado - ID: {program.id}, company_id: {program.company_id}")
-    
-    # ─── SEND EMAIL NOTIFICATION ───
+
+    # ─── Notificación por email ───
     if company:
         _send_program_assignment_email(company, program)
-    
-    # Obtener actividades creadas
+
     activities = Activity.objects.filter(program=program)
     activities_data = [
         {
@@ -445,8 +502,8 @@ def create_program(payload: ProgramIn) -> dict:
         }
         for a in activities
     ]
-    
-    response_data = {
+
+    return {
         "id": str(program.id),
         "name": program.name,
         "description": program.description or "",
@@ -458,12 +515,14 @@ def create_program(payload: ProgramIn) -> dict:
             "slug": program.company.slug,
         } if program.company else None,
         "status": program.status,
+        "template": {
+            "id": str(template.id),
+            "name": template.name,
+            "slug": template.slug,
+        } if template else None,
         "activities": activities_data,
         "activities_count": len(activities_data),
     }
-    
-    print(f"[DEBUG] Response data: {response_data}")
-    return response_data
 
 
 @router.get("/programs/{program_id}", response_model=ProgramOut)
@@ -472,8 +531,8 @@ def get_program(program_id: str) -> dict:
     import uuid
     
     try:
-        program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
-        
+        program = Program.objects.select_related('company', 'template').get(id=uuid.UUID(program_id))
+
         # Obtener actividades del programa
         activities = Activity.objects.filter(program=program)
         activities_data = []
@@ -543,6 +602,13 @@ def get_program(program_id: str) -> dict:
                 "slug": program.company.slug,
             } if program.company else None,
             "status": program.status,
+            "template": {
+                "id": str(program.template.id),
+                "name": program.template.name,
+                "slug": program.template.slug,
+            } if program.template else None,
+            "cohort_year": program.cohort_year,
+            "design_snapshot": program.design_snapshot or {},
             "activities": activities_data,
             "activities_count": len(activities_data),
             "participants_count": participants_count,
@@ -559,7 +625,8 @@ def update_program(program_id: str, payload: ProgramIn) -> dict:
     import uuid
     try:
         program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
-        program.name = payload.name
+        if payload.name:
+            program.name = payload.name
         program.description = payload.description or ""
         program.theme = payload.theme or "General"
         program.save()
@@ -3707,6 +3774,23 @@ def delete_user(user_id: str):
 from invitations.views import router as invitations_router
 
 api_app = FastAPI(title="Mentoring Platform API", version="0.1.0")
+
+# La app corre bajo FastAPI montado en ASGI (no como vistas Django), por lo que
+# las señales request_started/request_finished de Django no se disparan y las
+# conexiones DB rotas/obsoletas no se reciclan. Replicamos ese ciclo aqui para
+# evitar "InterfaceError: connection already closed" tras conexiones idle.
+from django.db import close_old_connections
+
+
+@api_app.middleware("http")
+async def manage_db_connections(request, call_next):
+    close_old_connections()
+    try:
+        response = await call_next(request)
+    finally:
+        close_old_connections()
+    return response
+
 
 from starlette.middleware.cors import CORSMiddleware
 api_app.add_middleware(
