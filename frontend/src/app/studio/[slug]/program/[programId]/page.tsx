@@ -368,28 +368,30 @@ export default function ProgramManagerConsole() {
           </div>
         </header>
 
-        {/* Hero */}
-        <section className="px-8 pt-7 pb-6 bg-white border-b border-zinc-100">
-          <div className="max-w-6xl">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <Tag>{program.theme}</Tag>
-              <TagSoft icon={<I.Building className="w-3 h-3" />}>{program.company?.name || 'Sin cuenta'}</TagSoft>
-              {program.cohort_year ? <TagSoft icon={<I.Calendar className="w-3 h-3" />}>{program.cohort_year}</TagSoft> : null}
-              {program.requires_certification && <TagAccent icon={<I.Award className="w-3 h-3" />}>Certificación</TagAccent>}
-            </div>
-            <h1 className="text-[25px] font-semibold text-zinc-900 tracking-tight leading-tight mb-1.5">{program.name}</h1>
-            {program.description && <p className="text-[14px] text-zinc-500 max-w-3xl leading-relaxed mb-6">{program.description}</p>}
-
-            {kpis && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <Kpi icon={<I.Users />} label="Participantes" value={program.participants_count} sub={`${kpis.mentors} mentores · ${kpis.mentees} mentees`} />
-                <Kpi icon={<I.Activity />} label="Actividades" value={kpis.totalActivities} sub={`${kpis.completed} completadas · ${kpis.inProgress} activas`} />
-                <Kpi icon={<I.Module />} label="Módulos" value={kpis.totalModules} sub={`${kpis.totalHours} h de contenido`} />
-                <Kpi icon={<I.Target />} label="Estado" value={stMeta.label} sub={program.updated_at ? `Actualizado ${formatDate(program.updated_at)}` : ''} />
+        {/* Hero — solo en la pestaña Resumen */}
+        {activeTab === 'resumen' && (
+          <section className="px-8 pt-7 pb-6 bg-white border-b border-zinc-100">
+            <div className="max-w-6xl">
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <Tag>{program.theme}</Tag>
+                <TagSoft icon={<I.Building className="w-3 h-3" />}>{program.company?.name || 'Sin cuenta'}</TagSoft>
+                {program.cohort_year ? <TagSoft icon={<I.Calendar className="w-3 h-3" />}>{program.cohort_year}</TagSoft> : null}
+                {program.requires_certification && <TagAccent icon={<I.Award className="w-3 h-3" />}>Certificación</TagAccent>}
               </div>
-            )}
-          </div>
-        </section>
+              <h1 className="text-[25px] font-semibold text-zinc-900 tracking-tight leading-tight mb-1.5">{program.name}</h1>
+              {program.description && <p className="text-[14px] text-zinc-500 max-w-3xl leading-relaxed mb-6">{program.description}</p>}
+
+              {kpis && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <Kpi icon={<I.Users />} label="Participantes" value={program.participants_count} sub={`${kpis.mentors} mentores · ${kpis.mentees} mentees`} />
+                  <Kpi icon={<I.Activity />} label="Actividades" value={kpis.totalActivities} sub={`${kpis.completed} completadas · ${kpis.inProgress} activas`} />
+                  <Kpi icon={<I.Module />} label="Módulos" value={kpis.totalModules} sub={`${kpis.totalHours} h de contenido`} />
+                  <Kpi icon={<I.Target />} label="Estado" value={stMeta.label} sub={program.updated_at ? `Actualizado ${formatDate(program.updated_at)}` : ''} />
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         <div className="px-8 py-7 max-w-6xl">
           {activeTab === 'resumen' && <TabResumen program={program} participants={participants} assignedPM={assignedPM} pms={pms} onAssignPM={assignPM} />}
