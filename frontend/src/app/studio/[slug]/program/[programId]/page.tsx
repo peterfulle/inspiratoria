@@ -112,6 +112,9 @@ const I = {
   Bot:         SvgBase(<><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="12" cy="5" r="2" /><path d="M12 7v4" /><line x1="8" y1="16" x2="8" y2="16" /><line x1="16" y1="16" x2="16" y2="16" /></>),
   Layout:      SvgBase(<><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></>),
   Home:        SvgBase(<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></>),
+  Chart:       SvgBase(<><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></>),
+  FileText:    SvgBase(<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" /></>),
+  Download:    SvgBase(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>),
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -140,7 +143,7 @@ export default function ProgramManagerConsole() {
   const [pms, setPms] = useState<PM[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno'>('resumen');
+  const [activeTab, setActiveTab] = useState<'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes'>('resumen');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   // ── Auth gate ──
@@ -400,6 +403,7 @@ export default function ProgramManagerConsole() {
           {activeTab === 'actividades' && <TabActividades programId={programId} activities={program.activities} onChange={fetchProgram} showToast={showToast} />}
           {activeTab === 'participantes' && <TabParticipantes participants={participants} programId={programId} onChange={fetchProgram} showToast={showToast} />}
           {activeTab === 'duplas' && <TabDuplas programId={programId} participants={participants} showToast={showToast} />}
+          {activeTab === 'reportes' && <TabReportes program={program} participants={participants} assignedPM={assignedPM} showToast={showToast} />}
           {activeTab === 'gobierno' && <TabGobierno program={program} slug={slug} assignedPM={assignedPM} pms={pms} onTransition={transitionStatus} onAssignPM={assignPM} />}
         </div>
       </main>
@@ -416,6 +420,11 @@ export default function ProgramManagerConsole() {
       <style jsx global>{`
         @keyframes slideup { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .animate-slideup { animation: slideup .25s ease-out; }
+        @media print {
+          aside, header.sticky { display: none !important; }
+          main { margin-left: 0 !important; }
+          body { background: #fff !important; }
+        }
       `}</style>
     </div>
   );
@@ -430,15 +439,16 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab }: {
   program: ProgramDetail;
   slug: string;
   activeTab: string;
-  onTab: (t: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno') => void;
+  onTab: (t: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes') => void;
 }) {
-  const tabsNav: { id: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno'; label: string; icon: React.ReactNode }[] = [
+  const tabsNav: { id: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes'; label: string; icon: React.ReactNode }[] = [
     { id: 'resumen', label: 'Resumen', icon: <I.Sparkles /> },
     { id: 'info', label: 'Información', icon: <I.Edit /> },
     { id: 'cronograma', label: 'Cronograma', icon: <I.Calendar /> },
     { id: 'actividades', label: 'Actividades', icon: <I.Activity /> },
     { id: 'participantes', label: 'Participantes', icon: <I.Users /> },
     { id: 'duplas', label: 'Duplas', icon: <I.Bot /> },
+    { id: 'reportes', label: 'Reportes', icon: <I.Chart /> },
     { id: 'gobierno', label: 'Gobierno', icon: <I.Settings /> },
   ];
 
@@ -2054,6 +2064,233 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
             })}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// TAB REPORTES — reporte ejecutivo enlazado a la BD + export PDF/CSV
+// ============================================================================
+function ReportTile({ label, value, sub, strong }: { label: string; value: string | number; sub?: string; strong?: boolean }) {
+  return (
+    <div className="rounded-xl border border-zinc-200/70 bg-white px-4 py-3.5">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-zinc-400">{label}</div>
+      <div className={`mt-1.5 leading-none tracking-tight ${strong ? 'text-[26px] text-blue-600' : 'text-[26px] text-zinc-900'} font-semibold`}>{value}</div>
+      {sub && <div className="mt-1.5 text-[11px] text-zinc-400">{sub}</div>}
+    </div>
+  );
+}
+function MetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2 border-b border-zinc-100 last:border-0">
+      <span className="text-[12px] text-zinc-500">{label}</span>
+      <span className="text-[12.5px] font-medium text-zinc-900 text-right truncate max-w-[60%]">{value}</span>
+    </div>
+  );
+}
+function BreakdownRow({ label, count, total, color = '#2563eb' }: { label: string; count: number; total: number; color?: string }) {
+  const pct = total ? Math.round((count / total) * 100) : 0;
+  return (
+    <div className="flex items-center gap-3 py-1.5">
+      <span className="w-28 text-[12px] text-zinc-600 flex-shrink-0">{label}</span>
+      <div className="flex-1 h-2 rounded-full bg-zinc-100 overflow-hidden">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="w-16 text-right text-[12px] font-semibold text-zinc-900 flex-shrink-0">{count} · {pct}%</span>
+    </div>
+  );
+}
+
+function TabReportes({ program, participants, assignedPM, showToast }: { program: ProgramDetail; participants: Participant[]; assignedPM: AssignedPM | null; showToast: (m: string, t?: 'success' | 'error') => void }) {
+  const [stats, setStats] = React.useState<any>(null);
+  const [exporting, setExporting] = React.useState(false);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`${API_URL}/api/stats/programs/${program.id}`);
+        if (r.ok) setStats(await r.json());
+      } catch {}
+    })();
+  }, [program.id]);
+
+  const stMeta = STATUS_META[program.status] || STATUS_META.draft;
+  const acts = program.activities || [];
+  const totalActs = acts.length;
+  const completedActs = acts.filter(a => a.status === 'completed').length;
+  const actByStatus: Record<string, number> = {};
+  acts.forEach(a => { actByStatus[a.status] = (actByStatus[a.status] || 0) + 1; });
+
+  const totalP = participants.length;
+  const mentors = participants.filter(p => p.role === 'mentor').length;
+  const mentees = participants.filter(p => p.role === 'mentee').length;
+  const others = totalP - mentors - mentees;
+  const activated = participants.filter(p => p.activated_at).length;
+  const invited = participants.filter(p => p.invitation_sent_at).length;
+
+  const matchesTotal = stats?.matches?.total ?? 0;
+  const matchesActive = stats?.matches?.active ?? 0;
+  const avgScore = Math.round(stats?.matches?.avg_score ?? 0);
+
+  const LIFECYCLE_PCT: Record<string, number> = { draft: 10, designed: 25, ready_for_execution: 55, under_review: 50, in_execution: 80, active: 80, closed: 100, completed: 100, paused: 70 };
+  const lifePct = LIFECYCLE_PCT[program.status] ?? 25;
+  const actPct = totalActs ? Math.round((completedActs / totalActs) * 100) : 0;
+  const activationPct = totalP ? Math.round((activated / totalP) * 100) : 0;
+
+  const safe = (program.name || 'programa').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 50);
+
+  const exportCSV = () => {
+    const header = ['Participante', 'Email', 'Rol', 'Estado', 'Invitado', 'Activado'];
+    const rows = participants.map(p => [
+      p.user.full_name || '', p.user.email || '', PARTICIPANT_ROLE_LABEL[p.role] || p.role,
+      p.status || '', p.invitation_sent_at ? 'sí' : 'no', p.activated_at ? 'sí' : 'no',
+    ]);
+    const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `participantes-${safe}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    showToast('CSV descargado', 'success');
+  };
+
+  const exportPDF = async () => {
+    setExporting(true);
+    try {
+      const jsPDF = (await import('jspdf')).default;
+      const autoTable = (await import('jspdf-autotable')).default;
+      const doc = new jsPDF();
+      const ink: [number, number, number] = [24, 24, 27];
+
+      doc.setFontSize(17); doc.setTextColor(17, 17, 17);
+      doc.text('Reporte de programa', 14, 20);
+      doc.setFontSize(11); doc.setTextColor(60, 60, 60);
+      doc.text(program.name, 14, 28);
+      doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+      doc.text(`${program.company?.name || 'Sin cuenta'}  ·  Estado: ${stMeta.label}  ·  Generado ${new Date().toLocaleDateString('es-ES')}`, 14, 34);
+
+      autoTable(doc, {
+        startY: 40,
+        head: [['Indicador', 'Valor']],
+        body: [
+          ['Participantes', `${totalP}`],
+          ['Mentores / Mentees', `${mentors} / ${mentees}`],
+          ['Invitados / Activados', `${invited} / ${activated} (${activationPct}%)`],
+          ['Actividades', `${totalActs}`],
+          ['Actividades completadas', `${completedActs} (${actPct}%)`],
+          ['Duplas activas', `${matchesActive} de ${matchesTotal}`],
+          ['Score promedio de matching', `${avgScore}%`],
+          ['Avance del ciclo de vida', `${lifePct}%`],
+        ],
+        headStyles: { fillColor: ink, textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 9, cellPadding: 3 },
+        alternateRowStyles: { fillColor: [245, 245, 246] },
+      });
+
+      if (participants.length) {
+        autoTable(doc, {
+          startY: (doc as any).lastAutoTable.finalY + 8,
+          head: [['Participante', 'Rol', 'Estado', 'Activación']],
+          body: participants.map(p => [
+            p.user.full_name || p.user.email,
+            PARTICIPANT_ROLE_LABEL[p.role] || p.role,
+            p.status || '—',
+            p.activated_at ? 'Activado' : p.invitation_sent_at ? 'Invitado' : 'Pendiente',
+          ]),
+          headStyles: { fillColor: ink, textColor: [255, 255, 255], fontStyle: 'bold' },
+          styles: { fontSize: 8, cellPadding: 2.5 },
+          alternateRowStyles: { fillColor: [245, 245, 246] },
+        });
+      }
+
+      const pages = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pages; i++) {
+        doc.setPage(i); doc.setFontSize(8); doc.setTextColor(160, 160, 160);
+        doc.text(`Inspiratoria · ${program.name}`, 14, doc.internal.pageSize.height - 8);
+        doc.text(`Página ${i} de ${pages}`, doc.internal.pageSize.width - 14, doc.internal.pageSize.height - 8, { align: 'right' });
+      }
+      doc.save(`reporte-${safe}.pdf`);
+      showToast('PDF generado', 'success');
+    } catch (e: any) {
+      showToast('No se pudo generar el PDF', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Barra de acciones */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-[15px] font-semibold text-zinc-900 tracking-tight">Reporte ejecutivo</h2>
+          <p className="text-[12px] text-zinc-400 mt-0.5">Generado {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })} · datos en vivo</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ActionBtn onClick={exportCSV} icon={<I.Download />} variant="ghost">CSV</ActionBtn>
+          <ActionBtn onClick={() => window.print()} icon={<I.FileText />} variant="ghost">Imprimir</ActionBtn>
+          <ActionBtn onClick={exportPDF} icon={<I.Download />} variant={exporting ? 'disabled' : 'primary'}>{exporting ? 'Generando…' : 'Exportar PDF'}</ActionBtn>
+        </div>
+      </div>
+
+      {/* Indicadores clave */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <ReportTile label="Participantes" value={totalP} sub={`${mentors} mentores · ${mentees} mentees`} />
+        <ReportTile label="Activación" value={`${activationPct}%`} sub={`${activated} de ${totalP} activados`} strong />
+        <ReportTile label="Actividades" value={totalActs} sub={`${completedActs} completadas`} />
+        <ReportTile label="Duplas" value={matchesTotal} sub={`${matchesActive} activas · score ${avgScore}%`} />
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-5">
+        {/* Resumen ejecutivo */}
+        <Card title="Resumen ejecutivo" subtitle="Identidad y estado del programa">
+          <div>
+            <MetaItem label="Programa" value={program.name} />
+            <MetaItem label="Empresa" value={program.company?.name || '—'} />
+            <MetaItem label="Estado" value={stMeta.label} />
+            {program.cohort_year ? <MetaItem label="Cohorte" value={String(program.cohort_year)} /> : null}
+            <MetaItem label="Plantilla de origen" value={program.template?.name || 'Sin plantilla'} />
+            <MetaItem label="Project Manager" value={assignedPM?.full_name || 'Sin asignar'} />
+            <MetaItem label="Certificación" value={program.requires_certification ? 'Sí' : 'No'} />
+            <MetaItem label="Creado" value={program.created_at ? formatDate(program.created_at) : '—'} />
+            <MetaItem label="Última actualización" value={program.updated_at ? formatDate(program.updated_at) : '—'} />
+          </div>
+        </Card>
+
+        {/* Progreso */}
+        <Card title="Progreso e indicadores" subtitle="Avance general de la cohorte">
+          <div className="space-y-5">
+            <ProgressStat label="Ciclo de vida" pct={lifePct} caption={stMeta.label} color="violet" />
+            <ProgressStat label="Actividades completadas" pct={actPct} caption={`${completedActs} de ${totalActs} actividades`} color="emerald" />
+            <ProgressStat label="Participantes activados" pct={activationPct} caption={`${activated} de ${totalP} activados`} color="indigo" />
+          </div>
+        </Card>
+
+        {/* Desglose de participantes */}
+        <Card title="Desglose de participantes" subtitle={`${totalP} miembros`}>
+          {totalP === 0 ? <Empty msg="Sin participantes" icon={<I.Users />} /> : (
+            <div>
+              <BreakdownRow label="Mentores" count={mentors} total={totalP} color="#2563eb" />
+              <BreakdownRow label="Mentees" count={mentees} total={totalP} color="#60a5fa" />
+              {others > 0 && <BreakdownRow label="Otros roles" count={others} total={totalP} color="#a1a1aa" />}
+              <div className="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-3">
+                <div className="text-center"><div className="text-[18px] font-semibold text-zinc-900 leading-none">{invited}</div><div className="text-[10.5px] text-zinc-400 mt-1">Invitados</div></div>
+                <div className="text-center"><div className="text-[18px] font-semibold text-blue-600 leading-none">{activated}</div><div className="text-[10.5px] text-zinc-400 mt-1">Activados</div></div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Desglose de actividades */}
+        <Card title="Desglose de actividades" subtitle={`${totalActs} actividades`}>
+          {totalActs === 0 ? <Empty msg="Sin actividades" icon={<I.Activity />} /> : (
+            <div>
+              {Object.entries(actByStatus).map(([st, n]) => (
+                <BreakdownRow key={st} label={ACTIVITY_STATUS_META[st]?.label || st} count={n} total={totalActs} color="#2563eb" />
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   );
