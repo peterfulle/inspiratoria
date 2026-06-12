@@ -353,15 +353,22 @@ def score_pair(mentor: User, mentee: User) -> Dict[str, Any]:
 # ────────────────────────────── candidate selection ──────────────────────────────
 
 def _query_users(role: str, program_id: Optional[str], company_id: Optional[str]) -> List[User]:
-    qs = User.objects.filter(role=role, is_active=True)
-    if company_id:
-        qs = qs.filter(company_id=company_id)
+    # Dentro de un programa, el rol que manda es el de ProgramParticipant
+    # (el rol que asignó el PM), no el rol global del usuario.
     if program_id:
         from programs.models import ProgramParticipant
         user_ids = ProgramParticipant.objects.filter(
-            program_id=program_id, deleted_at__isnull=True,
+            program_id=program_id, role=role, deleted_at__isnull=True,
         ).values_list("user_id", flat=True)
-        qs = qs.filter(id__in=list(user_ids))
+        qs = User.objects.filter(id__in=list(user_ids), is_active=True)
+        if company_id:
+            qs = qs.filter(company_id=company_id)
+        return list(qs)
+
+    # Sin programa: se usa el rol global del usuario
+    qs = User.objects.filter(role=role, is_active=True)
+    if company_id:
+        qs = qs.filter(company_id=company_id)
     return list(qs)
 
 
@@ -388,6 +395,7 @@ def intelligent_match(
             mentor = User.objects.get(id=mentor_id, role="mentor")
         except User.DoesNotExist:
             return {"results": [], "stats": {"error": "mentor not found"}}
+        mentors = [mentor]
         mentees = _query_users("mentee", program_id, company_id or str(mentor.company_id) if mentor.company_id else None)
         pairs = [(mentor, e) for e in mentees]
     elif mentee_id:
@@ -396,6 +404,7 @@ def intelligent_match(
         except User.DoesNotExist:
             return {"results": [], "stats": {"error": "mentee not found"}}
         mentors = _query_users("mentor", program_id, company_id or str(mentee.company_id) if mentee.company_id else None)
+        mentees = [mentee]
         pairs = [(m, mentee) for m in mentors]
     else:
         mentors = _query_users("mentor", program_id, company_id)
@@ -403,11 +412,20 @@ def intelligent_match(
         pairs = [(m, e) for m in mentors for e in mentees]
 
     if not pairs:
+        n_mentors, n_mentees = len(mentors), len(mentees)
+        if n_mentors == 0 and n_mentees == 0:
+            reason = "El programa no tiene mentores ni mentees asignados."
+        elif n_mentors == 0:
+            reason = "No hay mentores asignados al programa. Agrega al menos un mentor."
+        elif n_mentees == 0:
+            reason = "No hay mentees asignados al programa. Agrega al menos un mentee."
+        else:
+            reason = "No se encontraron candidatos compatibles."
         return {
             "results": [],
             "stats": {
-                "mentors": 0, "mentees": 0, "pairs": 0,
-                "reason": "no candidates found in scope",
+                "mentors": n_mentors, "mentees": n_mentees, "pairs": 0,
+                "reason": reason,
             },
         }
 

@@ -1833,6 +1833,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
   const [matchResults, setMatchResults] = React.useState<any[]>([]);
   const [matchRan, setMatchRan] = React.useState(false);
   const [matchError, setMatchError] = React.useState('');
+  const [matchStats, setMatchStats] = React.useState<any>(null);
   const [useAI, setUseAI] = React.useState(true);
   const [activations, setActivations] = React.useState<Record<string, 'loading' | 'done' | 'error'>>({});
   const [expandedAI, setExpandedAI] = React.useState<Record<string, boolean>>({});
@@ -1874,6 +1875,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
       setMatchResults(data.results || []);
+      setMatchStats(data.stats || null);
       setMatchRan(true);
     } catch (e: any) { setMatchError(e.message || 'Error al generar matches'); }
     setMatchLoading(false);
@@ -2006,6 +2008,24 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
         {!matchRan && !matchLoading && (
           <div className="rounded-2xl border border-dashed border-zinc-200 bg-white py-12 text-center">
             <p className="text-[13px] text-zinc-500">Pulsa «✨ Generar matches» para ver sugerencias de duplas.</p>
+          </div>
+        )}
+
+        {matchRan && !matchLoading && matchResults.length === 0 && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-6 text-center">
+            <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3">
+              <I.Alert className="w-5 h-5" />
+            </div>
+            <p className="text-[13px] font-semibold text-amber-900 mb-1">No se pudieron generar duplas</p>
+            <p className="text-[12.5px] text-amber-800 max-w-md mx-auto">
+              {matchStats?.reason || 'No se encontraron candidatos compatibles.'}
+            </p>
+            {matchStats && (
+              <p className="text-[11.5px] text-amber-700/80 mt-2">
+                En este programa: <b>{matchStats.mentors ?? 0}</b> mentor(es) · <b>{matchStats.mentees ?? 0}</b> mentee(s).
+                Asigná roles en la pestaña <b>Participantes</b>.
+              </p>
+            )}
           </div>
         )}
 
