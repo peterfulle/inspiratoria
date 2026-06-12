@@ -147,6 +147,20 @@ function DeleteModal({ countdown, setCountdown, confirmText, setConfirmText, tem
   );
 }
 
+// Estilos de estado para programas (instancias). Cada uno: label + colores del pill.
+const PROGRAM_STATUS_META: Record<string, { label: string; color: string; bg: string; dot: string }> = {
+  designed:            { label: "Diseñado",       color: "#7c3aed", bg: "#f5f3ff", dot: "#a78bfa" },
+  ready_for_execution: { label: "Listo",          color: "#0369a1", bg: "#f0f9ff", dot: "#38bdf8" },
+  in_execution:        { label: "En ejecución",   color: "#047857", bg: "#ecfdf5", dot: "#10b981" },
+  under_review:        { label: "En revisión",    color: "#b45309", bg: "#fffbeb", dot: "#f59e0b" },
+  closed:              { label: "Cerrado",         color: "#475569", bg: "#f1f5f9", dot: "#94a3b8" },
+  draft:               { label: "Borrador",        color: "#64748b", bg: "#f8fafc", dot: "#94a3b8" },
+  active:              { label: "Activo",          color: "#047857", bg: "#ecfdf5", dot: "#10b981" },
+  paused:              { label: "Pausado",         color: "#b45309", bg: "#fffbeb", dot: "#f59e0b" },
+  completed:           { label: "Completado",      color: "#4338ca", bg: "#eef2ff", dot: "#6366f1" },
+};
+const programStatusMeta = (s: string) => PROGRAM_STATUS_META[s] || PROGRAM_STATUS_META.draft;
+
 // ═══════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════
@@ -161,9 +175,10 @@ export default function ProgramsPage() {
 
   // Pestaña principal: Plantillas (diseño) | Programas (instancias por empresa)
   const [mainTab, setMainTab] = useState<"templates" | "programs">("templates");
-  const [programs, setPrograms] = useState<Array<{ id: string; name: string; status: string; company?: { name: string; slug?: string } | null; template?: { name: string } | null; activities_count?: number; participants_count?: number; cohort_year?: number | null }>>([]);
+  const [programs, setPrograms] = useState<Array<{ id: string; name: string; status: string; company?: { name: string; slug?: string } | null; template?: { name: string; slug?: string } | null; activities_count?: number; participants_count?: number; cohort_year?: number | null }>>([]);
   const [programsLoading, setProgramsLoading] = useState(false);
   const [programsSearch, setProgramsSearch] = useState("");
+  const [programsStatusFilter, setProgramsStatusFilter] = useState<string>("all");
   
   // Modals
   const [selectedTemplate, setSelectedTemplate] = useState<ProgramTemplate | null>(null);
@@ -776,16 +791,61 @@ export default function ProgramsPage() {
         {/* ── VISTA PROGRAMAS (instancias) ── */}
         {mainTab === "programs" && (
           <main className="p-4 sm:p-6 lg:p-8 w-full">
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <div className="stat-card">
+                <span className="section-title" style={{ margin: 0 }}>Total</span>
+                <p className="text-3xl font-semibold text-neutral-900 mt-2">{programs.length}</p>
+                <p className="text-neutral-500 text-xs mt-1">programas</p>
+              </div>
+              <div className="stat-card">
+                <span className="section-title" style={{ margin: 0 }}>En ejecución</span>
+                <p className="text-3xl font-semibold text-neutral-900 mt-2">{programs.filter(p => p.status === "in_execution" || p.status === "active").length}</p>
+                <p className="text-neutral-500 text-xs mt-1">activos</p>
+              </div>
+              <div className="stat-card">
+                <span className="section-title" style={{ margin: 0 }}>En diseño</span>
+                <p className="text-3xl font-semibold text-neutral-900 mt-2">{programs.filter(p => p.status === "designed" || p.status === "ready_for_execution" || p.status === "draft").length}</p>
+                <p className="text-neutral-500 text-xs mt-1">por lanzar</p>
+              </div>
+              <div className="stat-card">
+                <span className="section-title" style={{ margin: 0 }}>Participantes</span>
+                <p className="text-3xl font-semibold text-neutral-900 mt-2">{programs.reduce((a, p) => a + (p.participants_count || 0), 0)}</p>
+                <p className="text-neutral-500 text-xs mt-1">en total</p>
+              </div>
+            </div>
+
+            {/* Filters */}
             <div className="glass-card p-3 sm:p-4 mb-6">
-              <div className="relative flex-1">
-                <Icon.Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar programas por nombre o empresa..."
-                  value={programsSearch}
-                  onChange={(e) => setProgramsSearch(e.target.value)}
-                  className="input-field pl-11"
-                />
+              <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
+                <div className="relative flex-1">
+                  <Icon.Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre o empresa..."
+                    value={programsSearch}
+                    onChange={(e) => setProgramsSearch(e.target.value)}
+                    className="input-field pl-11"
+                  />
+                </div>
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                  {[
+                    { id: "all", label: "Todos" },
+                    { id: "designed", label: "Diseñado" },
+                    { id: "ready_for_execution", label: "Listo" },
+                    { id: "in_execution", label: "En ejecución" },
+                    { id: "under_review", label: "Revisión" },
+                    { id: "closed", label: "Cerrado" },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setProgramsStatusFilter(s.id)}
+                      className={`filter-btn whitespace-nowrap ${programsStatusFilter === s.id ? "active" : ""}`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -796,43 +856,90 @@ export default function ProgramsPage() {
               </div>
             ) : (() => {
               const q = programsSearch.toLowerCase();
-              const list = programs.filter(p =>
-                p.name.toLowerCase().includes(q) || (p.company?.name || "").toLowerCase().includes(q)
-              );
+              const list = programs.filter(p => {
+                const matchesSearch = p.name.toLowerCase().includes(q) || (p.company?.name || "").toLowerCase().includes(q);
+                const matchesStatus = programsStatusFilter === "all" || p.status === programsStatusFilter;
+                return matchesSearch && matchesStatus;
+              });
               if (list.length === 0) {
                 return (
-                  <div className="glass-card p-10 text-center">
-                    <p className="text-neutral-500 text-sm mb-3">No hay programas asignados todavía.</p>
-                    <button onClick={openAssignModal} className="btn-primary px-4 py-2 text-[13px] inline-flex items-center gap-2">
-                      <Icon.Link className="w-4 h-4" /> Asignar una plantilla a una empresa
-                    </button>
+                  <div className="empty-state">
+                    <p className="text-neutral-500 text-sm mb-3">
+                      {programs.length === 0 ? "No hay programas asignados todavía." : "Ningún programa coincide con los filtros."}
+                    </p>
+                    {programs.length === 0 && (
+                      <button onClick={openAssignModal} className="btn-primary px-4 py-2 text-[13px] inline-flex items-center gap-2">
+                        <Icon.Link className="w-4 h-4" /> Asignar una plantilla a una empresa
+                      </button>
+                    )}
                   </div>
                 );
               }
               return (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {list.map(p => (
-                    <button
-                      key={p.id}
-                      onClick={() => router.push(`/dashboard/programs/${p.id}/manage`)}
-                      className="glass-card p-4 text-left hover:shadow-md transition-shadow"
-                      style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-[14px] font-semibold text-neutral-900 leading-snug">{p.name}</span>
-                        <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: "#555", background: "#f4f4f4", borderRadius: 999, padding: "3px 9px" }}>{p.status}</span>
+                <div className="space-y-3">
+                  {list.map(p => {
+                    const sm = programStatusMeta(p.status);
+                    return (
+                      <div key={p.id} className="program-card p-3 sm:p-4">
+                        <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6">
+                          {/* Left: Status + Title + Company */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, color: sm.color, background: sm.bg, borderRadius: 999, padding: "3px 10px" }}>
+                                <span style={{ width: 6, height: 6, borderRadius: 999, background: sm.dot }} />
+                                {sm.label}
+                              </span>
+                              {p.cohort_year ? <span className="badge badge-draft">{p.cohort_year}</span> : null}
+                            </div>
+                            <h3 className="text-sm sm:text-base font-semibold text-neutral-900 truncate">{p.name}</h3>
+                            <p className="text-neutral-500 text-xs sm:text-sm truncate">{p.company?.name || "Sin empresa"}</p>
+                          </div>
+
+                          {/* Center: Stats */}
+                          <div className="flex items-center gap-4 sm:gap-6 text-center flex-shrink-0">
+                            <div className="px-2 sm:px-4">
+                              <p className="text-xs sm:text-sm font-semibold text-neutral-900">{p.activities_count ?? 0}</p>
+                              <p className="text-xs text-neutral-400">Actividades</p>
+                            </div>
+                            <div className="px-2 sm:px-4 border-l border-neutral-100">
+                              <p className="text-xs sm:text-sm font-semibold text-neutral-900">{p.participants_count ?? 0}</p>
+                              <p className="text-xs text-neutral-400">Participantes</p>
+                            </div>
+                          </div>
+
+                          {/* Right: Template origin - hidden on small screens */}
+                          <div className="hidden xl:block text-xs text-neutral-500 flex-shrink-0 w-48">
+                            {p.template?.name ? (
+                              <p className="truncate">Desde plantilla:<br /><span className="text-neutral-700 font-medium">{p.template.name}</span></p>
+                            ) : (
+                              <p className="text-neutral-300">Sin plantilla de origen</p>
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 flex-shrink-0 lg:pl-4 lg:border-l border-neutral-100">
+                            {p.template?.name && (
+                              <button
+                                onClick={() => router.push(`/dashboard/programs/preview/${p.template?.slug || ""}`)}
+                                className="btn-secondary flex items-center gap-2 text-sm py-2 px-4"
+                                title="Ver plantilla de origen"
+                              >
+                                <Icon.Eye className="w-4 h-4" />
+                                <span className="hidden sm:inline">Plantilla</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => router.push(`/dashboard/programs/${p.id}/manage`)}
+                              className="btn-primary flex items-center gap-2 text-sm py-2 px-4"
+                            >
+                              <Icon.Link className="w-4 h-4" />
+                              Abrir
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[12px] text-neutral-500">
-                        {p.company?.name || "Sin empresa"}
-                      </div>
-                      <div className="flex items-center gap-3 text-[11.5px] text-neutral-400 mt-1">
-                        <span>{p.activities_count ?? 0} actividades</span>
-                        <span>·</span>
-                        <span>{p.participants_count ?? 0} participantes</span>
-                        {p.template?.name && (<><span>·</span><span className="truncate">desde «{p.template.name}»</span></>)}
-                      </div>
-                    </button>
-                  ))}
+                    );
+                  })}
                 </div>
               );
             })()}
