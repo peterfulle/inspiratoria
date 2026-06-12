@@ -371,7 +371,7 @@ export default function ProgramManagerConsole() {
         {/* Hero — solo en la pestaña Resumen */}
         {activeTab === 'resumen' && (
           <section className="px-8 pt-7 pb-6 bg-white border-b border-zinc-100">
-            <div className="max-w-6xl">
+            <div className="w-full">
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <Tag>{program.theme}</Tag>
                 <TagSoft icon={<I.Building className="w-3 h-3" />}>{program.company?.name || 'Sin cuenta'}</TagSoft>
@@ -393,7 +393,7 @@ export default function ProgramManagerConsole() {
           </section>
         )}
 
-        <div className="px-8 py-7 max-w-6xl">
+        <div className="px-8 py-7 w-full">
           {activeTab === 'resumen' && <TabResumen program={program} participants={participants} assignedPM={assignedPM} pms={pms} onAssignPM={assignPM} />}
           {activeTab === 'info' && <TabInfo program={program} onSave={patchInfo} />}
           {activeTab === 'cronograma' && <TabCronograma programId={programId} activities={program.activities} onChange={fetchProgram} showToast={showToast} />}
