@@ -929,10 +929,12 @@ export default function ProgramsPage() {
                               </button>
                             )}
                             <button
-                              onClick={() => router.push(
+                              onClick={() => window.open(
                                 p.company?.slug
                                   ? `/studio/${p.company.slug}/program/${p.id}`
-                                  : `/dashboard/programs/${p.id}/manage`
+                                  : `/dashboard/programs/${p.id}/manage`,
+                                "_blank",
+                                "noopener,noreferrer"
                               )}
                               className="btn-primary flex items-center gap-2 text-sm py-2 px-4"
                             >

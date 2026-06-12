@@ -28,6 +28,7 @@ interface ProgramDetail {
   company_id: string | null; company: CompanyLite | null;
   template?: { id: string; name: string; slug: string } | null;
   cohort_year?: number | null;
+  design_snapshot?: Record<string, any> | null;
   activities: ProgramActivity[]; activities_count: number; participants_count: number;
   requires_certification: boolean; created_at: string | null; updated_at: string | null;
 }
@@ -646,63 +647,196 @@ const inputCls = "w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg 
 // ============================================================================
 // TABS
 // ============================================================================
+// Barra de progreso etiquetada (porcentaje grande + barra + caption)
+const PROGRESS_COLORS: Record<string, { bar: string; txt: string }> = {
+  violet:  { bar: 'bg-violet-500',  txt: 'text-violet-600' },
+  emerald: { bar: 'bg-emerald-500', txt: 'text-emerald-600' },
+  indigo:  { bar: 'bg-indigo-500',  txt: 'text-indigo-600' },
+};
+function ProgressStat({ label, pct, caption, color }: { label: string; pct: number; caption: string; color: 'violet' | 'emerald' | 'indigo' }) {
+  const c = PROGRESS_COLORS[color];
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="text-[12px] font-semibold text-gray-700">{label}</span>
+        <span className={`text-[22px] font-bold ${c.txt} leading-none tracking-tight`}>{pct}%</span>
+      </div>
+      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+        <div className={`h-full rounded-full ${c.bar} transition-all duration-500`} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="text-[11px] text-gray-400 mt-2">{caption}</div>
+    </div>
+  );
+}
+
+// Barra de composición (rol -> conteo + %)
+function CompositionBar({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
+  const pct = total ? Math.round((count / total) * 100) : 0;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[12px] font-medium text-gray-700">{label}</span>
+        <span className="text-[12px] font-semibold text-gray-900">{count}<span className="text-gray-400 font-normal"> · {pct}%</span></span>
+      </div>
+      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
+      </div>
+    </div>
+  );
+}
+
 function TabResumen({ program, participants, assignedPM, pms, onAssignPM }: { program: ProgramDetail; participants: Participant[]; assignedPM: AssignedPM | null; pms: PM[]; onAssignPM: (id: string | null) => void }) {
-  const upcoming = (program.activities || [])
+  const acts = program.activities || [];
+  const totalActs = acts.length;
+  const completedActs = acts.filter(a => a.status === 'completed').length;
+  const upcoming = acts
     .filter(a => a.start_date && new Date(a.start_date) > new Date())
     .sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime())
     .slice(0, 4);
 
+  const totalP = participants.length;
+  const mentors = participants.filter(p => p.role === 'mentor').length;
+  const mentees = participants.filter(p => p.role === 'mentee').length;
+  const others = totalP - mentors - mentees;
+  const activated = participants.filter(p => p.activated_at).length;
+  const invited = participants.filter(p => p.invitation_sent_at).length;
+
+  // Progreso del ciclo de vida según el estado
+  const LIFECYCLE_PCT: Record<string, number> = {
+    draft: 10, designed: 25, ready_for_execution: 55, under_review: 50,
+    in_execution: 80, active: 80, closed: 100, completed: 100, paused: 70,
+  };
+  const lifePct = LIFECYCLE_PCT[program.status] ?? 25;
+  const actPct = totalActs ? Math.round((completedActs / totalActs) * 100) : 0;
+  const activationPct = totalP ? Math.round((activated / totalP) * 100) : 0;
+  const stMeta = STATUS_META[program.status] || STATUS_META.draft;
+
+  // Diseño congelado desde la plantilla (datos en BD que normalmente no se ven)
+  const snap: any = program.design_snapshot || {};
+  const snapModules: any[] = Array.isArray(snap.modules) ? snap.modules : [];
+  const snapMilestones: any[] = Array.isArray(snap.milestones) ? snap.milestones : [];
+
   return (
-    <div className="grid lg:grid-cols-2 gap-5">
-      <Card title="Workflow del programa" subtitle="Estado actual y siguientes pasos">
-        <Workflow currentStatus={program.status} />
+    <div className="space-y-5">
+      {/* Progreso general (full width) */}
+      <Card title="Progreso del programa" subtitle="Avance general de la cohorte">
+        <div className="grid sm:grid-cols-3 gap-6">
+          <ProgressStat label="Ciclo de vida" pct={lifePct} caption={stMeta.label} color="violet" />
+          <ProgressStat label="Actividades completadas" pct={actPct} caption={`${completedActs} de ${totalActs} actividades`} color="emerald" />
+          <ProgressStat label="Participantes activados" pct={activationPct} caption={`${activated} de ${totalP} activados`} color="indigo" />
+        </div>
       </Card>
 
-      <PMCard assignedPM={assignedPM} pms={pms} onAssignPM={onAssignPM} />
+      <div className="grid lg:grid-cols-2 gap-5">
+        {/* Composición de participantes */}
+        <Card title="Composición de participantes" subtitle={`${totalP} miembros · ${invited} invitados`}>
+          {totalP === 0 ? <Empty msg="Aún no hay participantes inscritos" icon={<I.Users />} /> : (
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <CompositionBar label="Mentores" count={mentors} total={totalP} color="#6366f1" />
+                <CompositionBar label="Mentees" count={mentees} total={totalP} color="#8b5cf6" />
+                {others > 0 && <CompositionBar label="Otros roles" count={others} total={totalP} color="#94a3b8" />}
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-4 border-t border-gray-100">
+                <div className="text-center"><div className="text-[18px] font-bold text-gray-900 leading-none">{totalP}</div><div className="text-[10px] text-gray-400 mt-1">Total</div></div>
+                <div className="text-center"><div className="text-[18px] font-bold text-gray-900 leading-none">{invited}</div><div className="text-[10px] text-gray-400 mt-1">Invitados</div></div>
+                <div className="text-center"><div className="text-[18px] font-bold text-emerald-600 leading-none">{activated}</div><div className="text-[10px] text-gray-400 mt-1">Activados</div></div>
+              </div>
+            </div>
+          )}
+        </Card>
 
-      <Card title="Próximas actividades" subtitle={`${upcoming.length} agendadas`}>
-        {upcoming.length === 0 ? <Empty msg="No hay actividades agendadas a futuro" icon={<I.Calendar />} /> : (
-          <div className="space-y-2">
-            {upcoming.map(a => (
-              <div key={a.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-violet-50 transition">
-                <div className="w-12 text-center bg-white rounded-lg py-1.5 border border-gray-200 flex-shrink-0">
-                  <div className="text-[18px] font-bold text-gray-900 leading-none">{new Date(a.start_date!).getDate()}</div>
-                  <div className="text-[9px] font-bold text-violet-600 uppercase mt-0.5">{new Date(a.start_date!).toLocaleString('es', { month: 'short' })}</div>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-semibold text-gray-900 truncate">{a.name}</div>
-                  <div className="text-[11px] text-gray-500 mt-0.5 inline-flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1"><I.Globe className="w-3 h-3" />{MODALITY_META[a.modality]?.label || a.modality}</span>
-                    <span className="inline-flex items-center gap-1"><I.Clock className="w-3 h-3" />{new Date(a.start_date!).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</span>
+        <Card title="Workflow del programa" subtitle="Estado actual y siguientes pasos">
+          <Workflow currentStatus={program.status} />
+        </Card>
+
+        <PMCard assignedPM={assignedPM} pms={pms} onAssignPM={onAssignPM} />
+
+        <Card title="Próximas actividades" subtitle={`${upcoming.length} agendadas`}>
+          {upcoming.length === 0 ? <Empty msg="No hay actividades agendadas a futuro" icon={<I.Calendar />} /> : (
+            <div className="space-y-2">
+              {upcoming.map(a => (
+                <div key={a.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-violet-50 transition">
+                  <div className="w-12 text-center bg-white rounded-lg py-1.5 border border-gray-200 flex-shrink-0">
+                    <div className="text-[18px] font-bold text-gray-900 leading-none">{new Date(a.start_date!).getDate()}</div>
+                    <div className="text-[9px] font-bold text-violet-600 uppercase mt-0.5">{new Date(a.start_date!).toLocaleString('es', { month: 'short' })}</div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold text-gray-900 truncate">{a.name}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5 inline-flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1"><I.Globe className="w-3 h-3" />{MODALITY_META[a.modality]?.label || a.modality}</span>
+                      <span className="inline-flex items-center gap-1"><I.Clock className="w-3 h-3" />{new Date(a.start_date!).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
-      <Card title="Roster reciente" subtitle={`${participants.length} miembros`}>
-        {participants.length === 0 ? <Empty msg="Aún no hay participantes inscritos" icon={<I.Users />} /> : (
-          <div className="grid grid-cols-2 gap-2">
-            {participants.slice(0, 6).map(p => (
-              <div key={p.id} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-gray-50">
-                {p.user.avatar_url ? (
-                  <img src={p.user.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0">
-                    {(p.user.full_name || p.user.email).charAt(0).toUpperCase()}
+      <div className="grid lg:grid-cols-2 gap-5">
+        <Card title="Roster reciente" subtitle={`${participants.length} miembros`}>
+          {participants.length === 0 ? <Empty msg="Aún no hay participantes inscritos" icon={<I.Users />} /> : (
+            <div className="grid grid-cols-2 gap-2">
+              {participants.slice(0, 6).map(p => (
+                <div key={p.id} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-gray-50">
+                  {p.user.avatar_url ? (
+                    <img src={p.user.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0">
+                      {(p.user.full_name || p.user.email).charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-semibold text-gray-900 truncate">{p.user.full_name || p.user.email}</div>
+                    <div className="text-[10px] text-gray-500 capitalize">{p.role}</div>
                   </div>
-                )}
-                <div className="min-w-0">
-                  <div className="text-[12px] font-semibold text-gray-900 truncate">{p.user.full_name || p.user.email}</div>
-                  <div className="text-[10px] text-gray-500 capitalize">{p.role}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Diseño del programa (snapshot de la plantilla) */}
+        <Card
+          title="Diseño del programa"
+          subtitle={program.template?.name ? `Desde «${program.template.name}»` : 'Estructura del programa'}
+          action={program.template?.slug ? (
+            <a href={`/dashboard/programs/preview/${program.template.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-[11.5px] font-semibold hover:bg-gray-200 transition">
+              <I.Layout className="w-3 h-3" />Plantilla
+            </a>
+          ) : undefined}
+        >
+          {(snapModules.length > 0 || snapMilestones.length > 0) ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-amber-50 px-4 py-3">
+                  <div className="text-[22px] font-bold text-amber-700 leading-none">{snapModules.length}</div>
+                  <div className="text-[11px] text-amber-700/70 mt-1 font-medium">Módulos diseñados</div>
+                </div>
+                <div className="rounded-xl bg-violet-50 px-4 py-3">
+                  <div className="text-[22px] font-bold text-violet-700 leading-none">{snapMilestones.length}</div>
+                  <div className="text-[11px] text-violet-700/70 mt-1 font-medium">Hitos</div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </Card>
+              {snapModules.length > 0 && (
+                <div className="space-y-1.5">
+                  {snapModules.slice(0, 5).map((m, i) => (
+                    <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-gray-50">
+                      <span className="w-5 h-5 rounded-md bg-white border border-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500 flex-shrink-0">{i + 1}</span>
+                      <span className="text-[12.5px] font-medium text-gray-800 truncate">{m.name || m.title || `Módulo ${i + 1}`}</span>
+                    </div>
+                  ))}
+                  {snapModules.length > 5 && <div className="text-[11px] text-gray-400 px-3">+{snapModules.length - 5} módulos más</div>}
+                </div>
+              )}
+            </div>
+          ) : (
+            <Empty msg="Este programa no tiene diseño desde una plantilla" icon={<I.Module />} />
+          )}
+        </Card>
+      </div>
     </div>
   );
 }
