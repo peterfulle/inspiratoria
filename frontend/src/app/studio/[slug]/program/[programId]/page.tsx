@@ -1955,6 +1955,36 @@ function MatchDetail({ r }: { r: any }) {
   );
 }
 
+// Modal moderno con el detalle completo del match (mismo contenido que el panel expandible)
+function MatchPreviewModal({ r, onClose }: { r: any; onClose: () => void }) {
+  const s = r.score || 0;
+  const c = s >= 65 ? { color: '#16a34a', bg: '#dcfce7' } : s >= 45 ? { color: '#d97706', bg: '#fef3c7' } : { color: '#dc2626', bg: '#fee2e2' };
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl border border-zinc-200 shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-zinc-100 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold flex-shrink-0" style={{ background: c.bg, color: c.color }}>{s.toFixed(0)} pts</span>
+            <div className="min-w-0">
+              <h3 className="text-base font-bold text-zinc-900 truncate">{r.mentor?.name || '—'} <span className="text-zinc-300 font-normal mx-0.5">↔</span> {r.mentee?.name || '—'}</h3>
+              <p className="text-[11.5px] text-zinc-500 mt-0.5">Vista previa del match · análisis completo</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition flex-shrink-0"><I.Close className="w-4 h-4" /></button>
+        </div>
+        <div className="overflow-y-auto">
+          <MatchDetail r={r} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TabDuplas({ programId, participants, showToast }: { programId: string; participants: Participant[]; showToast: (m: string, t?: 'success' | 'error') => void }) {
   const [vincs, setVincs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -1963,9 +1993,11 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
   const [matchRan, setMatchRan] = React.useState(false);
   const [matchError, setMatchError] = React.useState('');
   const [matchStats, setMatchStats] = React.useState<any>(null);
+  const [progressFor, setProgressFor] = React.useState<any>(null);
   const [useAI, setUseAI] = React.useState(true);
   const [activations, setActivations] = React.useState<Record<string, 'loading' | 'done' | 'error'>>({});
   const [expandedAI, setExpandedAI] = React.useState<Record<string, boolean>>({});
+  const [previewMatch, setPreviewMatch] = React.useState<any>(null);
 
   const loadVincs = React.useCallback(async () => {
     setLoading(true);
@@ -2057,12 +2089,13 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
           </div>
         ) : (
           <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
-            <div className="grid grid-cols-[1fr_auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-2.5 bg-zinc-50 border-b border-zinc-100">
+            <div className="grid grid-cols-[1fr_auto_1fr_auto_auto_auto_auto] items-center gap-4 px-5 py-2.5 bg-zinc-50 border-b border-zinc-100">
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Mentor</span>
               <span />
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Mentee</span>
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Score</span>
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Origen</span>
+              <span />
               <span />
             </div>
             {vincs.map((v: any, i: number) => {
@@ -2074,7 +2107,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
               const score = v.score ?? v.metadata?.score ?? v.match_score;
               const c = score != null ? sc(Number(score)) : null;
               return (
-                <div key={v.id} className={`grid grid-cols-[1fr_auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-4 ${i > 0 ? 'border-t border-zinc-50' : ''} hover:bg-zinc-50/50 transition`}>
+                <div key={v.id} className={`grid grid-cols-[1fr_auto_1fr_auto_auto_auto_auto] items-center gap-4 px-5 py-4 ${i > 0 ? 'border-t border-zinc-50' : ''} hover:bg-zinc-50/50 transition`}>
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-zinc-900 truncate">{mentorName}</p>
                     <p className="text-[11px] text-zinc-400 truncate">{mentorEmail}</p>
@@ -2094,6 +2127,8 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
                       ? <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700"><I.Sparkles className="w-3 h-3" />IA</span>
                       : <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-zinc-100 text-zinc-500">Manual</span>}
                   </div>
+                  <button onClick={() => setProgressFor(v)} title="Ver avance de la dupla"
+                    className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-blue-50 hover:text-blue-600 transition"><I.Activity className="w-4 h-4" /></button>
                   <button onClick={() => removeVinc(v.id)} title="Desvincular"
                     className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[17px] text-zinc-300 hover:bg-red-50 hover:text-red-500 transition"><I.Close className="w-4 h-4" /></button>
                 </div>
@@ -2195,8 +2230,12 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
                       ) : act === 'loading' ? (
                         <svg className="h-4 w-4 animate-spin text-zinc-400" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                       ) : (
-                        <button onClick={() => activatePair(r.mentor?.id, r.mentee?.id, r.score, r.ai_recommendation)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-zinc-800 transition whitespace-nowrap"><I.Zap className="w-3.5 h-3.5" />Vincular</button>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => setPreviewMatch(r)} title="Vista previa del match"
+                            className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-[11.5px] font-semibold text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition whitespace-nowrap"><I.Sparkles className="w-3.5 h-3.5" />Preview</button>
+                          <button onClick={() => activatePair(r.mentor?.id, r.mentee?.id, r.score, r.ai_recommendation)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-zinc-800 transition whitespace-nowrap"><I.Zap className="w-3.5 h-3.5" />Vincular</button>
+                        </div>
                       )}
                     </div>
                     <button onClick={() => setExpandedAI(p => ({ ...p, [key]: !p[key] }))} title="Ver detalle del match"
@@ -2210,6 +2249,235 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
             })}
           </div>
         )}
+
+        {previewMatch && <MatchPreviewModal r={previewMatch} onClose={() => setPreviewMatch(null)} />}
+        {progressFor && <PairProgressModal programId={programId} vinc={progressFor} onClose={() => setProgressFor(null)} showToast={showToast} />}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// PROGRESO DE LA DUPLA (bitácora de sesiones + métricas + export)
+// ============================================================================
+const SESSION_STATUS_META: Record<string, { label: string; color: string; bg: string }> = { completed: { label: 'Completada', color: '#047857', bg: '#ecfdf5' }, scheduled: { label: 'Agendada', color: '#0369a1', bg: '#f0f9ff' }, cancelled: { label: 'Cancelada', color: '#b91c1c', bg: '#fef2f2' }, no_show: { label: 'No asistió', color: '#b45309', bg: '#fffbeb' } };
+
+function ProgMetric({ label, value, sub, strong }: { label: string; value: string | number; sub?: string; strong?: boolean }) {
+  return (
+    <div className="rounded-xl border border-zinc-200/70 bg-white px-3.5 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-zinc-400">{label}</div>
+      <div className={`mt-1 leading-none tracking-tight text-[20px] font-semibold ${strong ? 'text-blue-600' : 'text-zinc-900'}`}>{value}</div>
+      {sub && <div className="mt-1 text-[10.5px] text-zinc-400">{sub}</div>}
+    </div>
+  );
+}
+
+function PairProgressModal({ programId, vinc, onClose, showToast }: { programId: string; vinc: any; onClose: () => void; showToast: (m: string, t?: 'success' | 'error') => void }) {
+  const mentor = vinc.mentor || {};
+  const mentee = vinc.mentee || {};
+  const [data, setData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [showForm, setShowForm] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [exporting, setExporting] = React.useState(false);
+  const empty = { title: 'Sesión de mentoría', date: '', duration: '60', status: 'completed', mood: '', topics: '', notes: '', next_steps: '' };
+  const [form, setForm] = React.useState(empty);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API_URL}/api/programs/${programId}/pair-progress?mentor_id=${mentor.id}&mentee_id=${mentee.id}`);
+      if (r.ok) setData(await r.json());
+    } catch {} finally { setLoading(false); }
+  }, [programId, mentor.id, mentee.id]);
+  React.useEffect(() => { load(); }, [load]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.date) { showToast('Indicá la fecha de la sesión', 'error'); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/api/programs/${programId}/sessions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mentor_id: mentor.id, mentee_id: mentee.id, title: form.title || 'Sesión de mentoría',
+          scheduled_at: new Date(form.date).toISOString(), duration_minutes: Number(form.duration) || 60,
+          status: form.status, mentee_mood: form.mood ? Number(form.mood) : null,
+          topics_covered: form.topics.split(',').map(t => t.trim()).filter(Boolean),
+          session_notes: form.notes, next_steps: form.next_steps,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      showToast('Sesión registrada'); setShowForm(false); setForm(empty); await load();
+    } catch { showToast('Error al registrar la sesión', 'error'); } finally { setSaving(false); }
+  };
+
+  const exportPDF = async () => {
+    setExporting(true);
+    try {
+      const jsPDF = (await import('jspdf')).default;
+      const autoTable = (await import('jspdf-autotable')).default;
+      const doc = new jsPDF();
+      const ink: [number, number, number] = [24, 24, 27];
+      const m = data?.metrics || {};
+      doc.setFontSize(16); doc.setTextColor(17, 17, 17);
+      doc.text('Avance de la dupla', 14, 18);
+      doc.setFontSize(11); doc.setTextColor(60, 60, 60);
+      doc.text(`${mentor.full_name || mentor.email}  ↔  ${mentee.full_name || mentee.email}`, 14, 26);
+      doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+      doc.text(`Generado ${new Date().toLocaleDateString('es-ES')}`, 14, 32);
+      autoTable(doc, {
+        startY: 38, head: [['Indicador', 'Valor']],
+        body: [
+          ['Progreso', `${m.progress ?? 0}%`],
+          ['Sesiones completadas', `${m.completed ?? 0} de ${m.total_sessions ?? 0}`],
+          ['Asistencia', m.attendance != null ? `${Math.round(m.attendance * 100)}%` : '—'],
+          ['Horas de mentoría', `${m.total_hours ?? 0} h`],
+          ['Ánimo promedio del mentee', m.avg_mood != null ? `${m.avg_mood}/5` : '—'],
+          ['Última sesión', m.last_session ? new Date(m.last_session).toLocaleDateString('es-ES') : '—'],
+          ['Temas cubiertos', (m.topics || []).join(', ') || '—'],
+          ['Próximos pasos', m.next_steps || '—'],
+        ],
+        headStyles: { fillColor: ink, textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 9, cellPadding: 3 }, alternateRowStyles: { fillColor: [245, 245, 246] },
+      });
+      const sessions = data?.sessions || [];
+      if (sessions.length) {
+        autoTable(doc, {
+          startY: (doc as any).lastAutoTable.finalY + 8,
+          head: [['Fecha', 'Sesión', 'Estado', 'Ánimo', 'Temas', 'Notas']],
+          body: sessions.map((x: any) => [
+            x.scheduled_at ? new Date(x.scheduled_at).toLocaleDateString('es-ES') : '—',
+            x.title, SESSION_STATUS_META[x.status]?.label || x.status,
+            x.mentee_mood ? `${x.mentee_mood}/5` : '—',
+            (x.topics_covered || []).join(', '), x.session_notes || '',
+          ]),
+          headStyles: { fillColor: ink, textColor: [255, 255, 255], fontStyle: 'bold' },
+          styles: { fontSize: 8, cellPadding: 2 }, columnStyles: { 5: { cellWidth: 50 } },
+        });
+      }
+      doc.save(`avance-dupla.pdf`);
+      showToast('PDF generado');
+    } catch { showToast('No se pudo generar el PDF', 'error'); } finally { setExporting(false); }
+  };
+
+  const m = data?.metrics;
+  const sessions = data?.sessions || [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl border border-zinc-200 max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-zinc-100">
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-semibold text-zinc-900">Avance de la dupla</h3>
+            <p className="text-[12px] text-zinc-500 mt-0.5 truncate">{mentor.full_name || mentor.email} <span className="text-zinc-300">↔</span> {mentee.full_name || mentee.email}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <ActionBtn onClick={exportPDF} icon={<I.Download />} variant={exporting ? 'disabled' : 'ghost'}>{exporting ? 'PDF…' : 'PDF'}</ActionBtn>
+            <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition"><I.Close className="w-4 h-4" /></button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto px-6 py-5 space-y-5">
+          {loading ? (
+            <div className="flex items-center justify-center py-12 gap-2"><Spinner /><span className="text-[13px] text-zinc-400">Cargando avance…</span></div>
+          ) : (
+            <>
+              {/* KPIs */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <ProgMetric label="Progreso" value={`${m?.progress ?? 0}%`} sub={`meta ${m?.target_sessions ?? 6} sesiones`} strong />
+                <ProgMetric label="Sesiones" value={`${m?.completed ?? 0}/${m?.total_sessions ?? 0}`} sub="completadas" />
+                <ProgMetric label="Asistencia" value={m?.attendance != null ? `${Math.round(m.attendance * 100)}%` : '—'} sub={`${m?.no_show ?? 0} no-show`} />
+                <ProgMetric label="Ánimo mentee" value={m?.avg_mood != null ? `${m.avg_mood}/5` : '—'} sub={`${m?.total_hours ?? 0} h totales`} />
+              </div>
+
+              {/* Barra de progreso */}
+              <div>
+                <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${m?.progress ?? 0}%` }} />
+                </div>
+                <div className="flex items-center justify-between mt-1.5 text-[11px] text-zinc-400">
+                  <span>{m?.last_session ? `Última sesión: ${new Date(m.last_session).toLocaleDateString('es-ES')}` : 'Sin sesiones completadas'}</span>
+                  {m?.next_session && <span>Próxima: {new Date(m.next_session).toLocaleDateString('es-ES')}</span>}
+                </div>
+              </div>
+
+              {/* Temas + próximos pasos */}
+              {(m?.topics?.length > 0 || m?.next_steps) && (
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-zinc-200 p-3">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-2">Temas cubiertos</div>
+                    {m?.topics?.length ? <div className="flex flex-wrap gap-1">{m.topics.map((t: string, i: number) => <span key={i} className="inline-flex px-2 py-0.5 rounded-md text-[10.5px] font-medium bg-zinc-100 text-zinc-600">{t}</span>)}</div> : <span className="text-[11px] text-zinc-300">—</span>}
+                  </div>
+                  <div className="rounded-xl border border-zinc-200 p-3">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-2">Próximos pasos</div>
+                    <p className="text-[11.5px] text-zinc-600 leading-relaxed">{m?.next_steps || '—'}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Bitácora */}
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-[12px] font-semibold text-zinc-900">Bitácora de sesiones</span>
+                  <button onClick={() => setShowForm(v => !v)} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-zinc-800 transition"><I.Plus className="w-3.5 h-3.5" />Registrar sesión</button>
+                </div>
+
+                {showForm && (
+                  <form onSubmit={submit} className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 mb-3 space-y-3">
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Título</label><input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className={inputCls} /></div>
+                      <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Fecha y hora</label><input type="datetime-local" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputCls} /></div>
+                    </div>
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Estado</label>
+                        <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className={inputCls}>
+                          <option value="completed">Completada</option><option value="scheduled">Agendada</option><option value="cancelled">Cancelada</option><option value="no_show">No asistió</option>
+                        </select></div>
+                      <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Duración (min)</label><input type="number" value={form.duration} onChange={e => setForm({ ...form, duration: e.target.value })} className={inputCls} /></div>
+                      <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Ánimo mentee (1-5)</label><input type="number" min={1} max={5} value={form.mood} onChange={e => setForm({ ...form, mood: e.target.value })} className={inputCls} /></div>
+                    </div>
+                    <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Temas (separados por coma)</label><input value={form.topics} onChange={e => setForm({ ...form, topics: e.target.value })} placeholder="Liderazgo, Comunicación" className={inputCls} /></div>
+                    <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Notas de la sesión</label><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} className={inputCls} /></div>
+                    <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Próximos pasos</label><input value={form.next_steps} onChange={e => setForm({ ...form, next_steps: e.target.value })} className={inputCls} /></div>
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => setShowForm(false)} className="px-3 py-2 rounded-lg text-[12px] font-semibold text-zinc-600 hover:bg-zinc-100 transition">Cancelar</button>
+                      <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 transition disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar sesión'}</button>
+                    </div>
+                  </form>
+                )}
+
+                {sessions.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-zinc-200 py-10 text-center">
+                    <p className="text-[12.5px] text-zinc-500">Aún no hay sesiones registradas.</p>
+                    <p className="text-[11px] text-zinc-400 mt-1">Registrá la primera para empezar a medir el avance.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {sessions.slice().reverse().map((x: any) => {
+                      const st = SESSION_STATUS_META[x.status] || SESSION_STATUS_META.scheduled;
+                      return (
+                        <div key={x.id} className="rounded-xl border border-zinc-200 p-3">
+                          <div className="flex items-center justify-between gap-3 mb-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[12.5px] font-semibold text-zinc-900 truncate">{x.title}</span>
+                              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold flex-shrink-0" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                            </div>
+                            <span className="text-[11px] text-zinc-400 flex-shrink-0">{x.scheduled_at ? new Date(x.scheduled_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} · {x.duration_minutes}m{x.mentee_mood ? ` · ánimo ${x.mentee_mood}/5` : ''}</span>
+                          </div>
+                          {x.topics_covered?.length > 0 && <div className="flex flex-wrap gap-1 mb-1.5">{x.topics_covered.map((t: string, i: number) => <span key={i} className="inline-flex px-1.5 py-0.5 rounded text-[9.5px] bg-zinc-50 text-zinc-500 border border-zinc-100">{t}</span>)}</div>}
+                          {x.session_notes && <p className="text-[11.5px] text-zinc-600 leading-relaxed">{x.session_notes}</p>}
+                          {x.next_steps && <p className="text-[11px] text-zinc-500 mt-1"><span className="font-semibold">Próximos pasos:</span> {x.next_steps}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

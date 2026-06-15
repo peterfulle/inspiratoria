@@ -1727,3 +1727,172 @@ async def resend_participant_invitation(program_id: str, participant_id: str):
 
         return {"ok": True, "email": participant.user.email}
     return await sync_to_async(resend)()
+
+
+# ============================================================================
+# MENTORING SESSIONS / PROGRESO DE LA DUPLA
+# ============================================================================
+
+class SessionCreateIn(BaseModel):
+    mentor_id: str
+    mentee_id: str
+    title: str = "Sesión de mentoría"
+    scheduled_at: datetime
+    duration_minutes: int = 60
+    status: str = "scheduled"
+    session_notes: str = ""
+    topics_covered: List[str] = Field(default_factory=list)
+    mentee_mood: Optional[int] = None
+    next_steps: str = ""
+    meeting_url: str = ""
+
+
+class SessionUpdateIn(BaseModel):
+    title: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+    duration_minutes: Optional[int] = None
+    status: Optional[str] = None
+    session_notes: Optional[str] = None
+    topics_covered: Optional[List[str]] = None
+    mentee_mood: Optional[int] = None
+    next_steps: Optional[str] = None
+    meeting_url: Optional[str] = None
+
+
+def _serialize_session(s):
+    return {
+        "id": str(s.id),
+        "title": s.title,
+        "description": s.description,
+        "scheduled_at": s.scheduled_at.isoformat() if s.scheduled_at else None,
+        "duration_minutes": s.duration_minutes,
+        "status": s.status,
+        "meeting_url": s.meeting_url,
+        "session_notes": s.session_notes,
+        "topics_covered": s.topics_covered or [],
+        "mentee_mood": s.mentee_mood,
+        "next_steps": s.next_steps,
+        "created_at": s.created_at.isoformat() if s.created_at else None,
+    }
+
+
+@router.get("/{program_id}/pair-progress")
+async def pair_progress(program_id: str, mentor_id: str = Query(...), mentee_id: str = Query(...)):
+    """Progreso de una dupla: bitácora de sesiones + métricas derivadas."""
+    def build():
+        from .models import MentoringSession
+        try:
+            program = Program.objects.get(id=program_id)
+        except Program.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Programa no encontrado")
+
+        sessions = list(MentoringSession.objects.filter(
+            program=program, mentor_id=mentor_id, mentee_id=mentee_id
+        ).order_by("scheduled_at"))
+
+        completed = [s for s in sessions if s.status == "completed"]
+        n_completed = len(completed)
+        n_scheduled = len([s for s in sessions if s.status == "scheduled"])
+        n_cancelled = len([s for s in sessions if s.status == "cancelled"])
+        n_noshow = len([s for s in sessions if s.status == "no_show"])
+        denom = n_completed + n_noshow + n_cancelled
+        attendance = round(n_completed / denom, 3) if denom else None
+        total_minutes = sum(s.duration_minutes for s in completed)
+        moods = [s.mentee_mood for s in completed if s.mentee_mood]
+        avg_mood = round(sum(moods) / len(moods), 2) if moods else None
+
+        now = timezone.now()
+        last_session = max((s.scheduled_at for s in completed if s.scheduled_at), default=None)
+        upcoming = [s.scheduled_at for s in sessions if s.status == "scheduled" and s.scheduled_at and s.scheduled_at > now]
+        next_session = min(upcoming, default=None)
+
+        topics = []
+        for s in completed:
+            for t in (s.topics_covered or []):
+                if t not in topics:
+                    topics.append(t)
+        next_steps = ""
+        for s in sorted(completed, key=lambda x: x.scheduled_at or now, reverse=True):
+            if s.next_steps:
+                next_steps = s.next_steps
+                break
+
+        TARGET = 6
+        progress = round(
+            min(1.0, n_completed / TARGET) * 60
+            + (attendance if attendance is not None else 0) * 25
+            + ((avg_mood / 5) if avg_mood else 0) * 15
+        )
+
+        return {
+            "metrics": {
+                "progress": progress,
+                "total_sessions": len(sessions),
+                "completed": n_completed,
+                "scheduled": n_scheduled,
+                "cancelled": n_cancelled,
+                "no_show": n_noshow,
+                "attendance": attendance,
+                "total_minutes": total_minutes,
+                "total_hours": round(total_minutes / 60, 1),
+                "avg_mood": avg_mood,
+                "last_session": last_session.isoformat() if last_session else None,
+                "next_session": next_session.isoformat() if next_session else None,
+                "topics": topics,
+                "next_steps": next_steps,
+                "target_sessions": TARGET,
+            },
+            "sessions": [_serialize_session(s) for s in sessions],
+        }
+
+    return await sync_to_async(build)()
+
+
+@router.post("/{program_id}/sessions", status_code=status.HTTP_201_CREATED)
+async def create_session(program_id: str, payload: SessionCreateIn):
+    def create():
+        from .models import MentoringSession
+        try:
+            program = Program.objects.get(id=program_id)
+        except Program.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Programa no encontrado")
+        s = MentoringSession.objects.create(
+            program=program,
+            mentor_id=payload.mentor_id,
+            mentee_id=payload.mentee_id,
+            title=payload.title or "Sesión de mentoría",
+            scheduled_at=payload.scheduled_at,
+            duration_minutes=payload.duration_minutes or 60,
+            status=payload.status or "scheduled",
+            session_notes=payload.session_notes or "",
+            topics_covered=payload.topics_covered or [],
+            mentee_mood=payload.mentee_mood,
+            next_steps=payload.next_steps or "",
+            meeting_url=payload.meeting_url or "",
+        )
+        return _serialize_session(s)
+    return await sync_to_async(create)()
+
+
+@router.patch("/{program_id}/sessions/{session_id}")
+async def update_session(program_id: str, session_id: str, payload: SessionUpdateIn):
+    def update():
+        from .models import MentoringSession
+        try:
+            s = MentoringSession.objects.get(id=session_id, program_id=program_id)
+        except MentoringSession.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Sesión no encontrada")
+        for k, v in payload.model_dump(exclude_unset=True).items():
+            setattr(s, k, v)
+        s.save()
+        return _serialize_session(s)
+    return await sync_to_async(update)()
+
+
+@router.delete("/{program_id}/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(program_id: str, session_id: str):
+    def remove():
+        from .models import MentoringSession
+        MentoringSession.objects.filter(id=session_id, program_id=program_id).delete()
+    await sync_to_async(remove)()
+    return None
