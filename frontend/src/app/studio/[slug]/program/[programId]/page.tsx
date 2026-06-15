@@ -1830,6 +1830,131 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
 // ============================================================================
 // TAB DUPLAS — vinculaciones activas con matching IA inline
 // ============================================================================
+// Lista de chips (skills, keywords, etc.)
+function ChipRow({ items, tone = 'zinc', max = 14 }: { items?: string[]; tone?: 'blue' | 'zinc' | 'emerald'; max?: number }) {
+  if (!items || items.length === 0) return <span className="text-[11px] text-zinc-300">—</span>;
+  const cls = tone === 'blue' ? 'bg-blue-50 text-blue-700' : tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-600';
+  return (
+    <div className="flex flex-wrap gap-1">
+      {items.slice(0, max).map((x, i) => (
+        <span key={i} className={`inline-flex px-2 py-0.5 rounded-md text-[10.5px] font-medium ${cls}`}>{x}</span>
+      ))}
+      {items.length > max && <span className="text-[10.5px] text-zinc-400 px-1 py-0.5">+{items.length - max}</span>}
+    </div>
+  );
+}
+
+// Barra de una dimensión del breakdown del matching
+function DimensionBar({ label, earned, weight, matches }: { label: string; earned: number; weight: number; matches?: string[] }) {
+  const pct = weight ? Math.round((earned / weight) * 100) : 0;
+  const color = pct >= 66 ? '#16a34a' : pct >= 33 ? '#2563eb' : '#a1a1aa';
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <span className="text-[11px] text-zinc-600">{label}</span>
+        <span className="text-[11px] font-semibold text-zinc-900">{(earned ?? 0).toFixed(1)}<span className="text-zinc-400 font-normal">/{weight}</span></span>
+      </div>
+      <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      {matches && matches.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {matches.slice(0, 6).map((mm, i) => (
+            <span key={i} className="text-[9.5px] px-1.5 py-0.5 rounded bg-white text-zinc-500 border border-zinc-200">{mm}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniProfileRow({ label, items }: { label: string; items?: string[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="text-[10.5px] leading-snug mb-1">
+      <span className="text-zinc-400">{label}: </span>
+      <span className="text-zinc-700">{items.slice(0, 6).join(' · ')}</span>
+    </div>
+  );
+}
+
+// Panel expandible con el análisis completo del match (datos reales del motor)
+function MatchDetail({ r }: { r: any }) {
+  const bd: Record<string, any> = r.breakdown || {};
+  const dims = Object.values(bd);
+  const mStrength = Math.round((r.mentor_profile_strength ?? 0) * 100);
+  const eStrength = Math.round((r.mentee_profile_strength ?? 0) * 100);
+  return (
+    <div className="px-5 pb-4">
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 grid lg:grid-cols-2 gap-x-6 gap-y-4">
+        {/* Compatibilidad por dimensión */}
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.07em] text-zinc-400 mb-3">Compatibilidad por dimensión</div>
+          <div className="space-y-3">
+            {dims.length > 0 ? dims.map((d: any, i: number) => (
+              <DimensionBar key={i} label={d.label} earned={d.earned} weight={d.weight} matches={d.matches} />
+            )) : <span className="text-[11px] text-zinc-400">Sin desglose disponible</span>}
+          </div>
+        </div>
+
+        {/* Afinidad + perfiles */}
+        <div className="space-y-4">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.07em] text-zinc-400 mb-2">Afinidad detectada</div>
+            <ChipRow items={r.matched_keywords} tone="blue" max={16} />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="rounded-lg bg-white border border-zinc-200 p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Mentor</span>
+                <span className="text-[9.5px] text-zinc-400">perfil {mStrength}%</span>
+              </div>
+              <div className="text-[12px] font-semibold text-zinc-900 truncate">{r.mentor?.name}</div>
+              {r.mentor?.headline && <div className="text-[10.5px] text-zinc-500 mb-1.5 truncate">{r.mentor.headline}</div>}
+              <MiniProfileRow label="Skills" items={r.mentor?.skills} />
+              <MiniProfileRow label="Temas" items={r.mentor?.topics} />
+              <MiniProfileRow label="Estilo" items={r.mentor?.style} />
+              {r.mentor?.experience_level && <MiniProfileRow label="Experiencia" items={[r.mentor.experience_level]} />}
+            </div>
+            <div className="rounded-lg bg-white border border-zinc-200 p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Mentee</span>
+                <span className="text-[9.5px] text-zinc-400">perfil {eStrength}%</span>
+              </div>
+              <div className="text-[12px] font-semibold text-zinc-900 truncate">{r.mentee?.name}</div>
+              {r.mentee?.headline && <div className="text-[10.5px] text-zinc-500 mb-1.5 truncate">{r.mentee.headline}</div>}
+              <MiniProfileRow label="Objetivos" items={r.mentee?.goals} />
+              <MiniProfileRow label="Intereses" items={r.mentee?.interests} />
+              <MiniProfileRow label="Desafíos" items={r.mentee?.challenges} />
+              <MiniProfileRow label="Estilo pref." items={r.mentee?.preferred_style} />
+            </div>
+          </div>
+        </div>
+
+        {/* Razones */}
+        {r.reasons && r.reasons.length > 0 && (
+          <div className="lg:col-span-2">
+            <div className="text-[10px] font-bold uppercase tracking-[0.07em] text-zinc-400 mb-2">Por qué este match</div>
+            <ul className="space-y-1">
+              {r.reasons.slice(0, 6).map((x: string, i: number) => (
+                <li key={i} className="text-[11.5px] text-zinc-600 flex gap-2"><span className="text-blue-500 mt-px">›</span><span>{x}</span></li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Análisis IA */}
+        {r.ai_recommendation && (
+          <div className="lg:col-span-2 rounded-lg px-3.5 py-3" style={{ background: 'rgba(37,99,235,0.05)', borderLeft: '2.5px solid rgba(37,99,235,0.4)' }}>
+            <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1.5"><I.Sparkles className="w-3 h-3" />Análisis de Claude</div>
+            <p className="text-[11.5px] text-zinc-700 leading-relaxed">{r.ai_recommendation}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TabDuplas({ programId, participants, showToast }: { programId: string; participants: Participant[]; showToast: (m: string, t?: 'success' | 'error') => void }) {
   const [vincs, setVincs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -2035,12 +2160,13 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
 
         {matchResults.length > 0 && (
           <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
-            <div className="grid grid-cols-[auto_1fr_auto_1fr_auto_auto] items-center gap-3 px-5 py-2.5 bg-zinc-50 border-b border-zinc-100">
+            <div className="grid grid-cols-[auto_1fr_auto_1fr_auto_auto_auto] items-center gap-3 px-5 py-2.5 bg-zinc-50 border-b border-zinc-100">
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">#</span>
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Mentor</span>
               <span />
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Mentee</span>
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Score</span>
+              <span />
               <span />
             </div>
             {matchResults.map((r: any, idx: number) => {
@@ -2051,16 +2177,16 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
               const expanded = expandedAI[key];
               return (
                 <div key={key} className={`${idx > 0 ? 'border-t border-zinc-50' : ''}`}>
-                  <div className="grid grid-cols-[auto_1fr_auto_1fr_auto_auto] items-center gap-3 px-5 py-4 hover:bg-zinc-50/40 transition">
+                  <div className="grid grid-cols-[auto_1fr_auto_1fr_auto_auto_auto] items-center gap-3 px-5 py-4 hover:bg-zinc-50/40 transition">
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: c.bg, color: c.color }}>{idx + 1}</div>
                     <div className="min-w-0">
                       <p className="text-[13px] font-semibold text-zinc-900 truncate">{r.mentor?.name || '—'}</p>
-                      <p className="text-[11px] text-zinc-400 truncate">{r.mentor?.email || ''}</p>
+                      <p className="text-[11px] text-zinc-400 truncate">{r.mentor?.headline || r.mentor?.email || ''}</p>
                     </div>
                     <span className="text-zinc-300 flex-shrink-0"><I.Swap className="w-4 h-4" /></span>
                     <div className="min-w-0">
                       <p className="text-[13px] font-semibold text-zinc-900 truncate">{r.mentee?.name || '—'}</p>
-                      <p className="text-[11px] text-zinc-400 truncate">{r.mentee?.email || ''}</p>
+                      <p className="text-[11px] text-zinc-400 truncate">{r.mentee?.headline || r.mentee?.email || ''}</p>
                     </div>
                     <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold flex-shrink-0" style={{ background: c.bg, color: c.color }}>{(r.score || 0).toFixed(0)} pts</span>
                     <div className="flex-shrink-0">
@@ -2073,16 +2199,12 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
                           className="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-zinc-800 transition whitespace-nowrap"><I.Zap className="w-3.5 h-3.5" />Vincular</button>
                       )}
                     </div>
+                    <button onClick={() => setExpandedAI(p => ({ ...p, [key]: !p[key] }))} title="Ver detalle del match"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition flex-shrink-0">
+                      <I.Chevron className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                    </button>
                   </div>
-                  {r.ai_recommendation && (
-                    <div className="px-5 pb-3">
-                      <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(37,99,235,0.05)', borderLeft: '2.5px solid rgba(37,99,235,0.35)' }}>
-                        <p className={`text-[11.5px] text-zinc-600 leading-relaxed ${expanded ? '' : 'line-clamp-1'}`}>{r.ai_recommendation}</p>
-                        <button onClick={() => setExpandedAI(p => ({ ...p, [key]: !p[key] }))}
-                          className="inline-flex items-center gap-1 text-[10.5px] font-semibold mt-1 text-blue-600">{expanded ? 'Ver menos' : 'Ver análisis'}<I.Chevron className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`} /></button>
-                      </div>
-                    </div>
-                  )}
+                  {expanded && <MatchDetail r={r} />}
                 </div>
               );
             })}
