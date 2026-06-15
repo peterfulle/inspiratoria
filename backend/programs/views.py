@@ -922,8 +922,9 @@ async def search_users(
         return [{
             "id": str(u.id),
             "email": u.email,
-            "first_name": u.first_name,
-            "last_name": u.last_name,
+            "nombre": u.first_name or "",
+            "apellidos": u.last_name or "",
+            "telefono": getattr(u, 'phone', '') or "",
             "role": u.role,
             "company": u.company.name if u.company else None,
             "is_onboarded": u.is_onboarded,

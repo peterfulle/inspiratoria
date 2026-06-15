@@ -115,6 +115,10 @@ const I = {
   Chart:       SvgBase(<><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></>),
   FileText:    SvgBase(<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" /></>),
   Download:    SvgBase(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>),
+  Refresh:     SvgBase(<><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></>),
+  Swap:        SvgBase(<><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>),
+  Zap:         SvgBase(<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />),
+  Chevron:     SvgBase(<polyline points="6 9 12 15 18 9" />),
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -1508,7 +1512,7 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
           <div className="text-[11.5px] text-zinc-600 mt-0.5">Compártelo para que cualquier persona pueda registrarse al programa por sí misma.</div>
           <div className="mt-2 flex items-center gap-2">
             <input readOnly value={enrollLink} className="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-[12px] text-zinc-700 font-mono" />
-            <button onClick={copyEnrollLink} className="px-3 py-1.5 rounded-lg bg-zinc-900 text-yellow-300 text-[12px] font-semibold hover:bg-zinc-800 transition flex-shrink-0">Copiar</button>
+            <button onClick={copyEnrollLink} className="px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold hover:bg-zinc-800 transition flex-shrink-0">Copiar</button>
             <a href={enrollLink} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-[12px] font-semibold text-zinc-700 hover:border-zinc-300 transition flex-shrink-0">Abrir</a>
           </div>
         </div>
@@ -1541,7 +1545,7 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Buscar nombre o email…"
-                className="pl-7 pr-3 py-1.5 rounded-lg border border-zinc-200 text-[12px] focus:outline-none focus:border-zinc-300 w-48"
+                className="pl-7 pr-3 py-1.5 rounded-lg border border-zinc-200 text-[12px] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 w-48"
               />
             </div>
             <div className="inline-flex p-1 bg-zinc-100 rounded-lg">
@@ -1557,7 +1561,7 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
                 </button>
               ))}
             </div>
-            <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-yellow-300 text-[12px] font-semibold hover:bg-zinc-800 transition">
+            <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold hover:bg-zinc-800 transition">
               <I.Plus className="w-3.5 h-3.5" /> Agregar
             </button>
           </div>
@@ -1570,7 +1574,7 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
             {filtered.map(p => {
               const name = p.user.full_name || `${p.user.nombre || ''} ${p.user.apellidos || ''}`.trim() || p.user.email;
               return (
-                <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl bg-white border border-zinc-200 hover:border-zinc-200 transition">
+                <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50/40 transition-colors">
                   {p.user.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.user.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
@@ -1739,7 +1743,7 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
             <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Rol en el programa</label>
             <div className="grid grid-cols-2 gap-2">
               {(['mentor', 'mentee', 'facilitator', 'participant_cell'] as ParticipantRole[]).map(r => (
-                <button key={r} type="button" onClick={() => setRole(r)} className={`px-3 py-2 rounded-lg text-[12px] font-semibold border transition ${role === r ? 'border-zinc-300 bg-zinc-100 text-zinc-900' : 'border-zinc-200 text-zinc-700 hover:border-zinc-300'}`}>
+                <button key={r} type="button" onClick={() => setRole(r)} className={`px-3 py-2 rounded-lg text-[12px] font-semibold border transition ${role === r ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-zinc-200 text-zinc-700 hover:border-zinc-300'}`}>
                   {PARTICIPANT_ROLE_LABEL[r]}
                 </button>
               ))}
@@ -1748,7 +1752,7 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
 
           {/* email invitation toggle */}
           <label className="flex items-center gap-3 p-3 rounded-xl bg-zinc-50 border border-zinc-200 cursor-pointer">
-            <input type="checkbox" checked={sendInvitation} onChange={e => setSendInvitation(e.target.checked)} className="w-4 h-4 rounded text-zinc-800 focus:ring-zinc-400" />
+            <input type="checkbox" checked={sendInvitation} onChange={e => setSendInvitation(e.target.checked)} className="w-4 h-4 rounded accent-blue-600" />
             <div className="flex-1">
               <div className="text-[12.5px] font-semibold text-zinc-900">Enviar invitación por email</div>
               <div className="text-[11px] text-zinc-500">Recibirá un código OTP de 4 dígitos y un link para activar su cuenta.</div>
@@ -1764,7 +1768,7 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
                   onChange={e => setQuery(e.target.value)}
                   placeholder="Email, nombre o apellido…"
                   autoFocus
-                  className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:border-zinc-300 focus:ring-2 focus:ring-zinc-200"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"
                 />
               </div>
               {searching && <div className="text-[12px] text-zinc-400">Buscando…</div>}
@@ -1790,7 +1794,7 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
                         <div className="text-[12.5px] font-semibold text-zinc-900 truncate">{hitName}</div>
                         <div className="text-[11px] text-zinc-500 truncate">{h.email}{h.company ? ` · ${h.company}` : ''}</div>
                       </div>
-                      <span className="text-[11px] text-zinc-800 font-semibold flex-shrink-0">Agregar →</span>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-semibold flex-shrink-0">Agregar<I.ArrowRight className="w-3 h-3" /></span>
                     </button>
                   );
                 })}
@@ -1800,19 +1804,19 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
             <form onSubmit={createAndEnroll} className="space-y-3">
               <div>
                 <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Email</label>
-                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="persona@correo.com" className="w-full px-3 py-2.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:border-zinc-300 focus:ring-2 focus:ring-zinc-200" />
+                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="persona@correo.com" className="w-full px-3 py-2.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Nombre</label>
-                  <input required value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:border-zinc-300 focus:ring-2 focus:ring-zinc-200" />
+                  <input required value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Apellido</label>
-                  <input required value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:border-zinc-300 focus:ring-2 focus:ring-zinc-200" />
+                  <input required value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />
                 </div>
               </div>
-              <button type="submit" disabled={submitting} className="w-full py-2.5 rounded-lg bg-zinc-900 text-yellow-300 text-sm font-semibold hover:bg-zinc-800 transition disabled:opacity-60">
+              <button type="submit" disabled={submitting} className="w-full py-2.5 rounded-lg bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-800 transition disabled:opacity-60">
                 {submitting ? 'Creando…' : 'Crear y agregar al programa'}
               </button>
             </form>
@@ -1912,7 +1916,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
           </div>
           <button onClick={loadVincs} disabled={loading}
             className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-[12px] font-medium text-zinc-500 hover:bg-zinc-50 transition disabled:opacity-40">
-            {loading ? '…' : '↺ Actualizar'}
+            <I.Refresh className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />Actualizar
           </button>
         </div>
 
@@ -1950,7 +1954,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
                     <p className="text-[13px] font-semibold text-zinc-900 truncate">{mentorName}</p>
                     <p className="text-[11px] text-zinc-400 truncate">{mentorEmail}</p>
                   </div>
-                  <span className="text-zinc-300 text-[18px] flex-shrink-0">↔</span>
+                  <span className="text-zinc-300 flex-shrink-0"><I.Swap className="w-4 h-4" /></span>
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-zinc-900 truncate">{menteeName}</p>
                     <p className="text-[11px] text-zinc-400 truncate">{menteeEmail}</p>
@@ -1962,11 +1966,11 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
                   </div>
                   <div className="flex-shrink-0">
                     {isAI
-                      ? <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: 'rgba(245,200,0,0.15)', color: '#7a5900' }}>✨ IA</span>
+                      ? <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700"><I.Sparkles className="w-3 h-3" />IA</span>
                       : <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-zinc-100 text-zinc-500">Manual</span>}
                   </div>
                   <button onClick={() => removeVinc(v.id)} title="Desvincular"
-                    className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[17px] text-zinc-300 hover:bg-red-50 hover:text-red-500 transition">×</button>
+                    className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[17px] text-zinc-300 hover:bg-red-50 hover:text-red-500 transition"><I.Close className="w-4 h-4" /></button>
                 </div>
               );
             })}
@@ -1992,13 +1996,13 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
           <div className="flex items-center gap-3 flex-shrink-0">
             <label className="flex items-center gap-2 text-[12px] cursor-pointer select-none text-zinc-600">
               <input type="checkbox" checked={useAI} onChange={e => setUseAI(e.target.checked)} className="h-3.5 w-3.5 rounded border-zinc-300" />
-              ✨ Claude
+              <I.Sparkles className="w-3.5 h-3.5 text-blue-600" />Claude
             </label>
             <button onClick={runMatch} disabled={matchLoading}
               className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-[13px] font-bold text-white hover:bg-zinc-800 transition disabled:opacity-60">
               {matchLoading
                 ? <><svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Analizando…</>
-                : <>✨ Generar matches</>}
+                : <><I.Sparkles className="w-4 h-4" />Generar matches</>}
             </button>
           </div>
         </div>
@@ -2007,7 +2011,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
 
         {!matchRan && !matchLoading && (
           <div className="rounded-2xl border border-dashed border-zinc-200 bg-white py-12 text-center">
-            <p className="text-[13px] text-zinc-500">Pulsa «✨ Generar matches» para ver sugerencias de duplas.</p>
+            <p className="text-[13px] text-zinc-500">Pulsa «Generar matches» para ver sugerencias de duplas.</p>
           </div>
         )}
 
@@ -2053,7 +2057,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
                       <p className="text-[13px] font-semibold text-zinc-900 truncate">{r.mentor?.name || '—'}</p>
                       <p className="text-[11px] text-zinc-400 truncate">{r.mentor?.email || ''}</p>
                     </div>
-                    <span className="text-zinc-300 flex-shrink-0">↔</span>
+                    <span className="text-zinc-300 flex-shrink-0"><I.Swap className="w-4 h-4" /></span>
                     <div className="min-w-0">
                       <p className="text-[13px] font-semibold text-zinc-900 truncate">{r.mentee?.name || '—'}</p>
                       <p className="text-[11px] text-zinc-400 truncate">{r.mentee?.email || ''}</p>
@@ -2061,21 +2065,21 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
                     <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold flex-shrink-0" style={{ background: c.bg, color: c.color }}>{(r.score || 0).toFixed(0)} pts</span>
                     <div className="flex-shrink-0">
                       {alreadyActive || act === 'done' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10.5px] font-bold text-emerald-700 ring-1 ring-emerald-200 whitespace-nowrap">✓ Activa</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10.5px] font-bold text-emerald-700 ring-1 ring-emerald-200 whitespace-nowrap"><I.Check className="w-3 h-3" />Activa</span>
                       ) : act === 'loading' ? (
                         <svg className="h-4 w-4 animate-spin text-zinc-400" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
                       ) : (
                         <button onClick={() => activatePair(r.mentor?.id, r.mentee?.id, r.score, r.ai_recommendation)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-zinc-800 transition whitespace-nowrap">⚡ Vincular</button>
+                          className="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-zinc-800 transition whitespace-nowrap"><I.Zap className="w-3.5 h-3.5" />Vincular</button>
                       )}
                     </div>
                   </div>
                   {r.ai_recommendation && (
                     <div className="px-5 pb-3">
-                      <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(245,200,0,0.06)', borderLeft: '2.5px solid rgba(245,200,0,0.5)' }}>
+                      <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(37,99,235,0.05)', borderLeft: '2.5px solid rgba(37,99,235,0.35)' }}>
                         <p className={`text-[11.5px] text-zinc-600 leading-relaxed ${expanded ? '' : 'line-clamp-1'}`}>{r.ai_recommendation}</p>
                         <button onClick={() => setExpandedAI(p => ({ ...p, [key]: !p[key] }))}
-                          className="text-[10.5px] font-semibold mt-1" style={{ color: '#7a5900' }}>{expanded ? 'Ver menos ▴' : 'Ver análisis ▾'}</button>
+                          className="inline-flex items-center gap-1 text-[10.5px] font-semibold mt-1 text-blue-600">{expanded ? 'Ver menos' : 'Ver análisis'}<I.Chevron className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`} /></button>
                       </div>
                     </div>
                   )}
