@@ -105,7 +105,7 @@ export default function ProgramPreviewPage() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`${API_URL}/api/program-templates`);
+        const r = await fetch(`${API_URL}/api/program-templates?include_files=true`);
         if (r.ok) {
           const all: ProgramTemplate[] = await r.json();
           const found = all.find(t => t.slug === slug) || null;

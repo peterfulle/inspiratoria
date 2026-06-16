@@ -81,12 +81,40 @@ def _slugify(text: str) -> str:
     return slug or 'programa'
 
 
+def _strip_data_uris(obj):
+    """Elimina archivos embebidos (data:...base64) de estructuras anidadas.
+    Las plantillas guardan PDFs/videos como data-URI dentro de modules, lo que
+    infla el listado a decenas de MB. Para listar/contar no se necesitan."""
+    if isinstance(obj, dict):
+        return {k: _strip_data_uris(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_strip_data_uris(x) for x in obj]
+    if isinstance(obj, str) and obj.startswith("data:") and len(obj) > 200:
+        return ""
+    return obj
+
+
 @router.get("/program-templates", response_model=List[ProgramTemplateOut])
-def list_program_templates():
+def list_program_templates(include_files: bool = False, light: bool = False):
+    """
+    light=true: omite las columnas JSON pesadas (modules con archivos base64,
+    reglas, etc.) — no se transfieren desde la DB. Ideal para contar/listar
+    rápido (dashboard). include_files=true: incluye los data-URI de archivos.
+    """
     from programs.models import ProgramTemplate
-    templates = ProgramTemplate.objects.all()
-    return [
-        {
+    HEAVY = ["modules", "milestones", "mentor_requirements", "mentee_requirements", "matching_rules", "session_rules"]
+    qs = ProgramTemplate.objects.all()
+    if light:
+        qs = qs.defer(*HEAVY)
+    result = []
+    for t in qs:
+        if light:
+            mods, mils, mreq, ereq, mrules, srules = [], [], {}, {}, {}, {}
+        else:
+            mods = (t.modules or []) if include_files else _strip_data_uris(t.modules or [])
+            mils, mreq, ereq = t.milestones or [], t.mentor_requirements or {}, t.mentee_requirements or {}
+            mrules, srules = t.matching_rules or {}, t.session_rules or {}
+        result.append({
             "id": str(t.id),
             "slug": t.slug,
             "name": t.name,
@@ -94,19 +122,18 @@ def list_program_templates():
             "category": t.category,
             "duration": t.duration,
             "status": t.status,
-            "modules": t.modules or [],
-            "milestones": t.milestones or [],
+            "modules": mods,
+            "milestones": mils,
             "tags": t.tags or [],
-            "mentorRequirements": t.mentor_requirements or {},
-            "menteeRequirements": t.mentee_requirements or {},
-            "matchingRules": t.matching_rules or {},
-            "sessionRules": t.session_rules or {},
+            "mentorRequirements": mreq,
+            "menteeRequirements": ereq,
+            "matchingRules": mrules,
+            "sessionRules": srules,
             "createdAt": t.created_at.strftime("%Y-%m-%d"),
             "updatedAt": t.updated_at.strftime("%Y-%m-%d"),
             "createdBy": t.created_by.email if t.created_by else None,
-        }
-        for t in templates
-    ]
+        })
+    return result
 
 
 @router.post("/program-templates", response_model=ProgramTemplateOut, status_code=201)

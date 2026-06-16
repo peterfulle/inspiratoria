@@ -651,7 +651,7 @@ export default function DashboardPage() {
         const [statsRes, companiesRes, templatesRes] = await Promise.all([
           fetch(`${API_URL}/api/companies/stats`).catch(() => null),
           fetch(`${API_URL}/api/companies/`).catch(() => null),
-          fetch(`${API_URL}/api/program-templates`).catch(() => null),
+          fetch(`${API_URL}/api/program-templates?light=true`).catch(() => null),
         ]);
         let totalAccounts = 0, totalUsers = 0;
         if (statsRes?.ok) { const s = await statsRes.json(); totalAccounts = s.total_companies || 0; totalUsers = s.total_users || 0; }
