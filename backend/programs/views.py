@@ -1776,81 +1776,86 @@ def _serialize_session(s):
     }
 
 
+def _pair_payload(program, mentor_id, mentee_id):
+    """Métricas + bitácora de una dupla (mentor_id ↔ mentee_id) en un programa."""
+    from .models import MentoringSession
+    sessions = list(MentoringSession.objects.filter(
+        program=program, mentor_id=mentor_id, mentee_id=mentee_id
+    ).order_by("scheduled_at"))
+
+    completed = [s for s in sessions if s.status == "completed"]
+    n_completed = len(completed)
+    n_scheduled = len([s for s in sessions if s.status == "scheduled"])
+    n_cancelled = len([s for s in sessions if s.status == "cancelled"])
+    n_noshow = len([s for s in sessions if s.status == "no_show"])
+    denom = n_completed + n_noshow + n_cancelled
+    attendance = round(n_completed / denom, 3) if denom else None
+    total_minutes = sum(s.duration_minutes for s in completed)
+    moods = [s.mentee_mood for s in completed if s.mentee_mood]
+    avg_mood = round(sum(moods) / len(moods), 2) if moods else None
+
+    now = timezone.now()
+    last_session = max((s.scheduled_at for s in completed if s.scheduled_at), default=None)
+    upcoming = [s.scheduled_at for s in sessions if s.status == "scheduled" and s.scheduled_at and s.scheduled_at > now]
+    next_session = min(upcoming, default=None)
+
+    topics = []
+    for s in completed:
+        for t in (s.topics_covered or []):
+            if t not in topics:
+                topics.append(t)
+    next_steps = ""
+    for s in sorted(completed, key=lambda x: x.scheduled_at or now, reverse=True):
+        if s.next_steps:
+            next_steps = s.next_steps
+            break
+
+    TARGET = 6
+    progress = round(
+        min(1.0, n_completed / TARGET) * 60
+        + (attendance if attendance is not None else 0) * 25
+        + ((avg_mood / 5) if avg_mood else 0) * 15
+    )
+
+    return {
+        "metrics": {
+            "progress": progress,
+            "total_sessions": len(sessions),
+            "completed": n_completed,
+            "scheduled": n_scheduled,
+            "cancelled": n_cancelled,
+            "no_show": n_noshow,
+            "attendance": attendance,
+            "total_minutes": total_minutes,
+            "total_hours": round(total_minutes / 60, 1),
+            "avg_mood": avg_mood,
+            "last_session": last_session.isoformat() if last_session else None,
+            "next_session": next_session.isoformat() if next_session else None,
+            "topics": topics,
+            "next_steps": next_steps,
+            "target_sessions": TARGET,
+        },
+        "sessions": [_serialize_session(s) for s in sessions],
+    }
+
+
 @router.get("/{program_id}/pair-progress")
 async def pair_progress(program_id: str, mentor_id: str = Query(...), mentee_id: str = Query(...)):
     """Progreso de una dupla: bitácora de sesiones + métricas derivadas."""
     def build():
-        from .models import MentoringSession
+        from django.db import close_old_connections; close_old_connections()
         try:
             program = Program.objects.get(id=program_id)
         except Program.DoesNotExist:
             raise HTTPException(status_code=404, detail="Programa no encontrado")
-
-        sessions = list(MentoringSession.objects.filter(
-            program=program, mentor_id=mentor_id, mentee_id=mentee_id
-        ).order_by("scheduled_at"))
-
-        completed = [s for s in sessions if s.status == "completed"]
-        n_completed = len(completed)
-        n_scheduled = len([s for s in sessions if s.status == "scheduled"])
-        n_cancelled = len([s for s in sessions if s.status == "cancelled"])
-        n_noshow = len([s for s in sessions if s.status == "no_show"])
-        denom = n_completed + n_noshow + n_cancelled
-        attendance = round(n_completed / denom, 3) if denom else None
-        total_minutes = sum(s.duration_minutes for s in completed)
-        moods = [s.mentee_mood for s in completed if s.mentee_mood]
-        avg_mood = round(sum(moods) / len(moods), 2) if moods else None
-
-        now = timezone.now()
-        last_session = max((s.scheduled_at for s in completed if s.scheduled_at), default=None)
-        upcoming = [s.scheduled_at for s in sessions if s.status == "scheduled" and s.scheduled_at and s.scheduled_at > now]
-        next_session = min(upcoming, default=None)
-
-        topics = []
-        for s in completed:
-            for t in (s.topics_covered or []):
-                if t not in topics:
-                    topics.append(t)
-        next_steps = ""
-        for s in sorted(completed, key=lambda x: x.scheduled_at or now, reverse=True):
-            if s.next_steps:
-                next_steps = s.next_steps
-                break
-
-        TARGET = 6
-        progress = round(
-            min(1.0, n_completed / TARGET) * 60
-            + (attendance if attendance is not None else 0) * 25
-            + ((avg_mood / 5) if avg_mood else 0) * 15
-        )
-
-        return {
-            "metrics": {
-                "progress": progress,
-                "total_sessions": len(sessions),
-                "completed": n_completed,
-                "scheduled": n_scheduled,
-                "cancelled": n_cancelled,
-                "no_show": n_noshow,
-                "attendance": attendance,
-                "total_minutes": total_minutes,
-                "total_hours": round(total_minutes / 60, 1),
-                "avg_mood": avg_mood,
-                "last_session": last_session.isoformat() if last_session else None,
-                "next_session": next_session.isoformat() if next_session else None,
-                "topics": topics,
-                "next_steps": next_steps,
-                "target_sessions": TARGET,
-            },
-            "sessions": [_serialize_session(s) for s in sessions],
-        }
-
+        return _pair_payload(program, mentor_id, mentee_id)
     return await sync_to_async(build)()
 
 
 @router.post("/{program_id}/sessions", status_code=status.HTTP_201_CREATED)
 async def create_session(program_id: str, payload: SessionCreateIn):
     def create():
+        from django.db import close_old_connections; close_old_connections()
         from .models import MentoringSession
         try:
             program = Program.objects.get(id=program_id)
@@ -1877,6 +1882,7 @@ async def create_session(program_id: str, payload: SessionCreateIn):
 @router.patch("/{program_id}/sessions/{session_id}")
 async def update_session(program_id: str, session_id: str, payload: SessionUpdateIn):
     def update():
+        from django.db import close_old_connections; close_old_connections()
         from .models import MentoringSession
         try:
             s = MentoringSession.objects.get(id=session_id, program_id=program_id)
@@ -1892,7 +1898,59 @@ async def update_session(program_id: str, session_id: str, payload: SessionUpdat
 @router.delete("/{program_id}/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session(program_id: str, session_id: str):
     def remove():
+        from django.db import close_old_connections; close_old_connections()
         from .models import MentoringSession
         MentoringSession.objects.filter(id=session_id, program_id=program_id).delete()
     await sync_to_async(remove)()
     return None
+
+
+
+@router.get("/my-progress/{user_id}")
+async def my_progress(user_id: str):
+    """Duplas del usuario (como mentor o mentee) con su progreso real."""
+    def build():
+        from django.db import close_old_connections; close_old_connections()
+        vincs = Vinculation.objects.select_related(
+            "program", "program__company", "participant1__user", "participant2__user"
+        ).filter(
+            status="active"
+        ).filter(
+            db_models.Q(participant1__user_id=user_id) | db_models.Q(participant2__user_id=user_id)
+        ).order_by("-created_at")
+
+        out = []
+        for v in vincs:
+            p1, p2 = v.participant1, v.participant2
+            if p2.role == "mentor" and p1.role != "mentor":
+                mentor_pp, mentee_pp = p2, p1
+            else:
+                mentor_pp, mentee_pp = p1, p2
+            my_role = "mentor" if str(mentor_pp.user_id) == str(user_id) else "mentee"
+            counterpart_pp = mentee_pp if my_role == "mentor" else mentor_pp
+            cu = counterpart_pp.user
+            payload = _pair_payload(v.program, str(mentor_pp.user_id), str(mentee_pp.user_id))
+            meta = v.metadata or {}
+            out.append({
+                "vinculation_id": str(v.id),
+                "role": my_role,
+                "program": {
+                    "id": str(v.program.id),
+                    "name": v.program.name,
+                    "company": v.program.company.name if v.program.company else None,
+                    "slug": v.program.company.slug if v.program.company else None,
+                },
+                "counterpart": {
+                    "id": str(cu.id),
+                    "name": (f"{cu.first_name or ''} {cu.last_name or ''}".strip() or cu.email),
+                    "email": cu.email,
+                    "headline": getattr(cu, "headline", "") or "",
+                    "role": "mentor" if my_role == "mentee" else "mentee",
+                },
+                "score": meta.get("score"),
+                "origin": "IA" if meta.get("ai_recommendation") else "Manual",
+                "metrics": payload["metrics"],
+                "sessions": payload["sessions"],
+            })
+        return out
+    return await sync_to_async(build)()

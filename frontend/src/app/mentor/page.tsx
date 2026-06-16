@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { initialTemplates, getNextMonday, formatDateSpanish } from "../dashboard/programs/data";
 import { ProgramTemplate, Module, SessionDetail } from "../dashboard/programs/types";
+import MyProgressSection from "../../components/MyProgressSection";
 
 // ═══════════════════════════════════════════════════════════════════
 // MENTOR DASHBOARD - Ultra Modern Minimal Design
@@ -374,6 +375,8 @@ export default function MentorDashboard() {
                 <h2 className="text-2xl font-semibold text-gray-900">Hola, María 👋</h2>
                 <p className="text-gray-500 mt-1">Tienes 3 sesiones esta semana</p>
               </div>
+
+              <MyProgressSection />
 
               {/* Stats */}
               <div className="grid grid-cols-4 gap-4">

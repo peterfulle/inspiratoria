@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import MyProgressSection from "../../components/MyProgressSection";
 
 // Types
 interface Mentor {
@@ -319,6 +320,7 @@ export default function MenteeDashboard() {
         {/* Overview Tab */}
         {activeTab === "overview" && (
           <div className="space-y-8">
+            <MyProgressSection />
             {/* Welcome & Mentor Card */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Progress Overview */}
