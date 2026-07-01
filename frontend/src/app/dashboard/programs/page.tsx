@@ -650,7 +650,7 @@ export default function ProgramsPage() {
     setAssignDuplicate(null);
     setAssignForm({ programId: "", companyId: "", cohortYear: String(new Date().getFullYear()) });
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("auth_token");
       const res = await fetch(`${API_URL}/api/companies/active-companies`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -671,7 +671,7 @@ export default function ProgramsPage() {
     setAssignError("");
     if (!force) setAssignDuplicate(null);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("auth_token");
       const selectedTemplate = templates.find(t => t.id === assignForm.programId);
       if (!selectedTemplate) throw new Error("Plantilla no encontrada");
 

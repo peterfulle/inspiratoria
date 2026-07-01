@@ -640,8 +640,10 @@ class AuditLog(models.Model):
         blank=True
     )
     admin_user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
     )
     action = models.CharField(max_length=100)
     entity = models.CharField(max_length=50)  # user, participant, vinculation, etc

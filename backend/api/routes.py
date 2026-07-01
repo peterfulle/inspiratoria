@@ -8,9 +8,9 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mentorloop_clone.settings")
 django.setup()
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db import models as django_models
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
@@ -412,11 +412,43 @@ def _send_program_assignment_email(company, program):
         print(f"[EMAIL] Error sending email: {e}")
 
 
+def _actor_from_auth(authorization):
+    """Resuelve el usuario que ejecuta la acción a partir del token
+    'Bearer {user_id}:{...}'. Best-effort: devuelve None si no se puede."""
+    if not authorization:
+        return None
+    from companies.models import User
+    import uuid as _uuid
+    token = authorization.replace("Bearer ", "").strip()
+    uid = token.split(":", 1)[0] if ":" in token else token
+    try:
+        return User.objects.get(id=_uuid.UUID(uid))
+    except Exception:
+        return None
+
+
+# Estados válidos de un curso/programa (para validación de entrada)
+VALID_PROGRAM_STATUSES = {
+    "designed", "ready_for_execution", "in_execution", "under_review",
+    "closed", "draft", "active", "paused", "completed",
+}
+
+
 @router.post("/programs", response_model=ProgramOut, status_code=201)
-def create_program(payload: ProgramIn) -> dict:
+def create_program(payload: ProgramIn, authorization: Optional[str] = Header(None)) -> dict:
     from companies.models import Company
-    from programs.models import Activity, ProgramTemplate
+    from programs.models import Activity, ProgramTemplate, AuditLog
+    from django.db import close_old_connections
     import uuid
+    close_old_connections()
+
+    # ─── Validaciones de entrada ───
+    if payload.status and payload.status not in VALID_PROGRAM_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Estado inválido: '{payload.status}'.")
+    if payload.cohort_year is not None and not (2000 <= int(payload.cohort_year) <= 2100):
+        raise HTTPException(status_code=400, detail="Año de cohorte fuera de rango (2000–2100).")
+    if not (payload.name or "").strip() and not payload.template_id:
+        raise HTTPException(status_code=400, detail="Se requiere un nombre o una plantilla de origen para crear el curso.")
 
     # ─── Resolver empresa ───
     company = None
@@ -477,18 +509,9 @@ def create_program(payload: ProgramIn) -> dict:
     if not name:
         name = "Programa sin título"
 
-    program = Program.objects.create(
-        name=name,
-        description=payload.description or (template.description if template else "") or "",
-        theme=payload.theme or (template.category if template else "General") or "General",
-        company=company,
-        status=payload.status or "designed",
-        template=template,
-        design_snapshot=design_snapshot,
-        cohort_year=payload.cohort_year,
-    )
+    actor = _actor_from_auth(authorization)
 
-    # ─── Actividades: las enviadas, o derivadas del diseño de la plantilla ───
+    # ─── Actividades a crear: las enviadas, o derivadas del diseño de la plantilla ───
     activities_in = payload.activities
     if not activities_in and design_snapshot.get("modules"):
         activities_in = []
@@ -501,8 +524,20 @@ def create_program(payload: ProgramIn) -> dict:
                     "modality": a.get("modality") or "online",
                 })
 
-    if activities_in:
-        for act_data in activities_in:
+    # ─── Creación atómica: curso + actividades + auditoría (todo o nada) ───
+    with transaction.atomic():
+        program = Program.objects.create(
+            name=name,
+            description=payload.description or (template.description if template else "") or "",
+            theme=payload.theme or (template.category if template else "General") or "General",
+            company=company,
+            status=payload.status or "designed",
+            template=template,
+            design_snapshot=design_snapshot,
+            cohort_year=payload.cohort_year,
+        )
+
+        for act_data in (activities_in or []):
             Activity.objects.create(
                 program=program,
                 name=act_data.get('name', ''),
@@ -513,6 +548,28 @@ def create_program(payload: ProgramIn) -> dict:
                 modality=act_data.get('modality'),
                 status='created',
             )
+
+        # Bitácora de auditoría: registra QUIÉN creó QUÉ, con contexto completo
+        AuditLog.objects.create(
+            program=program,
+            admin_user=actor,
+            action="program_created",
+            entity="program",
+            entity_id=str(program.id),
+            details={
+                "name": program.name,
+                "status": program.status,
+                "company": company.name if company else None,
+                "company_id": str(company.id) if company else None,
+                "template": template.name if template else None,
+                "template_id": str(template.id) if template else None,
+                "cohort_year": payload.cohort_year,
+                "activities_created": len(activities_in or []),
+                "from_snapshot": bool(design_snapshot),
+                "forced_duplicate": bool(payload.force),
+                "actor": (actor.full_name or actor.email) if actor else "sistema/anónimo",
+            },
+        )
 
     # ─── Notificación por email ───
     if company:

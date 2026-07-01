@@ -401,34 +401,36 @@ class BatchImportRequest(BaseModel):
 
 class AuditLogResponse(BaseModel):
     id: str
-    program_id: str
-    user_email: str
+    program_id: Optional[str] = None
+    actor: Optional[str] = None
     action: str
-    entity_type: str
+    entity: str
     entity_id: Optional[str] = None
-    details: str
-    timestamp: datetime
-    
+    details: Dict[str, Any] = {}
+    created_at: datetime
+
     class Config:
         from_attributes = True
 
 
 # ============ HELPER FUNCTIONS ============
 
-async def log_audit(program_id: str, user: User, action: str, entity_type: str, 
-                   entity_id: Optional[str], details: str, ip_address: Optional[str] = None):
-    """Helper para crear audit logs"""
+async def log_audit(program_id: str, user, action: str, entity_type: str,
+                   entity_id: Optional[str], details=None, ip_address: Optional[str] = None):
+    """Helper para crear audit logs (alineado con el modelo AuditLog)."""
     def create_log():
+        from django.db import close_old_connections
+        close_old_connections()
         return AuditLog.objects.create(
             program_id=program_id,
-            user=user,
+            admin_user=user,
             action=action,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            details=details,
-            ip_address=ip_address or "unknown"
+            entity=entity_type,
+            entity_id=entity_id or "",
+            details=details if isinstance(details, dict) else ({"note": details} if details else {}),
+            ip_address=ip_address,
         )
-    
+
     await sync_to_async(create_log)()
 
 
@@ -1450,6 +1452,8 @@ async def get_audit_logs(
     Obtener logs de auditoría del programa
     """
     def get_logs():
+        from django.db import close_old_connections
+        close_old_connections()
         try:
             program = Program.objects.get(id=program_id)
         except Program.DoesNotExist:
@@ -1457,25 +1461,25 @@ async def get_audit_logs(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Programa no encontrado"
             )
-        
-        queryset = AuditLog.objects.filter(program=program).select_related('user')
-        
+
+        queryset = AuditLog.objects.filter(program=program).select_related('admin_user')
+
         if action:
             queryset = queryset.filter(action=action)
         if entity_type:
-            queryset = queryset.filter(entity_type=entity_type)
-        
-        logs = list(queryset.order_by('-timestamp')[skip:skip+limit])
-        
+            queryset = queryset.filter(entity=entity_type)
+
+        logs = list(queryset.order_by('-created_at')[skip:skip + limit])
+
         return [{
             "id": str(log.id),
-            "program_id": str(log.program.id),
-            "user_email": log.user.email,
+            "program_id": str(log.program_id) if log.program_id else None,
+            "actor": (log.admin_user.full_name or log.admin_user.email) if log.admin_user else "sistema/anónimo",
             "action": log.action,
-            "entity_type": log.entity_type,
+            "entity": log.entity,
             "entity_id": log.entity_id,
-            "details": log.details,
-            "timestamp": log.timestamp,
+            "details": log.details or {},
+            "created_at": log.created_at,
         } for log in logs]
     
     logs = await sync_to_async(get_logs)()
