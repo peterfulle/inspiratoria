@@ -2617,7 +2617,7 @@ class ActivateIntelligentMatchRequest(BaseModel):
 
 
 @router.post("/matches/intelligent/activate")
-def activate_intelligent_match(payload: ActivateIntelligentMatchRequest) -> dict:
+def activate_intelligent_match(payload: ActivateIntelligentMatchRequest, authorization: Optional[str] = Header(None)) -> dict:
     """
     Persiste un resultado del intelligent match como Vinculation activa.
 
@@ -2627,7 +2627,9 @@ def activate_intelligent_match(payload: ActivateIntelligentMatchRequest) -> dict
     parte muestra automáticamente al partner.
     """
     from programs.models import Program, ProgramParticipant, Vinculation
+    from django.db import close_old_connections
     from datetime import datetime, timezone
+    close_old_connections()
 
     if payload.vinculation_type not in ("mentoria", "tutoria", "equipo", "coaching"):
         raise HTTPException(status_code=400, detail="vinculation_type inválido")
@@ -2689,6 +2691,13 @@ def activate_intelligent_match(payload: ActivateIntelligentMatchRequest) -> dict
         status="active",
         metadata=metadata,
     )
+
+    _audit(program, _actor_from_auth(authorization), "match_activated", {
+        "mentor": mentor_pp.user.full_name or mentor_pp.user.email,
+        "mentee": mentee_pp.user.full_name or mentee_pp.user.email,
+        "score": payload.score,
+        "via": "intelligent_match",
+    }, entity="vinculation", entity_id=str(vinculation.id))
 
     # Notificación por email a ambas partes
     notifications = {"mentor_sent": False, "mentee_sent": False}

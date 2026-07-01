@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, UploadFile, File, Query
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Query, Header
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, EmailStr
 import uuid
@@ -415,6 +415,36 @@ class AuditLogResponse(BaseModel):
 
 # ============ HELPER FUNCTIONS ============
 
+def _actor(authorization):
+    """Resuelve el actor del token 'Bearer {user_id}:{...}'. Best-effort."""
+    if not authorization:
+        return None
+    import uuid as _u
+    tok = authorization.replace("Bearer ", "").strip()
+    uid = tok.split(":", 1)[0] if ":" in tok else tok
+    try:
+        return User.objects.get(id=_u.UUID(uid))
+    except Exception:
+        return None
+
+
+def _audit_sync(program, actor, action, entity, entity_id=None, details=None):
+    """Registra un evento de auditoría (sync, best-effort)."""
+    from django.db import close_old_connections
+    try:
+        close_old_connections()
+        AuditLog.objects.create(
+            program=program,
+            admin_user=actor,
+            action=action,
+            entity=entity,
+            entity_id=str(entity_id or "") ,
+            details=details or {},
+        )
+    except Exception as e:
+        print(f"[AUDIT] {action}: {e}")
+
+
 async def log_audit(program_id: str, user, action: str, entity_type: str,
                    entity_id: Optional[str], details=None, ip_address: Optional[str] = None):
     """Helper para crear audit logs (alineado con el modelo AuditLog)."""
@@ -687,7 +717,7 @@ async def get_participants_stats(program_id: str):
 
 
 @router.post("/{program_id}/participants", response_model=ParticipantResponse, status_code=status.HTTP_201_CREATED)
-async def create_participant(program_id: str, payload: ParticipantCreateRequest):
+async def create_participant(program_id: str, payload: ParticipantCreateRequest, authorization: Optional[str] = Header(None)):
     """
     Agregar un participante al programa
     """
@@ -742,6 +772,12 @@ async def create_participant(program_id: str, payload: ParticipantCreateRequest)
                 status=payload.status,
                 invitation_sent_at=datetime.now() if payload.send_invitation else None
             )
+
+        _audit_sync(program, _actor(authorization), "participant_added", "participant", participant.id, {
+            "user": user.full_name or user.email,
+            "role": participant_role,
+            "status": payload.status,
+        })
 
         # Mantener rol de usuario alineado al rol operativo dentro del programa
         user_role = map_participant_role_to_user_role(participant_role)
@@ -861,14 +897,14 @@ async def update_participant(program_id: str, participant_id: str, payload: Part
 
 
 @router.delete("/{program_id}/participants/{participant_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_participant(program_id: str, participant_id: str):
+async def delete_participant(program_id: str, participant_id: str, authorization: Optional[str] = Header(None)):
     """
     Eliminar participante (soft delete)
     """
     def delete():
         try:
             program = Program.objects.get(id=program_id)
-            participant = ProgramParticipant.objects.get(
+            participant = ProgramParticipant.objects.select_related('user').get(
                 id=participant_id,
                 program=program,
                 deleted_at__isnull=True
@@ -878,7 +914,12 @@ async def delete_participant(program_id: str, participant_id: str):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Participante no encontrado"
             )
-        
+
+        _audit_sync(program, _actor(authorization), "participant_removed", "participant", participant.id, {
+            "user": participant.user.full_name or participant.user.email,
+            "role": participant.role,
+        })
+
         participant.status = 'deleted'
         participant.deleted_at = datetime.now()
         participant.save(update_fields=['status', 'deleted_at'])
@@ -1321,7 +1362,7 @@ async def list_vinculations(program_id: str):
 
 
 @router.post("/{program_id}/vinculations", status_code=status.HTTP_201_CREATED)
-async def create_vinculation(program_id: str, payload: VinculationCreateRequest):
+async def create_vinculation(program_id: str, payload: VinculationCreateRequest, authorization: Optional[str] = Header(None)):
     """
     Crear una vinculación entre dos participantes
     """
@@ -1378,6 +1419,13 @@ async def create_vinculation(program_id: str, payload: VinculationCreateRequest)
             metadata=payload.metadata or {},
         )
 
+        _audit_sync(program, _actor(authorization), "vinculation_created", "vinculation", vinculation.id, {
+            "mentor": mentor.user.full_name or mentor.user.email,
+            "mentee": mentee.user.full_name or mentee.user.email,
+            "type": vinc_type,
+            "score": (payload.metadata or {}).get("score"),
+        })
+
         def _serialize(pp):
             u = pp.user
             full = f"{u.first_name or ''} {u.last_name or ''}".strip() or u.email
@@ -1411,14 +1459,16 @@ async def create_vinculation(program_id: str, payload: VinculationCreateRequest)
 
 
 @router.delete("/{program_id}/vinculations/{vinculation_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_vinculation(program_id: str, vinculation_id: str):
+async def delete_vinculation(program_id: str, vinculation_id: str, authorization: Optional[str] = Header(None)):
     """
     Eliminar una vinculación
     """
     def delete():
         try:
             program = Program.objects.get(id=program_id)
-            vinculation = Vinculation.objects.get(
+            vinculation = Vinculation.objects.select_related(
+                'participant1__user', 'participant2__user'
+            ).get(
                 id=vinculation_id,
                 program=program,
             )
@@ -1427,6 +1477,11 @@ async def delete_vinculation(program_id: str, vinculation_id: str):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Vinculación no encontrada"
             )
+
+        _audit_sync(program, _actor(authorization), "vinculation_removed", "vinculation", vinculation.id, {
+            "p1": vinculation.participant1.user.full_name or vinculation.participant1.user.email,
+            "p2": vinculation.participant2.user.full_name or vinculation.participant2.user.email,
+        })
 
         # Desvincular = marcar inactiva (soft) y registrar fin
         from django.utils import timezone as dj_timezone

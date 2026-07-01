@@ -2719,6 +2719,11 @@ const AUDIT_ACTION_META: Record<string, { label: string; dot: string }> = {
   program_status_changed: { label: 'Cambio de estado',   dot: '#8b5cf6' },
   program_launched:       { label: 'Curso lanzado',      dot: '#f59e0b' },
   program_deleted:        { label: 'Curso eliminado',    dot: '#ef4444' },
+  participant_added:      { label: 'Participante agregado', dot: '#10b981' },
+  participant_removed:    { label: 'Participante removido', dot: '#ef4444' },
+  vinculation_created:    { label: 'Dupla creada',        dot: '#0ea5e9' },
+  vinculation_removed:    { label: 'Dupla removida',      dot: '#ef4444' },
+  match_activated:        { label: 'Match activado',      dot: '#0ea5e9' },
   session_created:        { label: 'Sesión registrada',  dot: '#6366f1' },
 };
 
@@ -2732,6 +2737,11 @@ function auditDetail(action: string, d: any): string {
   }
   if (action === 'program_launched') return `${d.total_activities ?? 0} actividades · ${d.trainings ?? 0} entrenamientos`;
   if (action === 'program_deleted') return d.name || '';
+  if (action === 'participant_added') return `${d.user ?? ''}${d.role ? ` · ${d.role}` : ''}`;
+  if (action === 'participant_removed') return `${d.user ?? ''}${d.role ? ` · ${d.role}` : ''}`;
+  if (action === 'vinculation_created' || action === 'match_activated') return `${d.mentor ?? '—'} ↔ ${d.mentee ?? '—'}${d.score != null ? ` · ${Math.round(d.score)} pts` : ''}`;
+  if (action === 'vinculation_removed') return `${d.p1 ?? '—'} ↔ ${d.p2 ?? '—'}`;
+  if (action === 'session_created') return d.title || d.mentee || '';
   return '';
 }
 
