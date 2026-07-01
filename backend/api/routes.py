@@ -726,6 +726,8 @@ def get_program(program_id: str) -> dict:
 @router.put("/programs/{program_id}", response_model=ProgramOut)
 def update_program(program_id: str, payload: ProgramIn, authorization: Optional[str] = Header(None)) -> dict:
     import uuid
+    from django.db import close_old_connections
+    close_old_connections()
     try:
         program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
         before = {"name": program.name, "description": program.description, "theme": program.theme}
@@ -768,6 +770,8 @@ def patch_program(program_id: str, payload: ProgramPatchIn, authorization: Optio
     Actualización parcial de un programa (PM console).
     """
     import uuid
+    from django.db import close_old_connections
+    close_old_connections()
     try:
         program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
         changed = {}
@@ -811,6 +815,8 @@ def update_program_status(program_id: str, status: str, authorization: Optional[
         "designed", "ready_for_execution", "in_execution", "under_review", "closed",
         "draft", "active", "paused", "completed",
     ]
+    from django.db import close_old_connections
+    close_old_connections()
     if status not in valid_statuses:
         raise HTTPException(
             status_code=400, 
@@ -842,6 +848,8 @@ def launch_program(program_id: str, authorization: Optional[str] = Header(None))
     """
     from programs.models import Activity, Content
     import uuid
+    from django.db import close_old_connections
+    close_old_connections()
     try:
         program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
         
@@ -910,6 +918,8 @@ def delete_program(program_id: str, authorization: Optional[str] = Header(None))
     Eliminar un programa (soft delete cambiando a status=deleted)
     """
     import uuid
+    from django.db import close_old_connections
+    close_old_connections()
     try:
         program = Program.objects.get(id=uuid.UUID(program_id))
         old_status = program.status
