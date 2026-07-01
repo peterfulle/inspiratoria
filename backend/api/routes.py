@@ -434,6 +434,25 @@ VALID_PROGRAM_STATUSES = {
 }
 
 
+def _audit(program, actor, action, details=None, entity="program", entity_id=None):
+    """Registra un evento de auditoría del ciclo de vida del curso.
+    Best-effort: no debe romper la operación principal."""
+    from programs.models import AuditLog
+    from django.db import close_old_connections
+    try:
+        close_old_connections()
+        AuditLog.objects.create(
+            program=program,
+            admin_user=actor,
+            action=action,
+            entity=entity,
+            entity_id=entity_id or (str(program.id) if program else ""),
+            details=details or {},
+        )
+    except Exception as e:
+        print(f"[AUDIT] fallo al registrar '{action}': {e}")
+
+
 @router.post("/programs", response_model=ProgramOut, status_code=201)
 def create_program(payload: ProgramIn, authorization: Optional[str] = Header(None)) -> dict:
     from companies.models import Company
@@ -705,15 +724,20 @@ def get_program(program_id: str) -> dict:
 
 
 @router.put("/programs/{program_id}", response_model=ProgramOut)
-def update_program(program_id: str, payload: ProgramIn) -> dict:
+def update_program(program_id: str, payload: ProgramIn, authorization: Optional[str] = Header(None)) -> dict:
     import uuid
     try:
         program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
+        before = {"name": program.name, "description": program.description, "theme": program.theme}
         if payload.name:
             program.name = payload.name
         program.description = payload.description or ""
         program.theme = payload.theme or "General"
         program.save()
+        _audit(program, _actor_from_auth(authorization), "program_updated", {
+            "before": before,
+            "after": {"name": program.name, "description": program.description, "theme": program.theme},
+        })
         return {
             "id": str(program.id),
             "name": program.name,
@@ -739,22 +763,29 @@ class ProgramPatchIn(BaseModel):
 
 
 @router.patch("/programs/{program_id}")
-def patch_program(program_id: str, payload: ProgramPatchIn) -> dict:
+def patch_program(program_id: str, payload: ProgramPatchIn, authorization: Optional[str] = Header(None)) -> dict:
     """
     Actualización parcial de un programa (PM console).
     """
     import uuid
     try:
         program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
-        if payload.name is not None:
+        changed = {}
+        if payload.name is not None and payload.name != program.name:
+            changed["name"] = {"from": program.name, "to": payload.name}
             program.name = payload.name
-        if payload.description is not None:
+        if payload.description is not None and payload.description != program.description:
+            changed["description"] = {"from": program.description, "to": payload.description}
             program.description = payload.description
-        if payload.theme is not None:
+        if payload.theme is not None and payload.theme != program.theme:
+            changed["theme"] = {"from": program.theme, "to": payload.theme}
             program.theme = payload.theme
-        if payload.requires_certification is not None:
+        if payload.requires_certification is not None and payload.requires_certification != program.requires_certification:
+            changed["requires_certification"] = {"from": program.requires_certification, "to": payload.requires_certification}
             program.requires_certification = payload.requires_certification
         program.save()
+        if changed:
+            _audit(program, _actor_from_auth(authorization), "program_updated", {"changes": changed})
         return {
             "id": str(program.id),
             "name": program.name,
@@ -769,7 +800,7 @@ def patch_program(program_id: str, payload: ProgramPatchIn) -> dict:
 
 
 @router.patch("/programs/{program_id}/status")
-def update_program_status(program_id: str, status: str) -> dict:
+def update_program_status(program_id: str, status: str, authorization: Optional[str] = Header(None)) -> dict:
     """
     Cambiar el estado de un programa.
     Estados válidos (modernos): designed, ready_for_execution, in_execution, under_review, closed
@@ -788,8 +819,12 @@ def update_program_status(program_id: str, status: str) -> dict:
     
     try:
         program = Program.objects.get(id=uuid.UUID(program_id))
+        old_status = program.status
         program.status = status
         program.save()
+        _audit(program, _actor_from_auth(authorization), "program_status_changed", {
+            "from": old_status, "to": status,
+        })
         return {
             "success": True,
             "program_id": str(program.id),
@@ -801,7 +836,7 @@ def update_program_status(program_id: str, status: str) -> dict:
 
 
 @router.post("/programs/{program_id}/launch")
-def launch_program(program_id: str) -> dict:
+def launch_program(program_id: str, authorization: Optional[str] = Header(None)) -> dict:
     """
     Lanzar un programa: valida que esté completo y cambia su estado a 'launched'
     """
@@ -843,9 +878,16 @@ def launch_program(program_id: str) -> dict:
             )
         
         # Si todo está bien, lanzar el programa
+        old_status = program.status
         program.status = "launched"
         program.save()
-        
+        _audit(program, _actor_from_auth(authorization), "program_launched", {
+            "from": old_status,
+            "trainings": trainings.count(),
+            "events": events.count(),
+            "total_activities": activities.count(),
+        })
+
         return {
             "success": True,
             "program_id": program.id,
@@ -863,16 +905,20 @@ def launch_program(program_id: str) -> dict:
 
 
 @router.delete("/programs/{program_id}", status_code=204)
-def delete_program(program_id: str):
+def delete_program(program_id: str, authorization: Optional[str] = Header(None)):
     """
     Eliminar un programa (soft delete cambiando a status=deleted)
     """
     import uuid
     try:
         program = Program.objects.get(id=uuid.UUID(program_id))
+        old_status = program.status
         # Soft delete
         program.status = "deleted"
         program.save()
+        _audit(program, _actor_from_auth(authorization), "program_deleted", {
+            "from": old_status, "name": program.name,
+        })
     except Program.DoesNotExist as exc:
         raise HTTPException(status_code=404, detail="Program not found") from exc
 

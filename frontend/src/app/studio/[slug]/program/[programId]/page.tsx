@@ -2710,6 +2710,83 @@ function TabReportes({ program, participants, assignedPM, showToast }: { program
   );
 }
 
+// ============================================================================
+// FEED DE AUDITORÍA (bitácora del ciclo de vida del curso)
+// ============================================================================
+const AUDIT_ACTION_META: Record<string, { label: string; dot: string }> = {
+  program_created:        { label: 'Curso creado',       dot: '#10b981' },
+  program_updated:        { label: 'Curso editado',      dot: '#3b82f6' },
+  program_status_changed: { label: 'Cambio de estado',   dot: '#8b5cf6' },
+  program_launched:       { label: 'Curso lanzado',      dot: '#f59e0b' },
+  program_deleted:        { label: 'Curso eliminado',    dot: '#ef4444' },
+  session_created:        { label: 'Sesión registrada',  dot: '#6366f1' },
+};
+
+function auditDetail(action: string, d: any): string {
+  d = d || {};
+  if (action === 'program_status_changed') return `${d.from ?? '—'} → ${d.to ?? '—'}`;
+  if (action === 'program_created') return [d.company, d.template && `desde «${d.template}»`, d.cohort_year].filter(Boolean).join(' · ');
+  if (action === 'program_updated') {
+    if (d.changes) return `${Object.keys(d.changes).join(', ')} modificado`;
+    return 'Datos actualizados';
+  }
+  if (action === 'program_launched') return `${d.total_activities ?? 0} actividades · ${d.trainings ?? 0} entrenamientos`;
+  if (action === 'program_deleted') return d.name || '';
+  return '';
+}
+
+function AuditFeed({ programId }: { programId: string }) {
+  const [logs, setLogs] = React.useState<any[] | null>(null);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`${API_URL}/api/programs/${programId}/audit-logs?limit=100`);
+        setLogs(r.ok ? await r.json() : []);
+      } catch { setLogs([]); }
+    })();
+  }, [programId]);
+
+  return (
+    <Card title="Bitácora de auditoría" subtitle="Quién hizo qué y cuándo — trazabilidad completa del curso">
+      {logs === null ? (
+        <div className="flex items-center justify-center py-8 gap-2"><Spinner /><span className="text-[12px] text-zinc-400">Cargando bitácora…</span></div>
+      ) : logs.length === 0 ? (
+        <Empty msg="Sin eventos de auditoría todavía" icon={<I.FileText />} />
+      ) : (
+        <div className="relative pl-4">
+          <div className="absolute left-[6px] top-1 bottom-1 w-px bg-zinc-200" />
+          <div className="space-y-3.5">
+            {logs.map((l: any) => {
+              const meta = AUDIT_ACTION_META[l.action] || { label: l.action, dot: '#a1a1aa' };
+              const detail = auditDetail(l.action, l.details);
+              const when = l.created_at ? new Date(l.created_at) : null;
+              return (
+                <div key={l.id} className="relative">
+                  <span className="absolute -left-4 top-1 w-[9px] h-[9px] rounded-full ring-2 ring-white" style={{ background: meta.dot }} />
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[12.5px] font-semibold text-zinc-900">{meta.label}</div>
+                      {detail && <div className="text-[11.5px] text-zinc-500 mt-0.5 break-words">{detail}</div>}
+                      <div className="text-[11px] text-zinc-400 mt-0.5">por {l.actor || 'sistema'}</div>
+                    </div>
+                    {when && (
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-[11px] text-zinc-500">{when.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                        <div className="text-[10.5px] text-zinc-400">{when.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function TabGobierno({ program, slug, assignedPM, pms, onTransition, onAssignPM }: { program: ProgramDetail; slug: string; assignedPM: AssignedPM | null; pms: PM[]; onTransition: (s: string) => void; onAssignPM: (id: string | null) => void }) {
   return (
     <div className="space-y-5">
@@ -2731,6 +2808,8 @@ function TabGobierno({ program, slug, assignedPM, pms, onTransition, onAssignPM 
           })}
         </div>
       </Card>
+
+      <AuditFeed programId={program.id} />
 
       <PMCard assignedPM={assignedPM} pms={pms} onAssignPM={onAssignPM} />
 
