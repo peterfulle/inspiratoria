@@ -51,10 +51,12 @@ const VIEW_PERMISSIONS_OPTIONS = [
   { key: "accounts", label: "Cuentas Studio" },
   { key: "programs", label: "Programas Studio" },
   { key: "manage-programs", label: "Gestionar Programas" },
+  { key: "intelligent-match", label: "Match Inteligente" },
   { key: "billing", label: "Facturación" },
   { key: "users", label: "Usuarios" },
   { key: "analytics", label: "Analytics (Pronto)" },
   { key: "ecosystem", label: "Ecosistema" },
+  { key: "team-chat", label: "Chat de Equipo" },
   { key: "configuration", label: "Configuración" },
   { key: "notifications", label: "Notificaciones" },
 ];

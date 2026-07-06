@@ -1845,6 +1845,8 @@ async def list_companies(
             queryset = queryset.filter(account_type=account_type)
         
         def _build_list():
+            from django.db import close_old_connections
+            close_old_connections()
             companies = list(
                 queryset.select_related('assigned_pm').order_by('-created_at')[skip:skip + limit]
             )

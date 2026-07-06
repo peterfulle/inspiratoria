@@ -461,7 +461,10 @@ class User(AbstractUser):
             self.can_close_programs = True
             self.can_manage_alerts = True
         # Asignar todas las vistas si es admin/superadmin y no tiene permisos definidos
-        ALL_VIEWS = ["dashboard", "accounts", "programs", "billing", "users", "analytics", "ecosystem", "configuration"]
+        ALL_VIEWS = [
+            "dashboard", "accounts", "programs", "manage-programs", "intelligent-match",
+            "billing", "users", "analytics", "ecosystem", "team-chat", "configuration", "notifications",
+        ]
         if (self.role in ("superadmin", "inspiratoria_admin") or self.is_superuser) and not self.view_permissions:
             self.view_permissions = ALL_VIEWS
         super().save(*args, **kwargs)

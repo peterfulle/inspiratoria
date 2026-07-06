@@ -199,24 +199,28 @@ export default function AdminDashboard({
 
   const loadData = async () => {
     try {
-      const [progs, matchs, parts] = await Promise.all([
+      // allSettled: si un endpoint falla transitoriamente (ej. conexión DB
+      // fría), los demás igual se muestran en vez de dejar todo en 0.
+      const [progsR, matchsR, partsR, companiesR] = await Promise.allSettled([
         ApiClient.getPrograms(),
         ApiClient.getMatches(),
         ApiClient.getParticipants(),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies`).then((r) =>
+          r.ok ? r.json() : Promise.reject(new Error(`companies ${r.status}`))
+        ),
       ]);
-      
-      setPrograms(progs);
-      setMatches(matchs);
-      setParticipants(parts);
-      
-      // Cargar empresas
-      const companiesRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies`
-      );
-      if (companiesRes.ok) {
-        const companiesData = await companiesRes.json();
-        setCompanies(companiesData);
-      }
+
+      if (progsR.status === "fulfilled") setPrograms(progsR.value);
+      else console.error("Error cargando programas:", progsR.reason);
+
+      if (matchsR.status === "fulfilled") setMatches(matchsR.value);
+      else console.error("Error cargando matches:", matchsR.reason);
+
+      if (partsR.status === "fulfilled") setParticipants(partsR.value);
+      else console.error("Error cargando participantes:", partsR.reason);
+
+      if (companiesR.status === "fulfilled") setCompanies(companiesR.value);
+      else console.error("Error cargando empresas:", companiesR.reason);
     } catch (err) {
       console.error("Error cargando datos:", err);
     } finally {

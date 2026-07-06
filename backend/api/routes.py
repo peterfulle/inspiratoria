@@ -339,6 +339,8 @@ def team_chat_history(user_id: str, limit: int = 50):
 @router.get("/programs", response_model=List[ProgramOut])
 def list_programs(company_id: Optional[str] = None, template_id: Optional[str] = None) -> List[dict]:
     from programs.models import Activity, ProgramParticipant
+    from django.db import close_old_connections
+    close_old_connections()
 
     programs = Program.objects.select_related('company', 'template').all()
     if company_id:
@@ -1198,6 +1200,8 @@ def list_participants(
     - search: Búsqueda en nombre y headline
     - skills: Búsqueda en skills (separados por coma)
     """
+    from django.db import close_old_connections
+    close_old_connections()
     query = Participant.objects.select_related("program").all()
     
     if program_id:
@@ -1344,6 +1348,8 @@ def list_matches() -> list[dict]:
     """
     Lista todos los matches con información completa de mentor y mentee.
     """
+    from django.db import close_old_connections
+    close_old_connections()
     matches = Match.objects.select_related(
         "mentor",
         "mentee",
