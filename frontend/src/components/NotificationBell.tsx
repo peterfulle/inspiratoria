@@ -17,6 +17,9 @@ export default function NotificationBell({ userId, darkMode = false }: Notificat
   const router = useRouter();
 
   const loadNotifications = async () => {
+    // Evita el fetch con el userId placeholder (1) que se usa mientras el
+    // layout todavía está cargando al usuario real desde localStorage.
+    if (!userId || String(userId).length < 10) return;
     try {
       setLoading(true);
       const data = await ApiClient.getUserNotifications(userId, false);

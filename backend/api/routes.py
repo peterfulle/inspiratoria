@@ -1473,18 +1473,16 @@ def get_all_sentiments() -> List[Sentiment]:
 def get_user_notifications(user_id: str, unread_only: bool = False) -> list:
     """Obtener notificaciones de un usuario"""
     import uuid
-    from companies.models import User
-    
-    # Try to convert to UUID, if fails try to find user by ID
+    from django.db import close_old_connections
+    close_old_connections()
+
+    # user_id llega como placeholder no-UUID (ej. "1") mientras el layout carga
+    # al usuario real desde localStorage. Sin notificaciones que mostrar aún.
     try:
-        recipient_uuid = uuid.UUID(user_id)
-    except ValueError:
-        try:
-            user = User.objects.get(id=user_id)
-            recipient_uuid = user.id
-        except User.DoesNotExist:
-            return []
-    
+        recipient_uuid = uuid.UUID(str(user_id))
+    except (ValueError, AttributeError, TypeError):
+        return []
+
     query = Notification.objects.filter(recipient_id=recipient_uuid)
     if unread_only:
         query = query.filter(is_read=False)

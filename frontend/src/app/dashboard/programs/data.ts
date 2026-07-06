@@ -986,18 +986,81 @@ export const initialTemplates: ProgramTemplate[] = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════
+// CATEGORÍAS DE PROGRAMA — catálogo completo (temáticas reales de Inspiratoria)
+// ═══════════════════════════════════════════════════════════════════
+
+export interface ProgramCategoryDef {
+  key: string;
+  label: string;
+  bg: string;
+  fg: string;
+}
+
+export const PROGRAM_CATEGORIES: ProgramCategoryDef[] = [
+  { key: "leadership", label: "Liderazgo", bg: "#dbeafe", fg: "#2563eb" },
+  { key: "women_empowerment", label: "Empoderamiento Femenino", bg: "#fdf4ff", fg: "#86198f" },
+  { key: "diversity", label: "Diversidad e Inclusión", bg: "#fce7f3", fg: "#db2777" },
+  { key: "employability", label: "Empleabilidad", bg: "#d1fae5", fg: "#059669" },
+  { key: "mentoring", label: "Mentoría", bg: "#e0e7ff", fg: "#4f46e5" },
+  { key: "coaching", label: "Coaching", bg: "#eff6ff", fg: "#1d4ed8" },
+  { key: "entrepreneurship", label: "Emprendimiento", bg: "#ffedd5", fg: "#ea580c" },
+  { key: "tech", label: "Tecnología", bg: "#f3e8ff", fg: "#7c3aed" },
+  { key: "digital_skills", label: "Habilidades Digitales", bg: "#eef2ff", fg: "#4338ca" },
+  { key: "sales", label: "Ventas", bg: "#fef3c7", fg: "#d97706" },
+  { key: "operations", label: "Operaciones", bg: "#e0f2fe", fg: "#0369a1" },
+  { key: "communication", label: "Comunicación", bg: "#cffafe", fg: "#0e7490" },
+  { key: "public_speaking", label: "Oratoria y Comunicación Pública", bg: "#ffe4e6", fg: "#e11d48" },
+  { key: "career_development", label: "Desarrollo de Carrera", bg: "#ecfccb", fg: "#4d7c0f" },
+  { key: "networking", label: "Networking", bg: "#f5f3ff", fg: "#6d28d9" },
+  { key: "finance", label: "Finanzas", bg: "#dcfce7", fg: "#15803d" },
+  { key: "innovation", label: "Innovación", bg: "#fae8ff", fg: "#a21caf" },
+  { key: "wellbeing", label: "Bienestar y Salud Mental", bg: "#f0fdfa", fg: "#0f766e" },
+  { key: "work_life_balance", label: "Equilibrio Vida-Trabajo", bg: "#fef9c3", fg: "#a16207" },
+  { key: "personal_branding", label: "Marca Personal", bg: "#fdf2f8", fg: "#9d174d" },
+  { key: "negotiation", label: "Negociación", bg: "#f5f5f4", fg: "#57534e" },
+  { key: "team_management", label: "Gestión de Equipos", bg: "#ecfeff", fg: "#155e75" },
+  { key: "youth", label: "Desarrollo Juvenil", bg: "#fff7ed", fg: "#c2410c" },
+  { key: "sustainability", label: "Sostenibilidad y ESG", bg: "#f0fdf4", fg: "#166534" },
+];
+
+// ═══════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════
 
 export const getCategoryLabel = (category: string): string => {
-  const labels: Record<string, string> = {
-    leadership: "Leadership",
-    sales: "Sales",
-    tech: "Tech",
-    diversity: "Diversity",
-    operations: "Operations",
-  };
-  return labels[category] || category;
+  const found = PROGRAM_CATEGORIES.find((c) => c.key === category);
+  return found?.label || category;
+};
+
+export const getCategoryColor = (category: string): { bg: string; fg: string } => {
+  const found = PROGRAM_CATEGORIES.find((c) => c.key === category);
+  return found ? { bg: found.bg, fg: found.fg } : { bg: "#f4f4f5", fg: "#71717a" };
+};
+
+/**
+ * Calcula una duración legible ("3 meses", "1 año 2 meses") a partir de un
+ * rango de fechas. Usado para que el usuario elija fecha de inicio/término
+ * en vez de escribir la duración a mano; el resultado se guarda en el mismo
+ * campo `duration` (texto) que ya consume el resto de la plataforma.
+ */
+export const computeDurationFromDates = (startDate: string, endDate: string): string => {
+  if (!startDate || !endDate) return "";
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return "";
+
+  let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  if (end.getDate() < start.getDate()) months -= 1;
+  if (months < 1) {
+    const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+    return `${days} día${days === 1 ? "" : "s"}`;
+  }
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} año${years === 1 ? "" : "s"}`);
+  if (rem > 0) parts.push(`${rem} mes${rem === 1 ? "" : "es"}`);
+  return parts.join(" ") || "1 mes";
 };
 
 export const getAlgorithmLabel = (algo: string): string => {

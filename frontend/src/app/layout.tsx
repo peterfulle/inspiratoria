@@ -11,8 +11,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className="h-full">
       <body className="h-full bg-gray-50 text-gray-900 overflow-x-hidden">
         {children}
-        {/* Testing utilities - Habilitado para testing en producción */}
-        <script src="/test-roles.js" />
+        {/* Testing utilities: solo en desarrollo. En producción exponía funciones
+            (testAsAdmin, testAsSuperadmin, etc.) que escriben usuarios falsos
+            con ids no-UUID en localStorage, causando errores reales (ej. 500 en
+            /api/notifications/user/1) cuando alguien las ejecutaba sin querer. */}
+        {process.env.NODE_ENV !== "production" && <script src="/test-roles.js" />}
       </body>
     </html>
   );

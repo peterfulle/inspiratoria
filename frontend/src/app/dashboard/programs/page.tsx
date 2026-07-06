@@ -9,11 +9,97 @@ import {
   MentorRequirements, MenteeRequirements, MatchingRules, SessionRules,
   ViewMode, ConfigTab, SessionDetail 
 } from "./types";
-import { 
+import {
   defaultMentorReqs, defaultMenteeReqs, defaultMatchingRules, defaultSessionRules,
   getCategoryLabel, getAlgorithmLabel, getTotalSessions, getTotalResources, getTotalActivities,
-  getNextMonday, formatDateSpanish, generateModuleContent, generateSessionPlan, generateSlug
+  getNextMonday, formatDateSpanish, generateModuleContent, generateSessionPlan, generateSlug,
+  PROGRAM_CATEGORIES, computeDurationFromDates
 } from "./data";
+
+// ═══════════════════════════════════════════════════════════════════
+// CATEGORY PICKER — grilla scrolleable de 24 categorías temáticas
+// ═══════════════════════════════════════════════════════════════════
+function CategoryPicker({ value, onChange }: { value: string; onChange: (key: string) => void }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1 rounded-xl">
+      {PROGRAM_CATEGORIES.map((cat) => {
+        const active = value === cat.key;
+        return (
+          <button
+            key={cat.key}
+            type="button"
+            onClick={() => onChange(cat.key)}
+            className="relative flex items-center gap-2 rounded-xl py-2.5 px-3 text-left transition border-2"
+            style={{
+              background: active ? cat.bg : "#fafafa",
+              color: active ? cat.fg : "#71717a",
+              borderColor: active ? cat.fg : "transparent",
+            }}
+          >
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active ? cat.fg : "#d4d4d8" }} />
+            <span className="text-[12px] font-medium leading-tight truncate">{cat.label}</span>
+            {active && <Icon.Check className="w-3.5 h-3.5 flex-shrink-0 ml-auto" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DATE RANGE -> DURATION — reemplaza el texto libre de duración por un
+// rango de fechas real; la duración se calcula automáticamente.
+// ═══════════════════════════════════════════════════════════════════
+function DateRangeDuration({
+  startDate, endDate, onChange, computedDuration, existingDuration,
+}: {
+  startDate: string;
+  endDate: string;
+  onChange: (start: string, end: string) => void;
+  computedDuration: string;
+  existingDuration?: string;
+}) {
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[11px] font-medium text-neutral-500 mb-1.5">Fecha de inicio</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => onChange(e.target.value, endDate)}
+            className="input-field"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-neutral-500 mb-1.5">Fecha de término</label>
+          <input
+            type="date"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={(e) => onChange(startDate, e.target.value)}
+            className="input-field"
+          />
+        </div>
+      </div>
+      {!startDate && !endDate && existingDuration && (
+        <p className="text-[11.5px] text-neutral-500 mt-2 flex items-center gap-1.5">
+          <Icon.Clock className="w-3 h-3" /> Duración actual: <span className="font-semibold text-neutral-700">{existingDuration}</span>
+          <span className="text-neutral-400">— elige fechas para actualizarla</span>
+        </p>
+      )}
+      {startDate && endDate && (
+        computedDuration ? (
+          <p className="text-[11.5px] text-neutral-500 mt-2 flex items-center gap-1.5">
+            <Icon.Clock className="w-3 h-3" /> Duración: <span className="font-semibold text-neutral-700">{computedDuration}</span>
+          </p>
+        ) : (
+          <p className="text-[11.5px] text-red-500 mt-2">La fecha de término debe ser posterior a la de inicio.</p>
+        )
+      )}
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // DELETE MODAL COMPONENT
@@ -220,6 +306,11 @@ export default function ProgramsPage() {
   // New template modal: inline error + loading state (no silent failure)
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  // Fecha de inicio/término -> se traducen a formData.duration (texto)
+  const [createStartDate, setCreateStartDate] = useState("");
+  const [createEndDate, setCreateEndDate] = useState("");
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState("");
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
@@ -431,6 +522,8 @@ export default function ProgramsPage() {
     setEditTab("general");
     setExpandedModules([]);
     setIsDirty(false);
+    setEditStartDate("");
+    setEditEndDate("");
     setShowEditModal(true);
   };
 
@@ -459,6 +552,8 @@ export default function ProgramsPage() {
     });
     setEditTab("general");
     setExpandedModules([]);
+    setCreateStartDate("");
+    setCreateEndDate("");
   };
 
   // Module handlers — all use functional updater to prevent stale state
@@ -1264,63 +1359,23 @@ export default function ProgramsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">Categoría</label>
-                  <div className="grid grid-cols-5 gap-2">
-                    {([
-                      { key: "leadership", label: "Leadership", bg: "#dbeafe", fg: "#2563eb" },
-                      { key: "tech", label: "Tech", bg: "#f3e8ff", fg: "#7c3aed" },
-                      { key: "sales", label: "Sales", bg: "#fef3c7", fg: "#d97706" },
-                      { key: "diversity", label: "Diversity", bg: "#fce7f3", fg: "#db2777" },
-                      { key: "operations", label: "Operations", bg: "#e0f2fe", fg: "#0369a1" },
-                    ] as const).map((cat) => {
-                      const active = (formData.category || "leadership") === cat.key;
-                      return (
-                        <button
-                          key={cat.key}
-                          type="button"
-                          onClick={() => setFormData({ ...formData, category: cat.key as ProgramTemplate["category"] })}
-                          className="relative flex flex-col items-center justify-center gap-1.5 rounded-xl py-3 px-1 text-center transition border-2"
-                          style={{
-                            background: active ? cat.bg : "#fafafa",
-                            color: active ? cat.fg : "#8a8a8a",
-                            borderColor: active ? cat.fg : "transparent",
-                          }}
-                        >
-                          {active && (
-                            <span className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ background: cat.fg }}>
-                              <Icon.Check className="w-2 h-2 text-white" />
-                            </span>
-                          )}
-                          <span className="text-[11px] font-semibold">{cat.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <CategoryPicker
+                    value={formData.category || "leadership"}
+                    onChange={(key) => setFormData({ ...formData, category: key })}
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">Duración</label>
-                  <div className="flex flex-wrap gap-2 mb-2.5">
-                    {["1 mes", "3 meses", "6 meses", "12 meses"].map((d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, duration: d })}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-                          formData.duration === d
-                            ? "bg-neutral-900 text-white border-neutral-900"
-                            : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300"
-                        }`}
-                      >
-                        {d}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    type="text"
-                    value={formData.duration || ""}
-                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                    placeholder="o escribe una duración personalizada"
-                    className="input-field"
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Duración del programa</label>
+                  <DateRangeDuration
+                    startDate={createStartDate}
+                    endDate={createEndDate}
+                    computedDuration={computeDurationFromDates(createStartDate, createEndDate)}
+                    onChange={(start, end) => {
+                      setCreateStartDate(start);
+                      setCreateEndDate(end);
+                      setFormData({ ...formData, duration: computeDurationFromDates(start, end) });
+                    }}
                   />
                 </div>
 
@@ -1413,25 +1468,14 @@ export default function ProgramsPage() {
                 {/* General Tab */}
                 {editTab === "general" && (
                   <div className="space-y-5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-700 mb-2">Nombre *</label>
-                        <input
-                          type="text"
-                          value={formData.name || ""}
-                          onChange={(e) => setFormDataTracked({ ...formData, name: e.target.value })}
-                          className="input-field"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-700 mb-2">Duración *</label>
-                        <input
-                          type="text"
-                          value={formData.duration || ""}
-                          onChange={(e) => setFormDataTracked({ ...formData, duration: e.target.value })}
-                          className="input-field"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">Nombre *</label>
+                      <input
+                        type="text"
+                        value={formData.name || ""}
+                        onChange={(e) => setFormDataTracked({ ...formData, name: e.target.value })}
+                        className="input-field"
+                      />
                     </div>
 
                     <div>
@@ -1444,20 +1488,29 @@ export default function ProgramsPage() {
                       />
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">Categoría</label>
+                      <CategoryPicker
+                        value={formData.category || "leadership"}
+                        onChange={(key) => setFormDataTracked({ ...formData, category: key })}
+                      />
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-neutral-700 mb-2">Categoría</label>
-                        <select
-                          value={formData.category || "leadership"}
-                          onChange={(e) => setFormDataTracked({ ...formData, category: e.target.value as ProgramTemplate["category"] })}
-                          className="select-field"
-                        >
-                          <option value="leadership">Leadership</option>
-                          <option value="tech">Tech</option>
-                          <option value="sales">Sales</option>
-                          <option value="diversity">Diversity</option>
-                          <option value="operations">Operations</option>
-                        </select>
+                        <label className="block text-sm font-medium text-neutral-700 mb-2">Duración</label>
+                        <DateRangeDuration
+                          startDate={editStartDate}
+                          endDate={editEndDate}
+                          existingDuration={formData.duration}
+                          computedDuration={computeDurationFromDates(editStartDate, editEndDate)}
+                          onChange={(start, end) => {
+                            setEditStartDate(start);
+                            setEditEndDate(end);
+                            const computed = computeDurationFromDates(start, end);
+                            if (computed) setFormDataTracked({ ...formData, duration: computed });
+                          }}
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-neutral-700 mb-2">Estado</label>

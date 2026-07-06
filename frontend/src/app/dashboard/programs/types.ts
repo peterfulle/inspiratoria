@@ -100,7 +100,7 @@ export interface ProgramTemplate {
   slug: string;
   name: string;
   description: string;
-  category: "leadership" | "sales" | "diversity" | "operations" | "tech";
+  category: string;
   duration: string;
   modules: Module[];
   status: "published" | "draft";
