@@ -7,6 +7,7 @@ import TopNavbar from "@/components/TopNavbar";
 import PushNotificationPrompt from "@/components/PushNotificationPrompt";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import UIPrefsLoader from "@/components/UIPrefsLoader";
+import TeamChatWindow from "@/components/TeamChatWindow";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 export default function DashboardLayout({
@@ -136,6 +137,9 @@ export default function DashboardLayout({
           }}
         />
       )}
+
+      {/* Chat interno del equipo Inspiratoria (@inspiratoria.org) */}
+      {!isInClientRoute && <TeamChatWindow user={user} />}
     </div>
   );
 }

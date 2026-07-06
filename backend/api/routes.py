@@ -299,6 +299,43 @@ def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _is_inspiratoria_staff(user) -> bool:
+    """Gate de acceso al chat interno: solo staff activo con email @inspiratoria.org."""
+    return bool(user) and user.is_active and (user.email or "").lower().endswith("@inspiratoria.org")
+
+
+@router.get("/team-chat/messages")
+def team_chat_history(user_id: str, limit: int = 50):
+    """Historial del chat interno del equipo (carga inicial antes de conectar el socket)."""
+    from companies.models import User, TeamChatMessage
+    from django.db import close_old_connections
+    import uuid as _uuid
+    close_old_connections()
+
+    try:
+        user = User.objects.get(id=_uuid.UUID(user_id))
+    except (User.DoesNotExist, ValueError):
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if not _is_inspiratoria_staff(user):
+        raise HTTPException(status_code=403, detail="Chat disponible solo para el equipo de Inspiratoria")
+
+    msgs = list(
+        TeamChatMessage.objects.select_related("sender").order_by("-created_at")[: max(1, min(200, limit))]
+    )
+    return [
+        {
+            "id": str(m.id),
+            "sender_id": str(m.sender_id),
+            "sender_name": m.sender.full_name or m.sender.email,
+            "sender_email": m.sender.email,
+            "content": m.content,
+            "created_at": m.created_at.isoformat(),
+        }
+        for m in reversed(msgs)
+    ]
+
+
 @router.get("/programs", response_model=List[ProgramOut])
 def list_programs(company_id: Optional[str] = None, template_id: Optional[str] = None) -> List[dict]:
     from programs.models import Activity, ProgramParticipant

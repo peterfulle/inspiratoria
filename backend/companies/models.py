@@ -638,3 +638,21 @@ class StudioAccount(models.Model):
         if self.valid_until and timezone.now() > self.valid_until:
             return False
         return True
+
+
+class TeamChatMessage(models.Model):
+    """
+    Chat interno del equipo Inspiratoria — un único canal en tiempo real,
+    restringido a usuarios activos con email @inspiratoria.org.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="team_chat_messages")
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [models.Index(fields=["-created_at"])]
+
+    def __str__(self) -> str:
+        return f"{self.sender.email}: {self.content[:50]}"

@@ -111,6 +111,7 @@ interface MenuItem {
   badgeColor?: string;
   comingSoon?: boolean;
   subItems?: { id: string; label: string; path: string }[];
+  onClick?: () => void;
 }
 
 // Menu sections
@@ -155,6 +156,8 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
   const [viewPerms, setViewPerms] = useState<string[] | null>(null);
   const [mounted, setMounted] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState("");
+  const [teamChatUnread, setTeamChatUnread] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
   
@@ -182,14 +185,22 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
     // Siempre iniciar colapsado
     setIsCollapsed(true);
 
-    // Load avatar from localStorage
+    // Load avatar + email from localStorage
     try {
       const userStr = localStorage.getItem("user");
       if (userStr) {
         const user = JSON.parse(userStr);
         if (user.avatar_url) setAvatarUrl(user.avatar_url);
+        if (user.email) setUserEmail(user.email);
       }
     } catch {}
+
+    // Unread badge del chat de equipo (actualizado desde TeamChatWindow)
+    const handleTeamChatUnread = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setTeamChatUnread(typeof detail === "number" ? detail : 0);
+    };
+    window.addEventListener("teamChatUnread", handleTeamChatUnread);
 
     // Load view_permissions from localStorage first (instant), then fetch fresh from API
     const loadPerms = () => {
@@ -260,6 +271,7 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
       window.removeEventListener("avatarUpdated", handleAvatarUpdate);
       window.removeEventListener("themeToggle", handleThemeToggle);
       window.removeEventListener("viewPermissionsUpdated", onPermsUpdated);
+      window.removeEventListener("teamChatUnread", handleTeamChatUnread);
     };
   }, []);
 
@@ -308,28 +320,43 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
     
     // Admin management section
     if (isAdminRole) {
+      const gestionItems: MenuItem[] = [
+        {
+          id: "accounts",
+          label: "Cuentas Studio",
+          icon: IconAccounts,
+          path: "/dashboard/accounts",
+          subItems: [
+            { id: "accounts-internal", label: "Cuentas Internas", path: "/dashboard/accounts/internal" },
+            { id: "accounts-subscription", label: "Cuentas Suscripción", path: "/dashboard/accounts/subscription" },
+          ]
+        },
+        { id: "programs", label: "Programas Studio", icon: IconPrograms, path: "/dashboard/programs" },
+        { id: "manage-programs", label: "Gestionar Programas", icon: IconGoals, path: "/dashboard/manage-programs" },
+        { id: "intelligent-match", label: "Match Inteligente", icon: IconGoals, path: "/dashboard/intelligent-match" },
+        { id: "billing", label: "Facturación", icon: IconBilling, path: "/dashboard/billing" },
+        { id: "users", label: "Usuarios", icon: IconUsers, path: "/dashboard/users" },
+        { id: "analytics", label: "Analytics", icon: IconAnalytics, path: "/dashboard/analytics", comingSoon: true },
+        { id: "ecosystem", label: "Ecosistema", icon: IconEcosystem, path: "/dashboard/ecosystem" },
+      ];
+
+      // Chat interno: solo para el equipo de Inspiratoria (dominio @inspiratoria.org)
+      if (userEmail.toLowerCase().endsWith("@inspiratoria.org")) {
+        gestionItems.push({
+          id: "team-chat",
+          label: "Chat de Equipo",
+          icon: IconChat,
+          path: "#team-chat",
+          onClick: () => window.dispatchEvent(new CustomEvent("toggleTeamChat")),
+          badge: teamChatUnread > 0 ? String(teamChatUnread) : undefined,
+          badgeColor: "bg-blue-600",
+        });
+      }
+
       sections.push({
         title: "Gestión",
         roles: ["superadmin", "inspiratoria_admin", "admin", "admin_root"],
-        items: [
-          { 
-            id: "accounts", 
-            label: "Cuentas Studio", 
-            icon: IconAccounts, 
-            path: "/dashboard/accounts",
-            subItems: [
-              { id: "accounts-internal", label: "Cuentas Internas", path: "/dashboard/accounts/internal" },
-              { id: "accounts-subscription", label: "Cuentas Suscripción", path: "/dashboard/accounts/subscription" },
-            ]
-          },
-          { id: "programs", label: "Programas Studio", icon: IconPrograms, path: "/dashboard/programs" },
-          { id: "manage-programs", label: "Gestionar Programas", icon: IconGoals, path: "/dashboard/manage-programs" },
-          { id: "intelligent-match", label: "Match Inteligente", icon: IconGoals, path: "/dashboard/intelligent-match" },
-          { id: "billing", label: "Facturación", icon: IconBilling, path: "/dashboard/billing" },
-          { id: "users", label: "Usuarios", icon: IconUsers, path: "/dashboard/users" },
-          { id: "analytics", label: "Analytics", icon: IconAnalytics, path: "/dashboard/analytics", comingSoon: true },
-          { id: "ecosystem", label: "Ecosistema", icon: IconEcosystem, path: "/dashboard/ecosystem" },
-        ],
+        items: gestionItems,
       });
     }
     
@@ -635,7 +662,10 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
                   return (
                     <div key={item.id} className="relative group">
                       <button
-                        onClick={() => !item.comingSoon && router.push(item.path)}
+                        onClick={() => {
+                          if (item.onClick) { item.onClick(); return; }
+                          if (!item.comingSoon) router.push(item.path);
+                        }}
                         onMouseEnter={() => setHoveredItem(item.id)}
                         onMouseLeave={() => setHoveredItem(null)}
                         disabled={item.comingSoon}
