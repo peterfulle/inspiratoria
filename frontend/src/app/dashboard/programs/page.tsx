@@ -217,6 +217,9 @@ export default function ProgramsPage() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   // Loading state
   const [loading, setLoading] = useState(true);
+  // New template modal: inline error + loading state (no silent failure)
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
@@ -329,25 +332,40 @@ export default function ProgramsPage() {
 
   // Handlers — all persist to backend API
   const handleCreate = async () => {
+    setCreateError(null);
+
+    const name = (formData.name || "").trim();
+    const description = (formData.description || "").trim();
+    const duration = (formData.duration || "").trim();
+    if (!name) { setCreateError("Ponle un nombre a la plantilla."); return; }
+    if (!description) { setCreateError("Agrega una descripción breve."); return; }
+    if (!duration) { setCreateError("Indica la duración del programa."); return; }
+
     const payload = cleanForApi(formData);
-    payload.slug = generateSlug(formData.name || "");
-    setSaveStatus('saving');
+    payload.slug = generateSlug(name);
+    setCreating(true);
     try {
       const res = await fetch(`${API_URL}/api/program-templates`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Error al crear");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({} as any));
+        throw new Error(errBody?.detail || `No se pudo crear la plantilla (error ${res.status}).`);
+      }
       const created = await res.json();
       setTemplates(prev => [...prev, created]);
-      setSaveStatus('saved');
-    } catch {
-      setSaveStatus('error');
+      setShowCreateModal(false);
+      setIsDirty(false);
+      resetForm();
+      // Continuar directo en el editor completo, como promete el modal
+      openEditModal(created);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "No se pudo crear la plantilla. Intenta nuevamente.");
+    } finally {
+      setCreating(false);
     }
-    setShowCreateModal(false);
-    setIsDirty(false);
-    resetForm();
   };
 
   const handleSave = async () => {
@@ -753,8 +771,8 @@ export default function ProgramsPage() {
                   <Icon.Link className="w-4 h-4" />
                   <span className="hidden sm:inline">Asignar programa</span>
                 </button>
-                <button 
-                  onClick={() => { resetForm(); setShowCreateModal(true); }}
+                <button
+                  onClick={() => { resetForm(); setCreateError(null); setShowCreateModal(true); }}
                   className="btn-primary flex items-center gap-2 text-xs sm:text-sm"
                 >
                   <Icon.Plus className="w-4 h-4" />
@@ -1192,83 +1210,159 @@ export default function ProgramsPage() {
 
         {/* Create Modal */}
         {showCreateModal && (
-          <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-            <div className="modal-content max-w-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-overlay" onClick={() => !creating && setShowCreateModal(false)}>
+            <div className="modal-content max-w-xl" onClick={(e) => e.stopPropagation()}>
               <div className="p-6 border-b border-neutral-100">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-neutral-900">Nueva Plantilla</h2>
-                  <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-neutral-100 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                      <Icon.Lightbulb className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-neutral-900">Nueva plantilla</h2>
+                      <p className="text-xs text-neutral-500 mt-0.5">Diseña un programa reutilizable para tus cuentas</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => !creating && setShowCreateModal(false)}
+                    disabled={creating}
+                    className="p-2 hover:bg-neutral-100 rounded-lg disabled:opacity-40"
+                  >
                     <Icon.X className="w-5 h-5 text-neutral-500" />
                   </button>
                 </div>
               </div>
 
-              <div className="p-6 space-y-5">
+              <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">Nombre *</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Nombre del programa</label>
                   <input
                     type="text"
                     value={formData.name || ""}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="ej. Leadership Accelerator"
+                    autoFocus
                     className="input-field"
                   />
+                  {formData.name?.trim() && (
+                    <p className="text-[11px] text-neutral-400 mt-1.5">
+                      URL: <code className="text-neutral-500">/{generateSlug(formData.name)}</code>
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">Descripción *</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Descripción</label>
                   <textarea
                     value={formData.description || ""}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Describe el programa..."
+                    placeholder="¿De qué se trata este programa y a quién está dirigido?"
                     className="textarea-field"
                     rows={3}
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-2">Categoría *</label>
-                    <select
-                      value={formData.category || "leadership"}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value as ProgramTemplate["category"] })}
-                      className="select-field"
-                    >
-                      <option value="leadership">Leadership</option>
-                      <option value="tech">Tech</option>
-                      <option value="sales">Sales</option>
-                      <option value="diversity">Diversity</option>
-                      <option value="operations">Operations</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-2">Duración *</label>
-                    <input
-                      type="text"
-                      value={formData.duration || ""}
-                      onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                      placeholder="ej. 6 meses"
-                      className="input-field"
-                    />
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Categoría</label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {([
+                      { key: "leadership", label: "Leadership", bg: "#dbeafe", fg: "#2563eb" },
+                      { key: "tech", label: "Tech", bg: "#f3e8ff", fg: "#7c3aed" },
+                      { key: "sales", label: "Sales", bg: "#fef3c7", fg: "#d97706" },
+                      { key: "diversity", label: "Diversity", bg: "#fce7f3", fg: "#db2777" },
+                      { key: "operations", label: "Operations", bg: "#e0f2fe", fg: "#0369a1" },
+                    ] as const).map((cat) => {
+                      const active = (formData.category || "leadership") === cat.key;
+                      return (
+                        <button
+                          key={cat.key}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, category: cat.key as ProgramTemplate["category"] })}
+                          className="relative flex flex-col items-center justify-center gap-1.5 rounded-xl py-3 px-1 text-center transition border-2"
+                          style={{
+                            background: active ? cat.bg : "#fafafa",
+                            color: active ? cat.fg : "#8a8a8a",
+                            borderColor: active ? cat.fg : "transparent",
+                          }}
+                        >
+                          {active && (
+                            <span className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ background: cat.fg }}>
+                              <Icon.Check className="w-2 h-2 text-white" />
+                            </span>
+                          )}
+                          <span className="text-[11px] font-semibold">{cat.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="p-4 bg-neutral-50 rounded-xl">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Duración</label>
+                  <div className="flex flex-wrap gap-2 mb-2.5">
+                    {["1 mes", "3 meses", "6 meses", "12 meses"].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, duration: d })}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+                          formData.duration === d
+                            ? "bg-neutral-900 text-white border-neutral-900"
+                            : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300"
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.duration || ""}
+                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                    placeholder="o escribe una duración personalizada"
+                    className="input-field"
+                  />
+                </div>
+
+                {createError && (
+                  <div className="flex items-start gap-2.5 p-3.5 bg-red-50 border border-red-100 rounded-xl">
+                    <Icon.Flag className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700">{createError}</p>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-2.5 p-3.5 bg-neutral-50 rounded-xl">
+                  <Icon.Puzzle className="w-4 h-4 text-neutral-400 flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-neutral-600">
-                    Después de crear, podrás agregar módulos, recursos, actividades y configurar requisitos.
+                    Al crear, pasarás directo al editor completo para agregar módulos, recursos, actividades y configurar requisitos.
                   </p>
                 </div>
+              </div>
 
-                <div className="flex items-center gap-3 pt-4">
-                  <button onClick={() => setShowCreateModal(false)} className="btn-secondary flex-1">Cancelar</button>
-                  <button
-                    onClick={handleCreate}
-                    disabled={!formData.name || !formData.description || !formData.duration}
-                    className="btn-primary flex-1 disabled:opacity-50"
-                  >
-                    Crear Plantilla
-                  </button>
-                </div>
+              <div className="flex items-center gap-3 p-6 pt-4 border-t border-neutral-100">
+                <button onClick={() => setShowCreateModal(false)} disabled={creating} className="btn-secondary flex-1 disabled:opacity-50">
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCreate}
+                  disabled={creating}
+                  className="btn-primary flex-1 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {creating ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Creando…
+                    </>
+                  ) : (
+                    <>
+                      <Icon.Plus className="w-4 h-4" />
+                      Crear y continuar
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

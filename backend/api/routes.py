@@ -102,6 +102,8 @@ def list_program_templates(include_files: bool = False, light: bool = False):
     rápido (dashboard). include_files=true: incluye los data-URI de archivos.
     """
     from programs.models import ProgramTemplate
+    from django.db import close_old_connections
+    close_old_connections()
     HEAVY = ["modules", "milestones", "mentor_requirements", "mentee_requirements", "matching_rules", "session_rules"]
     qs = ProgramTemplate.objects.all()
     if light:
@@ -139,7 +141,12 @@ def list_program_templates(include_files: bool = False, light: bool = False):
 @router.post("/program-templates", response_model=ProgramTemplateOut, status_code=201)
 def create_program_template(data: ProgramTemplateIn):
     from programs.models import ProgramTemplate
+    from django.db import close_old_connections
     import time
+    close_old_connections()
+
+    if not (data.name or "").strip():
+        raise HTTPException(status_code=400, detail="El nombre de la plantilla es obligatorio")
 
     slug = data.slug or _slugify(data.name)
     # Ensure unique slug
@@ -188,6 +195,8 @@ def create_program_template(data: ProgramTemplateIn):
 @router.put("/program-templates/{template_id}", response_model=ProgramTemplateOut)
 def update_program_template(template_id: str, data: ProgramTemplateIn):
     from programs.models import ProgramTemplate
+    from django.db import close_old_connections
+    close_old_connections()
     try:
         t = ProgramTemplate.objects.get(id=template_id)
     except ProgramTemplate.DoesNotExist:
@@ -234,6 +243,8 @@ def update_program_template(template_id: str, data: ProgramTemplateIn):
 @router.delete("/program-templates/{template_id}", status_code=204)
 def delete_program_template(template_id: str):
     from programs.models import ProgramTemplate
+    from django.db import close_old_connections
+    close_old_connections()
     try:
         t = ProgramTemplate.objects.get(id=template_id)
     except ProgramTemplate.DoesNotExist:
@@ -245,6 +256,8 @@ def delete_program_template(template_id: str):
 @router.post("/program-templates/{template_id}/duplicate", response_model=ProgramTemplateOut, status_code=201)
 def duplicate_program_template(template_id: str):
     from programs.models import ProgramTemplate
+    from django.db import close_old_connections
+    close_old_connections()
     try:
         t = ProgramTemplate.objects.get(id=template_id)
     except ProgramTemplate.DoesNotExist:
