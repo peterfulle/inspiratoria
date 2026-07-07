@@ -11,9 +11,10 @@ import {
 } from "./types";
 import {
   defaultMentorReqs, defaultMenteeReqs, defaultMatchingRules, defaultSessionRules,
-  getCategoryLabel, getAlgorithmLabel, getTotalSessions, getTotalResources, getTotalActivities,
+  getCategoryLabel, getCategoryColor, getAlgorithmLabel, getTotalSessions, getTotalResources, getTotalActivities,
   getNextMonday, formatDateSpanish, generateModuleContent, generateSessionPlan, generateSlug,
-  PROGRAM_CATEGORIES, computeDurationFromDates
+  PROGRAM_CATEGORIES, computeDurationFromDates,
+  getTemplateSteps, getTemplateCompleteness, TemplateStepStatus
 } from "./data";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1147,12 +1148,24 @@ export default function ProgramsPage() {
                     {/* Left: Badges + Title + Description */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className={`badge badge-${template.category}`}>
+                        <span className="badge" style={{ background: getCategoryColor(template.category).bg, color: getCategoryColor(template.category).fg }}>
                           {getCategoryLabel(template.category)}
                         </span>
                         <span className={`badge badge-${template.status}`}>
                           {template.status === "published" ? "Publicada" : "Borrador"}
                         </span>
+                        {(() => {
+                          const { requiredComplete, percent } = getTemplateCompleteness(template);
+                          return requiredComplete ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">
+                              <Icon.Check className="w-2.5 h-2.5" /> Lista
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700">
+                              {percent}% completa
+                            </span>
+                          );
+                        })()}
                       </div>
                       <h3 className="text-sm sm:text-base font-semibold text-neutral-900">{template.name}</h3>
                       <p className="text-neutral-500 text-xs sm:text-sm truncate">{template.description}</p>
@@ -1222,12 +1235,24 @@ export default function ProgramsPage() {
                 <div key={template.id} className="program-row flex-col sm:flex-row !gap-3 sm:!gap-6">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`badge badge-${template.category}`}>
+                      <span className="badge" style={{ background: getCategoryColor(template.category).bg, color: getCategoryColor(template.category).fg }}>
                         {getCategoryLabel(template.category)}
                       </span>
                       <span className={`badge badge-${template.status}`}>
                         {template.status === "published" ? "Publicada" : "Borrador"}
                       </span>
+                      {(() => {
+                        const { requiredComplete, percent } = getTemplateCompleteness(template);
+                        return requiredComplete ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">
+                            <Icon.Check className="w-2.5 h-2.5" /> Lista
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700">
+                            {percent}% completa
+                          </span>
+                        );
+                      })()}
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-semibold text-neutral-900 truncate text-sm sm:text-base">{template.name}</h3>
@@ -1430,38 +1455,82 @@ export default function ProgramsPage() {
               <div className="p-4 sm:p-6 border-b border-neutral-100">
                 <div className="flex items-center justify-between mb-4">
                   <div className="min-w-0">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-amber-600 mb-0.5">Plantilla</div>
                     <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 truncate">{formData.name}</h2>
-                    <p className="text-sm text-neutral-500">Editor completo de plantilla{isDirty ? ' • cambios sin guardar' : ''}</p>
+                    <p className="text-sm text-neutral-500">{isDirty ? 'Cambios sin guardar' : 'Editor paso a paso'}</p>
                   </div>
                   <button
                     onClick={closeEditModal}
-                    className="p-2 hover:bg-neutral-100 rounded-lg"
+                    className="p-2 hover:bg-neutral-100 rounded-lg flex-shrink-0"
                   >
                     <Icon.X className="w-5 h-5 text-neutral-500" />
                   </button>
                 </div>
 
-                {/* Tabs */}
-                <div className="tab-nav -mx-4 sm:-mx-6 px-0 overflow-x-auto scrollbar-hide">
-                  {[
-                    { id: "general", label: "General", icon: Icon.Settings },
-                    { id: "modules", label: "Módulos", icon: Icon.Book },
-                    { id: "milestones", label: "Hitos", icon: Icon.Flag },
-                    { id: "mentors", label: "Mentores", icon: Icon.Award },
-                    { id: "mentees", label: "Mentees", icon: Icon.Users },
-                    { id: "matching", label: "Matching", icon: Icon.Link },
-                    { id: "sessions", label: "Sesiones", icon: Icon.Calendar },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setEditTab(tab.id as ConfigTab)}
-                      className={`tab-btn flex items-center gap-2 ${editTab === tab.id ? "active" : ""}`}
-                    >
-                      <tab.icon className="w-4 h-4" />
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+                {(() => {
+                  const steps: TemplateStepStatus[] = getTemplateSteps(formData);
+                  const stepIcons: Record<string, any> = {
+                    general: Icon.Settings, modules: Icon.Book, milestones: Icon.Flag,
+                    mentors: Icon.Award, mentees: Icon.Users, matching: Icon.Link, sessions: Icon.Calendar,
+                  };
+                  const doneCount = steps.filter((s) => s.complete).length;
+                  const percent = Math.round((doneCount / steps.length) * 100);
+                  const requiredMissing = steps.filter((s) => s.required && !s.complete);
+                  return (
+                    <>
+                      {/* Progreso general */}
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="flex-1 h-1.5 rounded-full bg-neutral-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{ width: `${percent}%`, background: requiredMissing.length ? "#f59e0b" : "#16a34a" }}
+                          />
+                        </div>
+                        <span className="text-[11px] font-semibold text-neutral-500 flex-shrink-0">{percent}% completo</span>
+                      </div>
+
+                      {/* Aviso: sin esto, el programa se crea vacío */}
+                      {requiredMissing.length > 0 && (
+                        <div className="flex items-start gap-2 mb-3 p-2.5 bg-amber-50 border border-amber-100 rounded-lg">
+                          <Icon.Flag className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <p className="text-[11.5px] text-amber-800">
+                            Falta completar <b>{requiredMissing.map((s) => s.label).join(" y ")}</b> — sin esto, al asignar
+                            esta plantilla el programa se creará sin actividades reales.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Pasos */}
+                      <div className="tab-nav -mx-4 sm:-mx-6 px-0 overflow-x-auto scrollbar-hide">
+                        {steps.map((step) => {
+                          const StepIcon = stepIcons[step.id];
+                          return (
+                            <button
+                              key={step.id}
+                              onClick={() => setEditTab(step.id as ConfigTab)}
+                              title={step.hint}
+                              className={`tab-btn flex items-center gap-1.5 ${editTab === step.id ? "active" : ""}`}
+                            >
+                              {step.complete ? (
+                                <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0">
+                                  <Icon.Check className="w-2 h-2" />
+                                </span>
+                              ) : (
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full border-2 flex-shrink-0"
+                                  style={{ borderColor: step.required ? "#f59e0b" : "#d4d4d8" }}
+                                />
+                              )}
+                              <StepIcon className="w-3.5 h-3.5" />
+                              {step.label}
+                              {step.required && !step.complete && <span className="text-amber-600 font-bold">*</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="p-4 sm:p-6 max-h-[60vh] overflow-y-auto">
@@ -2621,6 +2690,36 @@ export default function ProgramsPage() {
                           <option key={t.id} value={t.id}>{t.name} ({t.status === "published" ? "Publicado" : "Borrador"})</option>
                         ))}
                       </select>
+                      {assignForm.programId && (() => {
+                        const t = templates.find(x => x.id === assignForm.programId);
+                        if (!t) return null;
+                        const { requiredComplete, percent, steps } = getTemplateCompleteness(t);
+                        const missing = steps.filter(s => s.required && !s.complete);
+                        if (requiredComplete) {
+                          return (
+                            <p className="mt-1.5 text-[11px] text-emerald-600 flex items-center gap-1">
+                              <Icon.Check className="w-3 h-3" /> Plantilla lista ({percent}% completa)
+                            </p>
+                          );
+                        }
+                        return (
+                          <div className="mt-2 p-2.5 bg-amber-50 border border-amber-100 rounded-lg flex items-start gap-2">
+                            <Icon.Flag className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <div className="min-w-0">
+                              <p className="text-[11.5px] text-amber-800">
+                                Falta <b>{missing.map(s => s.label).join(" y ")}</b> ({percent}% completa) — el programa se creará sin actividades reales.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => { setShowAssignModal(false); openEditModal(t); }}
+                                className="text-[11px] font-semibold text-amber-800 underline mt-1"
+                              >
+                                Completar plantilla ahora
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div>

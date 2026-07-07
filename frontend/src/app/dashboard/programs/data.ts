@@ -1106,3 +1106,52 @@ export const getActivityIcon = (type: string) => {
   };
   return icons[type] || "Puzzle";
 };
+
+// ═══════════════════════════════════════════════════════════════════
+// VERIFICACIÓN DE COMPLETITUD DE LA PLANTILLA (wizard paso a paso)
+// ═══════════════════════════════════════════════════════════════════
+
+export interface TemplateStepStatus {
+  id: "general" | "modules" | "milestones" | "mentors" | "mentees" | "matching" | "sessions";
+  label: string;
+  required: boolean;
+  complete: boolean;
+  hint: string;
+}
+
+/**
+ * Evalúa qué tan lista está una plantilla para producir un programa real.
+ * "General" y "Módulos" son obligatorios: sin nombre/descripción no hay
+ * identidad, y sin módulos el programa se crea en la BD pero con 0
+ * actividades (se ve "vacío"). El resto tiene valores por defecto válidos,
+ * así que se marca como recomendado, no bloqueante.
+ */
+export function getTemplateSteps(t: Partial<ProgramTemplate>): TemplateStepStatus[] {
+  const modules = t.modules || [];
+  const generalOk = !!(t.name?.trim() && t.description?.trim() && t.category && t.duration?.trim());
+  const modulesOk = modules.length > 0 && modules.every((m) => (m.name || "").trim().length > 0);
+  const milestonesOk = (t.milestones || []).length > 0;
+  const mentorsOk = !!(t.mentorRequirements?.requiredSkills || []).length;
+  const menteesOk = !!(t.menteeRequirements?.requiredDepartments || []).length || !!t.menteeRequirements?.requiredGoals;
+  const matchingOk = !!t.matchingRules?.algorithm && t.matchingRules.algorithm !== "manual";
+  const sessionsOk = !!(t.sessionRules?.frequencyPerMonth && t.sessionRules?.defaultDuration);
+
+  return [
+    { id: "general", label: "General", required: true, complete: generalOk, hint: "Nombre, descripción, categoría y duración" },
+    { id: "modules", label: "Módulos", required: true, complete: modulesOk, hint: "Al menos un módulo con nombre — sin esto el programa no tendrá actividades" },
+    { id: "milestones", label: "Hitos", required: false, complete: milestonesOk, hint: "Hitos de avance (opcional)" },
+    { id: "mentors", label: "Mentores", required: false, complete: mentorsOk, hint: "Skills requeridas del mentor (opcional, usa valores por defecto)" },
+    { id: "mentees", label: "Mentees", required: false, complete: menteesOk, hint: "Requisitos del mentee (opcional, usa valores por defecto)" },
+    { id: "matching", label: "Matching", required: false, complete: matchingOk, hint: "Algoritmo de matching (opcional, usa valores por defecto)" },
+    { id: "sessions", label: "Sesiones", required: false, complete: sessionsOk, hint: "Frecuencia y duración de sesiones (opcional, usa valores por defecto)" },
+  ];
+}
+
+export function getTemplateCompleteness(t: Partial<ProgramTemplate>) {
+  const steps = getTemplateSteps(t);
+  const required = steps.filter((s) => s.required);
+  const requiredComplete = required.every((s) => s.complete);
+  const doneCount = steps.filter((s) => s.complete).length;
+  const percent = Math.round((doneCount / steps.length) * 100);
+  return { steps, requiredComplete, percent };
+}
