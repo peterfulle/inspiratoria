@@ -1155,3 +1155,17 @@ export function getTemplateCompleteness(t: Partial<ProgramTemplate>) {
   const percent = Math.round((doneCount / steps.length) * 100);
   return { steps, requiredComplete, percent };
 }
+
+// Estilos de estado para programas (instancias/asignaciones). Cada uno: label + colores del pill.
+export const PROGRAM_STATUS_META: Record<string, { label: string; color: string; bg: string; dot: string }> = {
+  designed:            { label: "Diseñado",       color: "#7c3aed", bg: "#f5f3ff", dot: "#a78bfa" },
+  ready_for_execution: { label: "Listo",          color: "#0369a1", bg: "#f0f9ff", dot: "#38bdf8" },
+  in_execution:        { label: "En ejecución",   color: "#047857", bg: "#ecfdf5", dot: "#10b981" },
+  under_review:        { label: "En revisión",    color: "#b45309", bg: "#fffbeb", dot: "#f59e0b" },
+  closed:              { label: "Cerrado",         color: "#475569", bg: "#f1f5f9", dot: "#94a3b8" },
+  draft:               { label: "Borrador",        color: "#64748b", bg: "#f8fafc", dot: "#94a3b8" },
+  active:              { label: "Activo",          color: "#047857", bg: "#ecfdf5", dot: "#10b981" },
+  paused:              { label: "Pausado",         color: "#b45309", bg: "#fffbeb", dot: "#f59e0b" },
+  completed:           { label: "Completado",      color: "#4338ca", bg: "#eef2ff", dot: "#6366f1" },
+};
+export const programStatusMeta = (s: string) => PROGRAM_STATUS_META[s] || PROGRAM_STATUS_META.draft;
