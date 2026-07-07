@@ -101,6 +101,7 @@ export interface ProgramTemplate {
   name: string;
   description: string;
   category: string;
+  categories?: string[];
   duration: string;
   modules: Module[];
   status: "published" | "draft";

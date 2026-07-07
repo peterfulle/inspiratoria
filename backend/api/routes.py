@@ -122,6 +122,7 @@ def list_program_templates(include_files: bool = False, light: bool = False):
             "name": t.name,
             "description": t.description,
             "category": t.category,
+            "categories": t.categories or ([t.category] if t.category else []),
             "duration": t.duration,
             "status": t.status,
             "modules": mods,
@@ -156,11 +157,15 @@ def create_program_template(data: ProgramTemplateIn):
         slug = f"{base_slug}-{counter}"
         counter += 1
 
+    categories = [c for c in (data.categories or []) if c] or ([data.category] if data.category else [])
+    primary_category = categories[0] if categories else (data.category or "leadership")
+
     t = ProgramTemplate.objects.create(
         slug=slug,
         name=data.name,
         description=data.description or "",
-        category=data.category or "leadership",
+        category=primary_category,
+        categories=categories,
         duration=data.duration or "",
         status=data.status or "draft",
         modules=data.modules or [],
@@ -177,6 +182,7 @@ def create_program_template(data: ProgramTemplateIn):
         "name": t.name,
         "description": t.description,
         "category": t.category,
+        "categories": t.categories or [],
         "duration": t.duration,
         "status": t.status,
         "modules": t.modules or [],
@@ -202,9 +208,16 @@ def update_program_template(template_id: str, data: ProgramTemplateIn):
     except ProgramTemplate.DoesNotExist:
         raise HTTPException(status_code=404, detail="Template no encontrado")
 
+    categories = [c for c in (data.categories or []) if c]
+    if categories:
+        t.categories = categories
+        t.category = categories[0]
+    elif data.category:
+        t.category = data.category
+        t.categories = [data.category]
+
     t.name = data.name
     t.description = data.description or ""
-    t.category = data.category or t.category
     t.duration = data.duration or ""
     t.status = data.status or t.status
     t.modules = data.modules or []
@@ -225,6 +238,7 @@ def update_program_template(template_id: str, data: ProgramTemplateIn):
         "name": t.name,
         "description": t.description,
         "category": t.category,
+        "categories": t.categories or [],
         "duration": t.duration,
         "status": t.status,
         "modules": t.modules or [],
@@ -276,6 +290,7 @@ def duplicate_program_template(template_id: str):
         name=new_name,
         description=t.description,
         category=t.category,
+        categories=t.categories or [],
         duration=t.duration,
         status="draft",
         modules=t.modules,
@@ -292,6 +307,7 @@ def duplicate_program_template(template_id: str):
         "name": dup.name,
         "description": dup.description,
         "category": dup.category,
+        "categories": dup.categories or [],
         "duration": dup.duration,
         "status": dup.status,
         "modules": dup.modules or [],

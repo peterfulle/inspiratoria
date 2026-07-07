@@ -20,29 +20,61 @@ import {
 // ═══════════════════════════════════════════════════════════════════
 // CATEGORY PICKER — grilla scrolleable de 24 categorías temáticas
 // ═══════════════════════════════════════════════════════════════════
-function CategoryPicker({ value, onChange }: { value: string; onChange: (key: string) => void }) {
+// ═══════════════════════════════════════════════════════════════════
+// WIZARD — orden fijo de pasos + cálculo de hasta dónde se puede avanzar
+// ═══════════════════════════════════════════════════════════════════
+const STEP_ORDER: ConfigTab[] = ["general", "modules", "milestones", "mentors", "mentees", "matching", "sessions"];
+
+/**
+ * Al abrir el editor, desbloquea hasta el primer paso OBLIGATORIO incompleto
+ * (fuerza a completarlo antes de seguir). Si ya está todo lo obligatorio
+ * resuelto, desbloquea todos los pasos (edición libre para retocar detalles).
+ */
+function computeInitialUnlockedIndex(steps: TemplateStepStatus[]): number {
+  const firstRequiredGap = steps.findIndex((s) => s.required && !s.complete);
+  return firstRequiredGap === -1 ? steps.length - 1 : firstRequiredGap;
+}
+
+function CategoryPicker({ value, onChange }: { value: string[]; onChange: (keys: string[]) => void }) {
+  const toggle = (key: string) => {
+    if (value.includes(key)) onChange(value.filter((k) => k !== key));
+    else onChange([...value, key]);
+  };
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1 rounded-xl">
-      {PROGRAM_CATEGORIES.map((cat) => {
-        const active = value === cat.key;
-        return (
-          <button
-            key={cat.key}
-            type="button"
-            onClick={() => onChange(cat.key)}
-            className="relative flex items-center gap-2 rounded-xl py-2.5 px-3 text-left transition border-2"
-            style={{
-              background: active ? cat.bg : "#fafafa",
-              color: active ? cat.fg : "#71717a",
-              borderColor: active ? cat.fg : "transparent",
-            }}
-          >
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active ? cat.fg : "#d4d4d8" }} />
-            <span className="text-[12px] font-medium leading-tight truncate">{cat.label}</span>
-            {active && <Icon.Check className="w-3.5 h-3.5 flex-shrink-0 ml-auto" />}
-          </button>
-        );
-      })}
+    <div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1 rounded-xl">
+        {PROGRAM_CATEGORIES.map((cat) => {
+          const active = value.includes(cat.key);
+          const isPrimary = value[0] === cat.key;
+          return (
+            <button
+              key={cat.key}
+              type="button"
+              onClick={() => toggle(cat.key)}
+              className="relative flex items-center gap-2 rounded-xl py-2.5 px-3 text-left transition border-2"
+              style={{
+                background: active ? cat.bg : "#fafafa",
+                color: active ? cat.fg : "#71717a",
+                borderColor: active ? cat.fg : "transparent",
+              }}
+            >
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active ? cat.fg : "#d4d4d8" }} />
+              <span className="text-[12px] font-medium leading-tight truncate">{cat.label}</span>
+              {active && <Icon.Check className="w-3.5 h-3.5 flex-shrink-0 ml-auto" />}
+              {isPrimary && (
+                <span className="absolute -top-1.5 -right-1.5 text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-neutral-900 text-white">
+                  Principal
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {value.length > 0 && (
+        <p className="text-[11px] text-neutral-400 mt-2">
+          {value.length} seleccionada{value.length === 1 ? "" : "s"} — la primera marcada como <b>Principal</b> define el color/insignia mostrada en las tarjetas.
+        </p>
+      )}
     </div>
   );
 }
@@ -287,7 +319,11 @@ export default function ProgramsPage() {
   
   // Edit tabs
   const [editTab, setEditTab] = useState<ConfigTab>("general");
-  
+  // Wizard: solo se puede avanzar hasta este índice (bloquea saltar pasos
+  // obligatorios incompletos). Retroceder siempre está permitido.
+  const [maxUnlockedIndex, setMaxUnlockedIndex] = useState(0);
+  const [stepError, setStepError] = useState<string | null>(null);
+
   // Expanded modules
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
 
@@ -471,17 +507,23 @@ export default function ProgramsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Error al guardar");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({} as any));
+        throw new Error(errBody?.detail || "No se pudo guardar la plantilla.");
+      }
       const updated = await res.json();
       setTemplates(prev => prev.map(t => t.id === selId ? updated : t));
       setSaveStatus('saved');
-    } catch {
+      // Solo cerramos si el guardado fue exitoso — si falla, el usuario ve el
+      // error y conserva su trabajo en vez de perderlo en silencio.
+      setShowEditModal(false);
+      setSelectedTemplate(null);
+      setIsDirty(false);
+      resetForm();
+    } catch (err) {
       setSaveStatus('error');
+      setStepError(err instanceof Error ? err.message : "No se pudo guardar la plantilla.");
     }
-    setShowEditModal(false);
-    setSelectedTemplate(null);
-    setIsDirty(false);
-    resetForm();
   };
 
   const handleDelete = async (id: string) => {
@@ -520,12 +562,51 @@ export default function ProgramsPage() {
     setSelectedTemplate(template);
     // Deep copy to avoid reference issues
     setFormData(JSON.parse(JSON.stringify(template)));
-    setEditTab("general");
+    const initialIndex = computeInitialUnlockedIndex(getTemplateSteps(template));
+    setEditTab(STEP_ORDER[initialIndex]);
+    setMaxUnlockedIndex(initialIndex);
+    setStepError(null);
     setExpandedModules([]);
     setIsDirty(false);
     setEditStartDate("");
     setEditEndDate("");
     setShowEditModal(true);
+  };
+
+  // ── Navegación del wizard: avanzar valida el paso actual, retroceder es libre ──
+  const wizardGoNext = () => {
+    const steps = getTemplateSteps(formData);
+    const currentIndex = STEP_ORDER.indexOf(editTab);
+    const currentStep = steps[currentIndex];
+    if (currentStep.required && !currentStep.complete) {
+      setStepError(`Completa "${currentStep.label}" antes de continuar — ${currentStep.hint}.`);
+      return;
+    }
+    setStepError(null);
+    const nextIndex = Math.min(currentIndex + 1, steps.length - 1);
+    setEditTab(STEP_ORDER[nextIndex]);
+    setMaxUnlockedIndex((m) => Math.max(m, nextIndex));
+  };
+
+  const wizardGoPrev = () => {
+    setStepError(null);
+    const currentIndex = STEP_ORDER.indexOf(editTab);
+    setEditTab(STEP_ORDER[Math.max(currentIndex - 1, 0)]);
+  };
+
+  const wizardFinalize = async () => {
+    const steps = getTemplateSteps(formData);
+    const missing = steps.filter((s) => s.required && !s.complete);
+    if (missing.length > 0) {
+      const gapId = missing[0].id as ConfigTab;
+      const gapIndex = STEP_ORDER.indexOf(gapId);
+      setEditTab(gapId);
+      setMaxUnlockedIndex((m) => Math.max(m, gapIndex));
+      setStepError(`Falta completar "${missing[0].label}" para poder crear un programa real con esta plantilla.`);
+      return;
+    }
+    setStepError(null);
+    await handleSave();
   };
 
   // Auto-save feedback timer
@@ -1383,10 +1464,10 @@ export default function ProgramsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">Categoría</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Categorías (puedes elegir más de una)</label>
                   <CategoryPicker
-                    value={formData.category || "leadership"}
-                    onChange={(key) => setFormData({ ...formData, category: key })}
+                    value={formData.categories && formData.categories.length ? formData.categories : (formData.category ? [formData.category] : [])}
+                    onChange={(keys) => setFormData({ ...formData, categories: keys, category: keys[0] || "leadership" })}
                   />
                 </div>
 
@@ -1476,10 +1557,11 @@ export default function ProgramsPage() {
                   const doneCount = steps.filter((s) => s.complete).length;
                   const percent = Math.round((doneCount / steps.length) * 100);
                   const requiredMissing = steps.filter((s) => s.required && !s.complete);
+                  const currentIndex = STEP_ORDER.indexOf(editTab);
                   return (
                     <>
                       {/* Progreso general */}
-                      <div className="flex items-center gap-3 mb-3">
+                      <div className="flex items-center gap-3 mb-1">
                         <div className="flex-1 h-1.5 rounded-full bg-neutral-100 overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all duration-300"
@@ -1488,6 +1570,7 @@ export default function ProgramsPage() {
                         </div>
                         <span className="text-[11px] font-semibold text-neutral-500 flex-shrink-0">{percent}% completo</span>
                       </div>
+                      <p className="text-[11px] text-neutral-400 mb-3">Paso {currentIndex + 1} de {steps.length}</p>
 
                       {/* Aviso: sin esto, el programa se crea vacío */}
                       {requiredMissing.length > 0 && (
@@ -1500,21 +1583,26 @@ export default function ProgramsPage() {
                         </div>
                       )}
 
-                      {/* Pasos */}
+                      {/* Pasos — retroceder siempre se puede; avanzar está bloqueado
+                          más allá de maxUnlockedIndex hasta resolver lo obligatorio */}
                       <div className="tab-nav -mx-4 sm:-mx-6 px-0 overflow-x-auto scrollbar-hide">
-                        {steps.map((step) => {
+                        {steps.map((step, i) => {
                           const StepIcon = stepIcons[step.id];
+                          const locked = i > maxUnlockedIndex;
                           return (
                             <button
                               key={step.id}
-                              onClick={() => setEditTab(step.id as ConfigTab)}
-                              title={step.hint}
-                              className={`tab-btn flex items-center gap-1.5 ${editTab === step.id ? "active" : ""}`}
+                              onClick={() => { if (!locked) { setEditTab(step.id as ConfigTab); setStepError(null); } }}
+                              disabled={locked}
+                              title={locked ? "Completa los pasos anteriores primero" : step.hint}
+                              className={`tab-btn flex items-center gap-1.5 ${editTab === step.id ? "active" : ""} ${locked ? "opacity-40 cursor-not-allowed" : ""}`}
                             >
                               {step.complete ? (
                                 <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0">
                                   <Icon.Check className="w-2 h-2" />
                                 </span>
+                              ) : locked ? (
+                                <Icon.Lock className="w-3 h-3 flex-shrink-0" />
                               ) : (
                                 <span
                                   className="w-3.5 h-3.5 rounded-full border-2 flex-shrink-0"
@@ -1558,10 +1646,10 @@ export default function ProgramsPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-2">Categoría</label>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">Categorías (puedes elegir más de una)</label>
                       <CategoryPicker
-                        value={formData.category || "leadership"}
-                        onChange={(key) => setFormDataTracked({ ...formData, category: key })}
+                        value={formData.categories && formData.categories.length ? formData.categories : (formData.category ? [formData.category] : [])}
+                        onChange={(keys) => setFormDataTracked({ ...formData, categories: keys, category: keys[0] || "leadership" })}
                       />
                     </div>
 
@@ -2619,24 +2707,48 @@ export default function ProgramsPage() {
                 )}
               </div>
 
-              {/* Footer */}
+              {/* Footer — navegación de wizard: Anterior / Siguiente (valida) / Finalizar */}
               <div className="p-4 sm:p-6 border-t border-neutral-100 bg-neutral-50">
+                {stepError && (
+                  <div className="flex items-start gap-2 mb-3 p-2.5 bg-red-50 border border-red-100 rounded-lg">
+                    <Icon.Flag className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-[12px] text-red-700">{stepError}</p>
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <button onClick={closeEditModal} className="btn-secondary">Cancelar</button>
+                    <button onClick={handleSave} className="text-[12px] text-neutral-400 hover:text-neutral-600 underline">
+                      Guardar borrador y salir
+                    </button>
                     {saveStatus === 'saved' && (
                       <span className="text-xs text-green-600 flex items-center gap-1">
                         <Icon.Check className="w-3 h-3" /> Guardado
                       </span>
                     )}
                     {saveStatus === 'error' && (
-                      <span className="text-xs text-red-600">Error al guardar (almacenamiento lleno)</span>
+                      <span className="text-xs text-red-600">Error al guardar</span>
                     )}
                   </div>
-                  <button onClick={handleSave} className="btn-primary flex items-center gap-2">
-                    <Icon.Check className="w-4 h-4" />
-                    {isDirty ? 'Guardar Cambios *' : 'Guardar Cambios'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {STEP_ORDER.indexOf(editTab) > 0 && (
+                      <button onClick={wizardGoPrev} className="btn-secondary flex items-center gap-2">
+                        <Icon.ChevronRight className="w-4 h-4 rotate-180" />
+                        Anterior
+                      </button>
+                    )}
+                    {STEP_ORDER.indexOf(editTab) < STEP_ORDER.length - 1 ? (
+                      <button onClick={wizardGoNext} className="btn-primary flex items-center gap-2">
+                        Siguiente
+                        <Icon.ChevronRight className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <button onClick={wizardFinalize} className="btn-primary flex items-center gap-2">
+                        <Icon.Check className="w-4 h-4" />
+                        Finalizar y guardar
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

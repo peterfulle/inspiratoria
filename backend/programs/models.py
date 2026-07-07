@@ -722,6 +722,9 @@ class ProgramTemplate(models.Model):
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default="leadership")
+    # Multi-selección de categorías; `category` se mantiene como la primera
+    # (compatibilidad con badges/filtros que aún leen un único valor).
+    categories = models.JSONField(default=list, blank=True)
     duration = models.CharField(max_length=100, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
 

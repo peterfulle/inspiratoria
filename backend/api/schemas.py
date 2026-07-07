@@ -340,6 +340,7 @@ class ProgramTemplateIn(BaseModel):
     slug: Optional[str] = None
     description: Optional[str] = ""
     category: Optional[str] = "leadership"
+    categories: Optional[List[str]] = None  # multi-selección; category = categories[0] (compat)
     duration: Optional[str] = ""
     status: Optional[str] = "draft"
     modules: Optional[List[Dict[str, Any]]] = []
@@ -357,6 +358,7 @@ class ProgramTemplateOut(BaseModel):
     name: str
     description: str
     category: str
+    categories: List[str] = []
     duration: str
     status: str
     modules: List[Dict[str, Any]]
