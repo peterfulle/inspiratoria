@@ -103,6 +103,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.68.58:3005",
     "https://inspiratoria-frontend.onrender.com",
     "https://inspiratoria.aplifly.com",
+    "https://plataforma.inspiratoria.org",
 ]
 
 CORS_ALLOW_CREDENTIALS = True

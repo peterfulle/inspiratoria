@@ -4946,7 +4946,7 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
         )
 
         # ── Email to mentee ─────────────────────────────────────
-        frontend_url = getattr(django_settings, "FRONTEND_URL", "https://inspiratoria.aplifly.com")
+        frontend_url = getattr(django_settings, "FRONTEND_URL", "https://plataforma.inspiratoria.org")
         mentee_portal_link = f"{frontend_url}/p/{mentee.portal_code}/sesiones" if mentee.portal_code else frontend_url
         meeting_block = ""
         if session.meeting_url:
