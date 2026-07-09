@@ -95,12 +95,14 @@ def _strip_data_uris(obj):
 
 
 @router.get("/program-templates", response_model=List[ProgramTemplateOut])
-def list_program_templates(include_files: bool = False, light: bool = False):
+def list_program_templates(include_files: bool = False, light: bool = False, authorization: Optional[str] = Header(None)):
     """
     light=true: omite las columnas JSON pesadas (modules con archivos base64,
     reglas, etc.) — no se transfieren desde la DB. Ideal para contar/listar
     rápido (dashboard). include_files=true: incluye los data-URI de archivos.
     """
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     from programs.models import ProgramTemplate
     from django.db import close_old_connections
     close_old_connections()
@@ -140,7 +142,9 @@ def list_program_templates(include_files: bool = False, light: bool = False):
 
 
 @router.post("/program-templates", response_model=ProgramTemplateOut, status_code=201)
-def create_program_template(data: ProgramTemplateIn):
+def create_program_template(data: ProgramTemplateIn, authorization: Optional[str] = Header(None)):
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from programs.models import ProgramTemplate
     from django.db import close_old_connections
     import time
@@ -199,7 +203,9 @@ def create_program_template(data: ProgramTemplateIn):
 
 
 @router.put("/program-templates/{template_id}", response_model=ProgramTemplateOut)
-def update_program_template(template_id: str, data: ProgramTemplateIn):
+def update_program_template(template_id: str, data: ProgramTemplateIn, authorization: Optional[str] = Header(None)):
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from programs.models import ProgramTemplate
     from django.db import close_old_connections
     close_old_connections()
@@ -255,7 +261,9 @@ def update_program_template(template_id: str, data: ProgramTemplateIn):
 
 
 @router.delete("/program-templates/{template_id}", status_code=204)
-def delete_program_template(template_id: str):
+def delete_program_template(template_id: str, authorization: Optional[str] = Header(None)):
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from programs.models import ProgramTemplate
     from django.db import close_old_connections
     close_old_connections()
@@ -268,7 +276,9 @@ def delete_program_template(template_id: str):
 
 
 @router.post("/program-templates/{template_id}/duplicate", response_model=ProgramTemplateOut, status_code=201)
-def duplicate_program_template(template_id: str):
+def duplicate_program_template(template_id: str, authorization: Optional[str] = Header(None)):
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from programs.models import ProgramTemplate
     from django.db import close_old_connections
     close_old_connections()
@@ -334,17 +344,14 @@ def _is_inspiratoria_staff(user) -> bool:
 
 
 @router.get("/team-chat/messages")
-def team_chat_history(user_id: str, limit: int = 50):
+def team_chat_history(limit: int = 50, authorization: Optional[str] = Header(None)):
     """Historial del chat interno del equipo (carga inicial antes de conectar el socket)."""
-    from companies.models import User, TeamChatMessage
+    from companies.auth_deps import get_current_user
+    from companies.models import TeamChatMessage
     from django.db import close_old_connections
-    import uuid as _uuid
     close_old_connections()
 
-    try:
-        user = User.objects.get(id=_uuid.UUID(user_id))
-    except (User.DoesNotExist, ValueError):
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    user = get_current_user(authorization)
 
     if not _is_inspiratoria_staff(user):
         raise HTTPException(status_code=403, detail="Chat disponible solo para el equipo de Inspiratoria")
@@ -366,10 +373,15 @@ def team_chat_history(user_id: str, limit: int = 50):
 
 
 @router.get("/programs", response_model=List[ProgramOut])
-def list_programs(company_id: Optional[str] = None, template_id: Optional[str] = None) -> List[dict]:
+def list_programs(company_id: Optional[str] = None, template_id: Optional[str] = None, authorization: Optional[str] = Header(None)) -> List[dict]:
+    from companies.auth_deps import get_current_user, is_admin
     from programs.models import Activity, ProgramParticipant
     from django.db import close_old_connections
     close_old_connections()
+
+    actor = get_current_user(authorization)
+    if not is_admin(actor):
+        company_id = str(actor.company_id) if actor.company_id else "__none__"
 
     programs = Program.objects.select_related('company', 'template').all()
     if company_id:
@@ -481,18 +493,10 @@ def _send_program_assignment_email(company, program):
 
 
 def _actor_from_auth(authorization):
-    """Resuelve el usuario que ejecuta la acción a partir del token
-    'Bearer {user_id}:{...}'. Best-effort: devuelve None si no se puede."""
-    if not authorization:
-        return None
-    from companies.models import User
-    import uuid as _uuid
-    token = authorization.replace("Bearer ", "").strip()
-    uid = token.split(":", 1)[0] if ":" in token else token
-    try:
-        return User.objects.get(id=_uuid.UUID(uid))
-    except Exception:
-        return None
+    """Resuelve el usuario que ejecuta la acción, validando la sesión real
+    (AuthToken) en vez de confiar en el UUID embebido en el token."""
+    from companies.services import AuthService
+    return AuthService.verify_session_token(authorization)
 
 
 # Estados válidos de un curso/programa (para validación de entrada)
@@ -523,6 +527,8 @@ def _audit(program, actor, action, details=None, entity="program", entity_id=Non
 
 @router.post("/programs", response_model=ProgramOut, status_code=201)
 def create_program(payload: ProgramIn, authorization: Optional[str] = Header(None)) -> dict:
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from companies.models import Company
     from programs.models import Activity, ProgramTemplate, AuditLog
     from django.db import close_old_connections
@@ -696,13 +702,33 @@ def create_program(payload: ProgramIn, authorization: Optional[str] = Header(Non
     }
 
 
+@router.get("/programs/{program_id}/company-slug")
+def get_program_company_slug(program_id: str) -> dict:
+    """
+    Endpoint público minimal: solo resuelve el slug de la empresa dueña de un
+    programa, para que las páginas de redirect (server components, sin acceso
+    a localStorage/token) puedan armar la URL de /studio/{slug}/... No expone
+    datos del programa.
+    """
+    import uuid
+    try:
+        program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
+    except (Program.DoesNotExist, ValueError):
+        return {"slug": None}
+    return {"slug": program.company.slug if program.company_id else None}
+
+
 @router.get("/programs/{program_id}", response_model=ProgramOut)
-def get_program(program_id: str) -> dict:
+def get_program(program_id: str, authorization: Optional[str] = Header(None)) -> dict:
+    from companies.auth_deps import get_current_user, require_company_access
     from programs.models import Activity, Content, ProgramParticipant
     import uuid
-    
+
+    actor = get_current_user(authorization)
+
     try:
         program = Program.objects.select_related('company', 'template').get(id=uuid.UUID(program_id))
+        require_company_access(actor, program.company_id)
 
         # Obtener actividades del programa
         activities = Activity.objects.filter(program=program)
@@ -717,9 +743,11 @@ def get_program(program_id: str) -> dict:
                     "title": m.title,
                     "description": m.description or "",
                     "order": m.order,
-                    "duration_minutes": 60,
-                    "requires_evaluation": False,
-                    "minimum_score": 70,
+                    "duration_minutes": m.duration_minutes,
+                    "requires_evaluation": m.requires_evaluation,
+                    "minimum_score": m.minimum_score,
+                    "start_date": m.start_date.isoformat() if m.start_date else None,
+                    "end_date": m.end_date.isoformat() if m.end_date else None,
                     "is_published": m.is_published,
                     "materials_url": m.materials_url or "",
                 }
@@ -794,10 +822,13 @@ def get_program(program_id: str) -> dict:
 @router.put("/programs/{program_id}", response_model=ProgramOut)
 def update_program(program_id: str, payload: ProgramIn, authorization: Optional[str] = Header(None)) -> dict:
     import uuid
+    from companies.auth_deps import get_current_user, require_company_access
     from django.db import close_old_connections
     close_old_connections()
+    actor = get_current_user(authorization)
     try:
         program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
+        require_company_access(actor, program.company_id)
         before = {"name": program.name, "description": program.description, "theme": program.theme}
         if payload.name:
             program.name = payload.name
@@ -838,10 +869,13 @@ def patch_program(program_id: str, payload: ProgramPatchIn, authorization: Optio
     Actualización parcial de un programa (PM console).
     """
     import uuid
+    from companies.auth_deps import get_current_user, require_company_access
     from django.db import close_old_connections
     close_old_connections()
+    actor = get_current_user(authorization)
     try:
         program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
+        require_company_access(actor, program.company_id)
         changed = {}
         if payload.name is not None and payload.name != program.name:
             changed["name"] = {"from": program.name, "to": payload.name}
@@ -879,6 +913,7 @@ def update_program_status(program_id: str, status: str, authorization: Optional[
     Estados legacy soportados: draft, active, paused, completed
     """
     import uuid
+    from companies.auth_deps import get_current_user, require_company_access
     valid_statuses = [
         "designed", "ready_for_execution", "in_execution", "under_review", "closed",
         "draft", "active", "paused", "completed",
@@ -887,12 +922,14 @@ def update_program_status(program_id: str, status: str, authorization: Optional[
     close_old_connections()
     if status not in valid_statuses:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"Estado inválido. Debe ser uno de: {', '.join(valid_statuses)}"
         )
-    
+
+    actor = get_current_user(authorization)
     try:
         program = Program.objects.get(id=uuid.UUID(program_id))
+        require_company_access(actor, program.company_id)
         old_status = program.status
         program.status = status
         program.save()
@@ -912,15 +949,18 @@ def update_program_status(program_id: str, status: str, authorization: Optional[
 @router.post("/programs/{program_id}/launch")
 def launch_program(program_id: str, authorization: Optional[str] = Header(None)) -> dict:
     """
-    Lanzar un programa: valida que esté completo y cambia su estado a 'launched'
+    Lanzar un programa: valida que esté completo y cambia su estado a 'in_execution'
     """
+    from companies.auth_deps import get_current_user, require_company_access
     from programs.models import Activity, Content
     import uuid
     from django.db import close_old_connections
     close_old_connections()
+    actor = get_current_user(authorization)
     try:
         program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
-        
+        require_company_access(actor, program.company_id)
+
         # Validaciones
         issues = []
         
@@ -955,7 +995,7 @@ def launch_program(program_id: str, authorization: Optional[str] = Header(None))
         
         # Si todo está bien, lanzar el programa
         old_status = program.status
-        program.status = "launched"
+        program.status = "in_execution"
         program.save()
         _audit(program, _actor_from_auth(authorization), "program_launched", {
             "from": old_status,
@@ -985,6 +1025,8 @@ def delete_program(program_id: str, authorization: Optional[str] = Header(None))
     """
     Eliminar un programa (soft delete cambiando a status=deleted)
     """
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     import uuid
     from django.db import close_old_connections
     close_old_connections()
@@ -1002,16 +1044,19 @@ def delete_program(program_id: str, authorization: Optional[str] = Header(None))
 
 
 @router.get("/programs/{program_id}/participants")
-def get_program_participants(program_id: str):
+def get_program_participants(program_id: str, authorization: Optional[str] = Header(None)):
     """
     Obtener todos los participantes de un programa específico
     """
-    from accounts.models import User
+    from companies.auth_deps import get_current_user, require_company_access
     from programs.models import ProgramParticipant
     import uuid
-    
+
+    actor = get_current_user(authorization)
+
     try:
         program = Program.objects.get(id=uuid.UUID(program_id))
+        require_company_access(actor, program.company_id)
         participants = ProgramParticipant.objects.filter(program=program).select_related('user')
         
         result = []
@@ -1044,27 +1089,33 @@ def get_program_participants(program_id: str):
 @router.get("/programs/users/search")
 def search_users_for_program(
     q: str,
-    exclude_program_id: Optional[str] = None
+    exclude_program_id: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
 ):
     """
     Buscar usuarios por nombre o email (para agregar a programas)
     - q: Término de búsqueda (mínimo 2 caracteres)
     - exclude_program_id: Excluir usuarios que ya están en este programa
     """
-    from accounts.models import User
+    from companies.auth_deps import get_current_user, is_admin
+    from companies.models import User
     from programs.models import ProgramParticipant
     from django.db.models import Q
     import uuid
-    
+
+    actor = get_current_user(authorization)
+
     if len(q) < 2:
         return []
-    
+
     # Buscar usuarios por nombre o email
     users = User.objects.filter(
-        Q(first_name__icontains=q) | 
-        Q(last_name__icontains=q) | 
+        Q(first_name__icontains=q) |
+        Q(last_name__icontains=q) |
         Q(email__icontains=q)
     )
+    if not is_admin(actor):
+        users = users.filter(company_id=actor.company_id)
     
     # Excluir usuarios que ya están en el programa
     if exclude_program_id:
@@ -1096,14 +1147,18 @@ def search_users_for_program(
 
 
 @router.post("/programs/{program_id}/participants", status_code=201)
-def add_participant_to_program(program_id: str, payload: dict):
+def add_participant_to_program(program_id: str, payload: dict, authorization: Optional[str] = Header(None)):
     """
     Agregar un participante a un programa
     """
-    from accounts.models import User
+    from companies.auth_deps import get_current_user, require_program_access
+    from companies.models import User
     from programs.models import ProgramParticipant
     import uuid
-    
+
+    actor = get_current_user(authorization)
+    require_program_access(actor, program_id)
+
     try:
         program = Program.objects.get(id=uuid.UUID(program_id))
         user = User.objects.get(id=uuid.UUID(payload.get('user_id')))
@@ -1154,14 +1209,18 @@ def add_participant_to_program(program_id: str, payload: dict):
 
 
 @router.delete("/programs/{program_id}/participants/{participant_id}", status_code=204)
-def remove_participant_from_program(program_id: str, participant_id: str):
+def remove_participant_from_program(program_id: str, participant_id: str, authorization: Optional[str] = Header(None)):
     """
     Eliminar un participante de un programa (soft delete)
     """
+    from companies.auth_deps import get_current_user, require_program_access
     from programs.models import ProgramParticipant
     from datetime import datetime
     import uuid
-    
+
+    actor = get_current_user(authorization)
+    require_program_access(actor, program_id)
+
     try:
         participant = ProgramParticipant.objects.get(
             id=participant_id,
@@ -1183,13 +1242,16 @@ class CreateUserRequest(BaseModel):
 
 
 @router.post("/programs/users", status_code=201)
-async def create_user_for_program(request: CreateUserRequest):
+async def create_user_for_program(request: CreateUserRequest, authorization: Optional[str] = Header(None)):
     """
     Crear un nuevo usuario (para luego agregarlo a un programa)
     """
-    from accounts.models import User
+    from companies.auth_deps import get_current_user
+    from companies.models import User
     from asgiref.sync import sync_to_async
-    
+
+    await sync_to_async(get_current_user)(authorization)
+
     def create_user_sync():
         # Verificar si el email ya existe
         if User.objects.filter(email=request.email).exists():
@@ -1221,6 +1283,7 @@ def list_participants(
     role: Optional[str] = None,
     search: Optional[str] = None,
     skills: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
 ) -> List[Participant]:
     """
     Listar participantes con filtros avanzados
@@ -1229,6 +1292,8 @@ def list_participants(
     - search: Búsqueda en nombre y headline
     - skills: Búsqueda en skills (separados por coma)
     """
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     from django.db import close_old_connections
     close_old_connections()
     query = Participant.objects.select_related("program").all()
@@ -1255,7 +1320,9 @@ def list_participants(
 
 
 @router.get("/participants/{participant_id}", response_model=ParticipantOut)
-def get_participant(participant_id: int) -> Participant:
+def get_participant(participant_id: int, authorization: Optional[str] = Header(None)) -> Participant:
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         return Participant.objects.select_related("program").get(id=participant_id)
     except Participant.DoesNotExist as exc:
@@ -1263,7 +1330,9 @@ def get_participant(participant_id: int) -> Participant:
 
 
 @router.post("/participants", response_model=ParticipantOut, status_code=201)
-def create_participant(payload: ParticipantIn) -> Participant:
+def create_participant(payload: ParticipantIn, authorization: Optional[str] = Header(None)) -> Participant:
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         participant = Participant.objects.create(
             program_id=payload.program_id,
@@ -1280,7 +1349,9 @@ def create_participant(payload: ParticipantIn) -> Participant:
 
 
 @router.put("/participants/{participant_id}", response_model=ParticipantOut)
-def update_participant(participant_id: int, payload: ParticipantIn) -> Participant:
+def update_participant(participant_id: int, payload: ParticipantIn, authorization: Optional[str] = Header(None)) -> Participant:
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         participant = Participant.objects.get(id=participant_id)
         participant.program_id = payload.program_id
@@ -1297,7 +1368,9 @@ def update_participant(participant_id: int, payload: ParticipantIn) -> Participa
 
 
 @router.delete("/participants/{participant_id}", status_code=204)
-def delete_participant(participant_id: int):
+def delete_participant(participant_id: int, authorization: Optional[str] = Header(None)):
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         participant = Participant.objects.get(id=participant_id)
         participant.delete()
@@ -1306,11 +1379,13 @@ def delete_participant(participant_id: int):
 
 
 @router.post("/participants/bulk-import")
-def bulk_import_participants(data: dict) -> dict:
+def bulk_import_participants(data: dict, authorization: Optional[str] = Header(None)) -> dict:
     """
     Importa múltiples participantes desde CSV/Excel.
     Valida y crea todos los registros en una transacción.
     """
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     program_id = data.get("program_id")
     participants_data = data.get("participants", [])
     
@@ -1373,10 +1448,12 @@ def bulk_import_participants(data: dict) -> dict:
 
 
 @router.get("/matches")
-def list_matches() -> list[dict]:
+def list_matches(authorization: Optional[str] = Header(None)) -> list[dict]:
     """
     Lista todos los matches con información completa de mentor y mentee.
     """
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     from django.db import close_old_connections
     close_old_connections()
     matches = Match.objects.select_related(
@@ -1446,7 +1523,9 @@ def list_matches() -> list[dict]:
 
 
 @router.post("/matches/smart", response_model=MatchOut, status_code=201)
-def smart_match(payload: SmartMatchRequest) -> Match:
+def smart_match(payload: SmartMatchRequest, authorization: Optional[str] = Header(None)) -> Match:
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         match = create_match_with_score(
             program_id=payload.program_id,
@@ -1459,12 +1538,14 @@ def smart_match(payload: SmartMatchRequest) -> Match:
 
 
 @router.post("/sentiment", response_model=SentimentOut, status_code=201)
-def create_sentiment(payload: SentimentIn) -> Sentiment:
+def create_sentiment(payload: SentimentIn, authorization: Optional[str] = Header(None)) -> Sentiment:
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         match = Match.objects.get(id=payload.match_id)
     except Match.DoesNotExist as exc:
         raise HTTPException(status_code=404, detail="Match not found") from exc
-    
+
     sentiment = Sentiment.objects.create(
         match=match,
         rating=payload.rating,
@@ -1474,21 +1555,26 @@ def create_sentiment(payload: SentimentIn) -> Sentiment:
 
 
 @router.get("/sentiment/match/{match_id}", response_model=List[SentimentOut])
-def get_match_sentiments(match_id: int) -> List[Sentiment]:
+def get_match_sentiments(match_id: int, authorization: Optional[str] = Header(None)) -> List[Sentiment]:
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     return list(Sentiment.objects.filter(match_id=match_id))
 
 
 @router.get("/sentiment", response_model=List[SentimentOut])
-def get_all_sentiments() -> List[Sentiment]:
+def get_all_sentiments(authorization: Optional[str] = Header(None)) -> List[Sentiment]:
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     return list(Sentiment.objects.all())
 
 
 # ============= NOTIFICATIONS ENDPOINTS =============
 
 @router.get("/notifications/user/{user_id}")
-def get_user_notifications(user_id: str, unread_only: bool = False) -> list:
+def get_user_notifications(user_id: str, unread_only: bool = False, authorization: Optional[str] = Header(None)) -> list:
     """Obtener notificaciones de un usuario"""
     import uuid
+    from companies.auth_deps import get_current_user, require_self_or_admin
     from django.db import close_old_connections
     close_old_connections()
 
@@ -1498,6 +1584,9 @@ def get_user_notifications(user_id: str, unread_only: bool = False) -> list:
         recipient_uuid = uuid.UUID(str(user_id))
     except (ValueError, AttributeError, TypeError):
         return []
+
+    actor = get_current_user(authorization)
+    require_self_or_admin(actor, recipient_uuid)
 
     query = Notification.objects.filter(recipient_id=recipient_uuid)
     if unread_only:
@@ -1524,8 +1613,10 @@ def get_user_notifications(user_id: str, unread_only: bool = False) -> list:
 
 
 @router.post("/notifications", response_model=NotificationOut, status_code=201)
-def create_notification(payload: NotificationIn) -> Notification:
+def create_notification(payload: NotificationIn, authorization: Optional[str] = Header(None)) -> Notification:
     """Crear una nueva notificación"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     notification = Notification.objects.create(
         recipient_id=payload.recipient_id,
         notification_type=payload.notification_type,
@@ -1539,8 +1630,10 @@ def create_notification(payload: NotificationIn) -> Notification:
 
 
 @router.post("/notifications/broadcast", status_code=201)
-def broadcast_notification(payload: NotificationBroadcast) -> dict:
+def broadcast_notification(payload: NotificationBroadcast, authorization: Optional[str] = Header(None)) -> dict:
     """Enviar notificación a todos los usuarios internos de Inspiratoria"""
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from companies.models import User
 
     INTERNAL_ROLES = [
@@ -1563,24 +1656,35 @@ def broadcast_notification(payload: NotificationBroadcast) -> dict:
 
 
 @router.post("/notifications/mark-read")
-def mark_notifications_read(payload: NotificationMarkRead) -> dict[str, str]:
-    """Marcar notificaciones como leídas"""
-    Notification.objects.filter(id__in=payload.notification_ids).update(is_read=True)
-    return {"status": "success", "updated": len(payload.notification_ids)}
+def mark_notifications_read(payload: NotificationMarkRead, authorization: Optional[str] = Header(None)) -> dict[str, str]:
+    """Marcar notificaciones como leídas — solo las del propio usuario (o cualquiera si es admin)."""
+    from companies.auth_deps import get_current_user, is_admin
+    actor = get_current_user(authorization)
+    qs = Notification.objects.filter(id__in=payload.notification_ids)
+    if not is_admin(actor):
+        qs = qs.filter(recipient_id=actor.id)
+    updated = qs.update(is_read=True)
+    return {"status": "success", "updated": updated}
 
 
 @router.get("/notifications/unread-count/{user_id}")
-def get_unread_count(user_id: str) -> dict[str, int]:
+def get_unread_count(user_id: str, authorization: Optional[str] = Header(None)) -> dict[str, int]:
     """Obtener cantidad de notificaciones no leídas"""
+    from companies.auth_deps import get_current_user, require_self_or_admin
+    actor = get_current_user(authorization)
+    require_self_or_admin(actor, user_id)
     count = Notification.objects.filter(recipient_id=user_id, is_read=False).count()
     return {"unread_count": count}
 
 
 @router.delete("/notifications/{notification_id}")
-def delete_notification(notification_id: int) -> dict[str, str]:
-    """Eliminar una notificación"""
+def delete_notification(notification_id: int, authorization: Optional[str] = Header(None)) -> dict[str, str]:
+    """Eliminar una notificación — solo si es del propio usuario, o admin."""
+    from companies.auth_deps import get_current_user, require_self_or_admin
+    actor = get_current_user(authorization)
     try:
         notification = Notification.objects.get(id=notification_id)
+        require_self_or_admin(actor, notification.recipient_id)
         notification.delete()
         return {"status": "deleted"}
     except Notification.DoesNotExist as exc:
@@ -1590,18 +1694,22 @@ def delete_notification(notification_id: int) -> dict[str, str]:
 # ============= GOALS & OKRs ENDPOINTS =============
 
 @router.get("/goals/match/{match_id}", response_model=List[GoalOut])
-def get_match_goals(match_id: int) -> List[Goal]:
+def get_match_goals(match_id: int, authorization: Optional[str] = Header(None)) -> List[Goal]:
     """Obtener todos los goals de un match"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     goals = Goal.objects.filter(match_id=match_id).prefetch_related("key_results")
     return list(goals)
 
 
 @router.post("/goals", response_model=GoalOut, status_code=201)
-def create_goal(payload: GoalIn) -> Goal:
+def create_goal(payload: GoalIn, authorization: Optional[str] = Header(None)) -> Goal:
     """Crear un nuevo goal con key results"""
+    from companies.auth_deps import get_current_user
+    actor = get_current_user(authorization)
     try:
         from datetime import datetime
-        
+
         goal = Goal.objects.create(
             match_id=payload.match_id,
             title=payload.title,
@@ -1613,7 +1721,7 @@ def create_goal(payload: GoalIn) -> Goal:
             achievable=payload.achievable,
             relevant=payload.relevant,
             time_bound=datetime.strptime(payload.time_bound, "%Y-%m-%d").date(),
-            created_by_id=1,  # TODO: Get from auth
+            created_by_id=actor.id,
         )
         
         # Crear key results
@@ -1632,8 +1740,10 @@ def create_goal(payload: GoalIn) -> Goal:
 
 
 @router.put("/goals/{goal_id}/progress")
-def update_goal_progress(goal_id: int, payload: GoalUpdateIn) -> dict[str, str]:
+def update_goal_progress(goal_id: int, payload: GoalUpdateIn, authorization: Optional[str] = Header(None)) -> dict[str, str]:
     """Actualizar progreso de un goal"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         goal = Goal.objects.get(id=goal_id)
         
@@ -1663,8 +1773,10 @@ def update_goal_progress(goal_id: int, payload: GoalUpdateIn) -> dict[str, str]:
 
 
 @router.put("/key-results/{kr_id}")
-def update_key_result(kr_id: int, payload: KeyResultUpdateIn) -> KeyResultOut:
+def update_key_result(kr_id: int, payload: KeyResultUpdateIn, authorization: Optional[str] = Header(None)) -> KeyResultOut:
     """Actualizar un key result"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         kr = KeyResult.objects.get(id=kr_id)
         kr.current_value = payload.current_value
@@ -1685,14 +1797,18 @@ def update_key_result(kr_id: int, payload: KeyResultUpdateIn) -> KeyResultOut:
 
 
 @router.get("/goals/{goal_id}/updates", response_model=List[GoalUpdateOut])
-def get_goal_updates(goal_id: int) -> List[GoalUpdate]:
+def get_goal_updates(goal_id: int, authorization: Optional[str] = Header(None)) -> List[GoalUpdate]:
     """Obtener historial de actualizaciones de un goal"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     return list(GoalUpdate.objects.filter(goal_id=goal_id))
 
 
 @router.delete("/goals/{goal_id}")
-def delete_goal(goal_id: int) -> dict[str, str]:
+def delete_goal(goal_id: int, authorization: Optional[str] = Header(None)) -> dict[str, str]:
     """Eliminar un goal"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         goal = Goal.objects.get(id=goal_id)
         goal.delete()
@@ -1706,8 +1822,10 @@ def delete_goal(goal_id: int) -> dict[str, str]:
 # ============================================
 
 @router.post("/ai/recommendations", response_model=AIRecommendationOut)
-def get_ai_goal_recommendations(payload: AIRecommendationRequest):
+def get_ai_goal_recommendations(payload: AIRecommendationRequest, authorization: Optional[str] = Header(None)):
     """Genera recomendaciones de goals usando Neuramorphic AI"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         participant = Participant.objects.get(id=payload.participant_id)
         
@@ -1759,8 +1877,10 @@ def get_ai_goal_recommendations(payload: AIRecommendationRequest):
 
 
 @router.post("/ai/analyze-goal", response_model=AIAnalysisOut)
-def analyze_goal_with_ai(payload: AIAnalysisRequest):
+def analyze_goal_with_ai(payload: AIAnalysisRequest, authorization: Optional[str] = Header(None)):
     """Analiza un goal usando Neuramorphic AI para detectar sentiment y riesgos"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         goal = Goal.objects.get(id=payload.goal_id)
         
@@ -1806,8 +1926,10 @@ def analyze_goal_with_ai(payload: AIAnalysisRequest):
 
 
 @router.post("/ai/match-health", response_model=AIMatchHealthOut)
-def analyze_match_health(payload: AIMatchHealthRequest):
+def analyze_match_health(payload: AIMatchHealthRequest, authorization: Optional[str] = Header(None)):
     """Analiza la salud de un match usando Neuramorphic AI"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         match = Match.objects.get(id=payload.match_id)
         
@@ -1852,8 +1974,10 @@ def analyze_match_health(payload: AIMatchHealthRequest):
 
 
 @router.post("/ai/generate-program")
-def generate_program_with_ai(payload: dict):
+def generate_program_with_ai(payload: dict, authorization: Optional[str] = Header(None)):
     """Genera contenido de programa usando Neuramorphic AI con contexto de Inspiratoria"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         name = payload.get("name", "")
         theme = payload.get("theme", "")
@@ -1953,8 +2077,10 @@ Responde SOLO con las metodologías, una por línea, sin numeración."""
 
 
 @router.post("/ai/generate-objectives")
-def generate_objectives_with_ai(payload: dict):
+def generate_objectives_with_ai(payload: dict, authorization: Optional[str] = Header(None)):
     """Genera objetivos SMART usando Neuramorphic AI basados en un contexto específico"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         name = payload.get("name", "")
         theme = payload.get("theme", "")
@@ -2041,8 +2167,10 @@ Responde SOLO con los 5 objetivos, uno por línea, sin numeración, viñetas ni 
 
 
 @router.post("/ai/generate-methodology")
-def generate_methodology_with_ai(payload: dict):
+def generate_methodology_with_ai(payload: dict, authorization: Optional[str] = Header(None)):
     """Genera metodologías y áreas de enfoque usando AI con contexto de Inspiratoria"""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         name = payload.get("name", "")
         theme = payload.get("theme", "")
@@ -2202,10 +2330,12 @@ Incluye entre 5 y 7 áreas."""
 # ============= DASHBOARD STATISTICS ENDPOINTS =============
 
 @router.get("/stats/dashboard")
-def get_dashboard_stats() -> dict:
+def get_dashboard_stats(authorization: Optional[str] = Header(None)) -> dict:
     """
     Obtener estadísticas generales del dashboard
     """
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from django.db.models import Count, Avg, Q
     from datetime import datetime, timedelta
     
@@ -2282,15 +2412,19 @@ def get_dashboard_stats() -> dict:
 
 
 @router.get("/stats/programs/{program_id}")
-def get_program_stats(program_id: str) -> dict:
+def get_program_stats(program_id: str, authorization: Optional[str] = Header(None)) -> dict:
     """
     Estadísticas detalladas de un programa específico
     """
+    from companies.auth_deps import get_current_user, require_company_access
     from django.db.models import Avg, Count
     import uuid
-    
+
+    actor = get_current_user(authorization)
+
     try:
         program = Program.objects.get(id=uuid.UUID(program_id))
+        require_company_access(actor, program.company_id)
     except Program.DoesNotExist as exc:
         raise HTTPException(status_code=404, detail="Program not found") from exc
     
@@ -2315,10 +2449,12 @@ def get_program_stats(program_id: str) -> dict:
 
 
 @router.get("/stats/timeline")
-def get_timeline_stats(days: int = 30) -> dict:
+def get_timeline_stats(days: int = 30, authorization: Optional[str] = Header(None)) -> dict:
     """
     Estadísticas de timeline para gráficos temporales
     """
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from datetime import datetime, timedelta
     from django.db.models.functions import TruncDate
     from django.db.models import Count
@@ -2369,11 +2505,13 @@ def get_timeline_stats(days: int = 30) -> dict:
 # ==========================================
 
 @router.post("/ai/match-suggestions")
-def generate_ai_match_suggestions(data: dict) -> list[dict]:
+def generate_ai_match_suggestions(data: dict, authorization: Optional[str] = Header(None)) -> list[dict]:
     """
     Genera sugerencias de matching usando IA avanzada.
     Analiza skills, goals, disponibilidad y compatibilidad.
     """
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     program_id = data.get("program_id")
     
     if not program_id:
@@ -2578,7 +2716,7 @@ class IntelligentMatchRequest(BaseModel):
 
 
 @router.post("/matches/intelligent")
-def intelligent_match_endpoint(payload: IntelligentMatchRequest) -> dict:
+def intelligent_match_endpoint(payload: IntelligentMatchRequest, authorization: Optional[str] = Header(None)) -> dict:
     """
     Smart mentor↔mentee matching based on rich User profile data:
     skills, mentor_topics, mentor_style, experience level/area, mentor_objectives,
@@ -2588,6 +2726,10 @@ def intelligent_match_endpoint(payload: IntelligentMatchRequest) -> dict:
     Returns ranked suggestions with explainable per-dimension breakdown,
     matched keywords, human-readable reasons, and (optionally) Gemini rationale.
     """
+    from companies.auth_deps import get_current_user, require_company_access
+    actor = get_current_user(authorization)
+    if payload.company_id:
+        require_company_access(actor, payload.company_id)
     try:
         result = intelligent_match(
             program_id=payload.program_id,
@@ -2606,8 +2748,10 @@ def intelligent_match_endpoint(payload: IntelligentMatchRequest) -> dict:
 
 
 @router.get("/matches/intelligent/score")
-def intelligent_match_score(mentor_id: str, mentee_id: str) -> dict:
+def intelligent_match_score(mentor_id: str, mentee_id: str, authorization: Optional[str] = Header(None)) -> dict:
     """Score a single (mentor, mentee) pair on demand."""
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     from companies.models import User as _User
     try:
         mentor = _User.objects.get(id=mentor_id, role="mentor")
@@ -2618,10 +2762,12 @@ def intelligent_match_score(mentor_id: str, mentee_id: str) -> dict:
 
 
 @router.post("/matches/{match_id}/approve")
-def approve_match_suggestion(match_id: str) -> dict:
+def approve_match_suggestion(match_id: str, authorization: Optional[str] = Header(None)) -> dict:
     """
     Aprueba una sugerencia de matching y crea el match en la base de datos.
     """
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         # Parse the suggestion ID format: "suggestion-{mentor_id}-{mentee_id}"
         if not match_id.startswith("suggestion-"):
@@ -2696,10 +2842,14 @@ def activate_intelligent_match(payload: ActivateIntelligentMatchRequest, authori
     keywords, reasons). A partir de ese momento el portal /p/{code} de cada
     parte muestra automáticamente al partner.
     """
+    from companies.auth_deps import get_current_user, require_program_access
     from programs.models import Program, ProgramParticipant, Vinculation
     from django.db import close_old_connections
     from datetime import datetime, timezone
     close_old_connections()
+
+    actor = get_current_user(authorization)
+    require_program_access(actor, payload.program_id)
 
     if payload.vinculation_type not in ("mentoria", "tutoria", "equipo", "coaching"):
         raise HTTPException(status_code=400, detail="vinculation_type inválido")
@@ -2821,10 +2971,12 @@ def activate_intelligent_match(payload: ActivateIntelligentMatchRequest, authori
 from programs.models import Activity
 
 @router.get("/activities")
-def list_activities(program_id: Optional[int] = None) -> List[dict]:
+def list_activities(program_id: Optional[int] = None, authorization: Optional[str] = Header(None)) -> List[dict]:
     """
     Lista todas las actividades o las de un programa específico
     """
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         if program_id:
             activities = Activity.objects.filter(program_id=program_id).select_related('program')
@@ -2873,11 +3025,15 @@ def create_activity(
     provides_participation_certificate: bool = False,
     meeting_url: Optional[str] = None,
     location_address: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
 ) -> dict:
     """
     Crea una nueva actividad con todos los campos necesarios
     Genera automáticamente URL de Google Meet para modalidad online
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = get_current_user(authorization)
+    require_program_access(actor, program_id)
     from datetime import datetime
     import uuid
     
@@ -2947,20 +3103,24 @@ def create_activity(
 
 
 @router.post("/activities/create", status_code=201)
-def create_activity_with_modules(payload: dict) -> dict:
+def create_activity_with_modules(payload: dict, authorization: Optional[str] = Header(None)) -> dict:
     """
     Crea una nueva actividad con módulos de contenido (para entrenamientos)
     Acepta JSON body con estructura completa incluyendo módulos y configuración
     """
+    from companies.auth_deps import get_current_user, require_program_access
     from datetime import datetime
     from programs.models import Content
     import uuid
-    
+
+    actor = get_current_user(authorization)
+
     try:
         program_id = payload.get("program_id")
         if not program_id:
             raise HTTPException(status_code=400, detail="program_id is required")
-        
+
+        require_program_access(actor, program_id)
         program = Program.objects.get(id=program_id)
         
         # Parse dates if provided
@@ -3107,15 +3267,19 @@ def create_activity_with_modules(payload: dict) -> dict:
 
 
 @router.delete("/activities/{activity_id}", status_code=204)
-def delete_activity(activity_id: int):
+def delete_activity(activity_id: int, authorization: Optional[str] = Header(None)):
     """
     Elimina una actividad y todos sus módulos asociados
     """
+    from companies.auth_deps import get_current_user, require_company_access
     from programs.models import Activity, Content
-    
+
+    actor = get_current_user(authorization)
+
     try:
-        activity = Activity.objects.get(id=activity_id)
-        
+        activity = Activity.objects.select_related('program').get(id=activity_id)
+        require_company_access(actor, activity.program.company_id if activity.program else None)
+
         # Eliminar módulos asociados primero
         Content.objects.filter(activity=activity).delete()
         
@@ -3133,17 +3297,21 @@ def delete_activity(activity_id: int):
 
 
 @router.put("/activities/{activity_id}", status_code=200)
-def update_activity(activity_id: int, payload: dict) -> dict:
+def update_activity(activity_id: int, payload: dict, authorization: Optional[str] = Header(None)) -> dict:
     """
     Actualiza una actividad existente con sus módulos
     """
+    from companies.auth_deps import get_current_user, require_company_access
     from datetime import datetime
     from programs.models import Activity, Content
     import uuid
-    
+
+    actor = get_current_user(authorization)
+
     try:
-        activity = Activity.objects.get(id=activity_id)
-        
+        activity = Activity.objects.select_related('program').get(id=activity_id)
+        require_company_access(actor, activity.program.company_id if activity.program else None)
+
         # Parse dates if provided
         parsed_start_date = None
         parsed_end_date = None
@@ -3280,16 +3448,20 @@ def update_activity(activity_id: int, payload: dict) -> dict:
 # ==================== MODULES/CONTENT ROUTES ====================
 
 @router.post("/activities/{activity_id}/modules", status_code=201)
-def create_module(activity_id: int, payload: dict) -> dict:
+def create_module(activity_id: int, payload: dict, authorization: Optional[str] = Header(None)) -> dict:
     """
     Crea un nuevo módulo para una actividad de entrenamiento
     """
+    from companies.auth_deps import get_current_user, require_company_access
     from datetime import datetime
     from programs.models import Activity, Content
-    
+
+    actor = get_current_user(authorization)
+
     try:
-        activity = Activity.objects.get(id=activity_id)
-        
+        activity = Activity.objects.select_related('program').get(id=activity_id)
+        require_company_access(actor, activity.program.company_id if activity.program else None)
+
         # Parse module dates if provided
         module_start_date = None
         module_end_date = None
@@ -3348,16 +3520,20 @@ def create_module(activity_id: int, payload: dict) -> dict:
 
 
 @router.put("/modules/{module_id}", status_code=200)
-def update_module(module_id: int, payload: dict) -> dict:
+def update_module(module_id: int, payload: dict, authorization: Optional[str] = Header(None)) -> dict:
     """
     Actualiza un módulo existente
     """
+    from companies.auth_deps import get_current_user, require_company_access
     from datetime import datetime
     from programs.models import Content
-    
+
+    actor = get_current_user(authorization)
+
     try:
-        content = Content.objects.get(id=module_id)
-        
+        content = Content.objects.select_related('activity__program').get(id=module_id)
+        require_company_access(actor, content.activity.program.company_id if content.activity and content.activity.program else None)
+
         # Parse module dates if provided
         if payload.get("start_date"):
             try:
@@ -3409,14 +3585,18 @@ def update_module(module_id: int, payload: dict) -> dict:
 
 
 @router.delete("/modules/{module_id}", status_code=204)
-def delete_module(module_id: int):
+def delete_module(module_id: int, authorization: Optional[str] = Header(None)):
     """
     Elimina un módulo
     """
+    from companies.auth_deps import get_current_user, require_company_access
     from programs.models import Content
-    
+
+    actor = get_current_user(authorization)
+
     try:
-        content = Content.objects.get(id=module_id)
+        content = Content.objects.select_related('activity__program').get(id=module_id)
+        require_company_access(actor, content.activity.program.company_id if content.activity and content.activity.program else None)
         content.delete()
         return None
     except Content.DoesNotExist:
@@ -3435,10 +3615,13 @@ from programs.models import Alert
 def list_alerts(
     program_id: Optional[int] = None,
     status: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
 ) -> List[dict]:
     """
     Lista todas las alertas con filtros opcionales
     """
+    from companies.auth_deps import get_current_user
+    get_current_user(authorization)
     try:
         alerts = Alert.objects.all().select_related('program', 'activity', 'resolved_by')
         
@@ -3478,11 +3661,15 @@ def create_alert(
     alert_type: str,
     description: str,
     activity_id: Optional[int] = None,
+    authorization: Optional[str] = Header(None),
 ) -> dict:
     """
     Crea una nueva alerta
     """
+    from companies.auth_deps import get_current_user, require_program_access
     import uuid
+    actor = get_current_user(authorization)
+    require_program_access(actor, program_id)
     try:
         program = Program.objects.get(id=uuid.UUID(program_id))
         
@@ -3515,12 +3702,16 @@ def update_alert_status(
     alert_id: int,
     status: str,
     action_taken: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
 ) -> dict:
     """
     Actualiza el estado de una alerta
     """
+    from companies.auth_deps import get_current_user, require_company_access
+    actor = get_current_user(authorization)
     try:
-        alert = Alert.objects.get(id=alert_id)
+        alert = Alert.objects.select_related('program').get(id=alert_id)
+        require_company_access(actor, alert.program.company_id if alert.program else None)
         alert.status = status
         
         if action_taken:
@@ -3544,12 +3735,17 @@ def update_alert_status(
 
 
 @router.delete("/clear-all-data")
-def clear_all_data():
+def clear_all_data(authorization: Optional[str] = Header(None)):
     """
     ⚠️ DANGER ZONE ⚠️
     Elimina TODOS los datos de la base de datos.
-    Útil para desarrollo y testing.
+    Útil para desarrollo y testing. Requiere sesión de admin real — antes
+    cualquiera podía borrar la base de datos completa sin autenticarse.
     """
+    actor = _actor_from_auth(authorization)
+    admin_roles = {"superadmin", "admin_root", "inspiratoria_admin"}
+    if actor is None or (actor.role not in admin_roles and not actor.is_superuser):
+        raise HTTPException(status_code=403, detail="Requiere permisos de administrador")
     try:
         from companies.models import Company, User
         from programs.models import (
@@ -3669,8 +3865,10 @@ def clear_all_data():
 # ============================================
 
 @router.get("/users", response_model=List[UserOut])
-def list_users():
+def list_users(authorization: Optional[str] = Header(None)):
     """Lista todos los usuarios del sistema con sus permisos"""
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from companies.models import User
     
     # Obtener todos los usuarios
@@ -3706,8 +3904,10 @@ def list_users():
 
 
 @router.post("/users", response_model=UserOut)
-def create_user(user_data: UserIn):
+def create_user(user_data: UserIn, authorization: Optional[str] = Header(None)):
     """Crea un nuevo usuario en el sistema"""
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from companies.models import User
     
     # Verificar si el usuario ya existe
@@ -3837,8 +4037,10 @@ def create_user(user_data: UserIn):
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
-def update_user(user_id: str, user_data: UserUpdateIn):
+def update_user(user_id: str, user_data: UserUpdateIn, authorization: Optional[str] = Header(None)):
     """Actualiza un usuario existente"""
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from companies.models import User
     
     try:
@@ -3967,8 +4169,10 @@ def update_user(user_id: str, user_data: UserUpdateIn):
 
 
 @router.delete("/users/{user_id}")
-def delete_user(user_id: str):
+def delete_user(user_id: str, authorization: Optional[str] = Header(None)):
     """Elimina un usuario del sistema"""
+    from companies.auth_deps import require_admin
+    require_admin(authorization)
     from companies.models import User
     
     try:

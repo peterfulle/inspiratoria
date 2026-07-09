@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
 
 interface Breakdown {
   weight: number;
@@ -125,7 +126,7 @@ export default function IntelligentMatchPage() {
   // Load programs (best effort)
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-    fetch(`${API}/api/programs`, {
+    apiFetch(`${API}/api/programs`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((r) => (r.ok ? r.json() : []))
@@ -143,7 +144,7 @@ export default function IntelligentMatchPage() {
     setStepIndex(0);
 
     // Kick off the real request in parallel with the animated progress
-    const fetchPromise = fetch(`${API}/api/matches/intelligent`, {
+    const fetchPromise = apiFetch(`${API}/api/matches/intelligent`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -202,7 +203,7 @@ export default function IntelligentMatchPage() {
     setActivations((prev) => ({ ...prev, [key]: { status: "loading" } }));
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-      const res = await fetch(`${API}/api/matches/intelligent/activate`, {
+      const res = await apiFetch(`${API}/api/matches/intelligent/activate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -249,7 +250,7 @@ export default function IntelligentMatchPage() {
       return;
     }
     const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-    fetch(`${API}/api/programs/${programId}/participants?limit=500`, {
+    apiFetch(`${API}/api/programs/${programId}/participants?limit=500`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((r) => (r.ok ? r.json() : []))
@@ -289,7 +290,7 @@ export default function IntelligentMatchPage() {
     setManualState({ status: "loading" });
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-      const res = await fetch(`${API}/api/matches/intelligent/activate`, {
+      const res = await apiFetch(`${API}/api/matches/intelligent/activate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

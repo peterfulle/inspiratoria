@@ -16,6 +16,7 @@ import {
   PROGRAM_CATEGORIES, computeDurationFromDates,
   getTemplateSteps, getTemplateCompleteness, TemplateStepStatus
 } from "./data";
+import { apiFetch } from "@/lib/api";
 
 // ═══════════════════════════════════════════════════════════════════
 // CATEGORY PICKER — grilla scrolleable de 24 categorías temáticas
@@ -362,7 +363,7 @@ export default function ProgramsPage() {
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/program-templates`);
+        const res = await apiFetch(`${API_URL}/api/program-templates`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
@@ -428,7 +429,7 @@ export default function ProgramsPage() {
     payload.slug = generateSlug(name);
     setCreating(true);
     try {
-      const res = await fetch(`${API_URL}/api/program-templates`, {
+      const res = await apiFetch(`${API_URL}/api/program-templates`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -457,7 +458,7 @@ export default function ProgramsPage() {
     const selId = selectedTemplate.id;
     setSaveStatus('saving');
     try {
-      const res = await fetch(`${API_URL}/api/program-templates/${selId}`, {
+      const res = await apiFetch(`${API_URL}/api/program-templates/${selId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -483,7 +484,7 @@ export default function ProgramsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await fetch(`${API_URL}/api/program-templates/${id}`, { method: "DELETE" });
+      await apiFetch(`${API_URL}/api/program-templates/${id}`, { method: "DELETE" });
       setTemplates(prev => prev.filter(t => t.id !== id));
     } catch { /* ignore */ }
     setShowDeleteConfirm(null);
@@ -491,7 +492,7 @@ export default function ProgramsPage() {
 
   const handleDuplicate = async (template: ProgramTemplate) => {
     try {
-      const res = await fetch(`${API_URL}/api/program-templates/${template.id}/duplicate`, {
+      const res = await apiFetch(`${API_URL}/api/program-templates/${template.id}/duplicate`, {
         method: "POST",
       });
       if (res.ok) {
@@ -1968,38 +1969,51 @@ export default function ProgramsPage() {
                           S{milestone.week}
                         </div>
                         <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                          <input
-                            type="text"
-                            value={milestone.name}
-                            onChange={(e) => updateMilestone(milestone.id, { name: e.target.value })}
-                            className="input-field text-sm sm:col-span-2 lg:col-span-2"
-                            placeholder="Nombre del hito"
-                          />
-                          <input
-                            type="number"
-                            value={milestone.week}
-                            onChange={(e) => updateMilestone(milestone.id, { week: Number(e.target.value) })}
-                            className="input-field text-sm"
-                            placeholder="Semana"
-                            min="1"
-                          />
-                          <input
-                            type="text"
-                            value={milestone.deliverable}
-                            onChange={(e) => updateMilestone(milestone.id, { deliverable: e.target.value })}
-                            className="input-field text-sm"
-                            placeholder="Entregable"
-                          />
-                          <input
-                            type="text"
-                            value={milestone.description}
-                            onChange={(e) => updateMilestone(milestone.id, { description: e.target.value })}
-                            className="input-field text-sm sm:col-span-2 lg:col-span-3"
-                            placeholder="Descripción"
-                          />
+                          <div className="sm:col-span-2 lg:col-span-2">
+                            <label className="block text-[11px] font-medium text-neutral-500 mb-1">Nombre del hito</label>
+                            <input
+                              type="text"
+                              value={milestone.name}
+                              onChange={(e) => updateMilestone(milestone.id, { name: e.target.value })}
+                              className="input-field text-sm w-full"
+                              placeholder="Ej: Cierre del módulo 1"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-neutral-500 mb-1">Semana</label>
+                            <input
+                              type="number"
+                              value={milestone.week}
+                              onChange={(e) => updateMilestone(milestone.id, { week: Number(e.target.value) })}
+                              className="input-field text-sm w-full"
+                              placeholder="1"
+                              min="1"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-neutral-500 mb-1">Entregable</label>
+                            <input
+                              type="text"
+                              value={milestone.deliverable}
+                              onChange={(e) => updateMilestone(milestone.id, { deliverable: e.target.value })}
+                              className="input-field text-sm w-full"
+                              placeholder="Ej: Informe de avance"
+                            />
+                          </div>
+                          <div className="sm:col-span-2 lg:col-span-3">
+                            <label className="block text-[11px] font-medium text-neutral-500 mb-1">Descripción</label>
+                            <input
+                              type="text"
+                              value={milestone.description}
+                              onChange={(e) => updateMilestone(milestone.id, { description: e.target.value })}
+                              className="input-field text-sm w-full"
+                              placeholder="Descripción breve del hito"
+                            />
+                          </div>
                           <button
                             onClick={() => deleteMilestone(milestone.id)}
-                            className="btn-ghost text-red-500 hover:bg-red-50 self-center"
+                            className="btn-ghost text-red-500 hover:bg-red-50 self-end"
+                            title="Eliminar hito"
                           >
                             <Icon.Trash className="w-4 h-4" />
                           </button>

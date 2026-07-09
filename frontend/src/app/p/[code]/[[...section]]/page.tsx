@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
+import { apiFetch } from "@/lib/api";
 
 // ============================================================================
 // CONSTANTS
@@ -928,14 +929,14 @@ export default function ParticipantPortalPage() {
     if (!token) { router.replace('/login/admin'); return; }
 
     // Validate the portal code
-    fetch(`${API_URL}/api/companies/portal/${portalCode}`)
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}`)
       .then(r => { if (!r.ok) throw new Error('not_found'); return r.json(); })
       .then(data => {
         setPortalUser(data.user);
         // Fetch programs
         if (data.user?.id) {
           setLoadingPrograms(true);
-          fetch(`${API_URL}/api/programs/my-programs/${data.user.id}`)
+          apiFetch(`${API_URL}/api/programs/my-programs/${data.user.id}`, { headers: { Authorization: `Bearer ${token}` } })
             .then(r => r.ok ? r.json() : [])
             .then(programs => {
               const arr = Array.isArray(programs) ? programs : [];
@@ -956,11 +957,12 @@ export default function ParticipantPortalPage() {
     const programId = selectedProgram.id;
     if (opts.silent) setRefreshing(true); else setLoadingDetail(true);
     try {
+      const authHeaders = { Authorization: `Bearer ${localStorage.getItem('auth_token')}` };
       const [detail, templates, participants, myProgs] = await Promise.all([
-        fetch(`${API_URL}/api/programs/${programId}`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_URL}/api/program-templates`).then(r => r.ok ? r.json() : []).catch(() => []),
-        fetch(`${API_URL}/api/programs/${programId}/participants`).then(r => r.ok ? r.json() : []).catch(() => []),
-        portalUser?.id ? fetch(`${API_URL}/api/programs/my-programs/${portalUser.id}`).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
+        apiFetch(`${API_URL}/api/programs/${programId}`, { headers: authHeaders }).then(r => r.ok ? r.json() : null).catch(() => null),
+        apiFetch(`${API_URL}/api/program-templates`).then(r => r.ok ? r.json() : []).catch(() => []),
+        apiFetch(`${API_URL}/api/programs/${programId}/participants`, { headers: authHeaders }).then(r => r.ok ? r.json() : []).catch(() => []),
+        portalUser?.id ? apiFetch(`${API_URL}/api/programs/my-programs/${portalUser.id}`, { headers: authHeaders }).then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null),
       ]);
       if (detail) setProgramDetail(detail);
       const allTemplates = Array.isArray(templates) ? templates : [];
@@ -1022,7 +1024,7 @@ export default function ParticipantPortalPage() {
   useEffect(() => {
     if (activeNav !== 'my-badges' || !portalCode) return;
     setBadgesLoading(true);
-    fetch(`${API_URL}/api/companies/portal/${portalCode}/badges`)
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/badges`)
       .then(r => { if (!r.ok) throw new Error('badges_error'); return r.json(); })
       .then(data => setBadgesData(data))
       .catch(() => setBadgesData(null))
@@ -1034,7 +1036,7 @@ export default function ParticipantPortalPage() {
     if ((activeNav !== 'my-mentees' && activeNav !== 'my-sessions') || !portalCode || isMentee) return;
     if (myMentees.length > 0 && activeNav === 'my-sessions') return; // already loaded
     setMenteesLoading(true);
-    fetch(`${API_URL}/api/companies/portal/${portalCode}/mentees`)
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/mentees`)
       .then(r => r.ok ? r.json() : { mentees: [] })
       .then(data => setMyMentees(data.mentees || []))
       .catch(() => setMyMentees([]))
@@ -1047,7 +1049,7 @@ export default function ParticipantPortalPage() {
     if (activeNav !== 'my-mentor' && activeNav !== 'my-sessions' && activeNav !== 'dashboard') return;
     if (myMentor) return; // already loaded
     setMentorLoading(true);
-    fetch(`${API_URL}/api/companies/portal/${portalCode}/my-mentor`)
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/my-mentor`)
       .then(r => r.ok ? r.json() : { mentor: null })
       .then(data => setMyMentor(data.mentor))
       .catch(() => setMyMentor(null))
@@ -1061,7 +1063,7 @@ export default function ParticipantPortalPage() {
     if (!needsSessions) return;
     if (mySessions.length > 0 && activeNav !== 'my-sessions') return; // already loaded from sessions tab
     setSessionsLoading(true);
-    fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`)
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`)
       .then(r => r.ok ? r.json() : { sessions: [] })
       .then(data => setMySessions(data.sessions || []))
       .catch(() => setMySessions([]))
@@ -1072,7 +1074,7 @@ export default function ParticipantPortalPage() {
   useEffect(() => {
     if (activeNav !== 'my-portal-activities' || !portalCode) return;
     setActivitiesLoading(true);
-    fetch(`${API_URL}/api/companies/portal/${portalCode}/activities`)
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/activities`)
       .then(r => r.ok ? r.json() : { activities: [] })
       .then(data => setPortalActivities(data.activities || []))
       .catch(() => setPortalActivities([]))
@@ -1083,7 +1085,7 @@ export default function ParticipantPortalPage() {
   useEffect(() => {
     if (activeNav !== 'my-network' || !portalCode) return;
     setNetworkLoading(true);
-    fetch(`${API_URL}/api/companies/portal/${portalCode}/network`)
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/network`)
       .then(r => r.ok ? r.json() : { network: [] })
       .then(data => setNetworkPeople(data.network || []))
       .catch(() => setNetworkPeople([]))
@@ -1097,7 +1099,7 @@ export default function ParticipantPortalPage() {
       if (chatPollRef.current) { clearInterval(chatPollRef.current); chatPollRef.current = null; }
       return;
     }
-    fetch(`${API_URL}/api/companies/portal/${portalCode}/chat/programs`)
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/chat/programs`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) {
@@ -1118,7 +1120,7 @@ export default function ParticipantPortalPage() {
     setChatLoading(true);
     setChatMessages([]);
     // Fetch messages
-    fetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/messages`)
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/messages`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) setChatMessages(data.messages || []);
@@ -1133,7 +1135,7 @@ export default function ParticipantPortalPage() {
   // ── Chat: fetch participants when program changes ──
   useEffect(() => {
     if (!chatActiveProgram || activeNav !== 'my-chat') return;
-    fetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/participants`)
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/participants`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setChatParticipants(data.participants || []); })
       .catch(() => {});
@@ -1145,7 +1147,7 @@ export default function ParticipantPortalPage() {
     const poll = () => {
       const lastMsg = chatMessages[chatMessages.length - 1];
       const after = lastMsg?.created_at || '';
-      fetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/poll${after ? `?after=${after}` : ''}`)
+      apiFetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/poll${after ? `?after=${after}` : ''}`)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (data) {
@@ -1173,7 +1175,7 @@ export default function ParticipantPortalPage() {
     if ((!chatInput.trim() && chatAttachments.length === 0) || chatSending || !chatActiveProgram) return;
     setChatSending(true);
     try {
-      const res = await fetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/messages`, {
+      const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: chatInput.trim(), attachments: chatAttachments }),
@@ -1194,7 +1196,7 @@ export default function ParticipantPortalPage() {
     const now = Date.now();
     if (chatTypingRef.current && now - chatTypingRef.current < 2000) return;
     chatTypingRef.current = now;
-    fetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/typing`, { method: 'POST' }).catch(() => {});
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/typing`, { method: 'POST' }).catch(() => {});
   }, [chatActiveProgram, portalCode]);
 
   const handleChatFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1205,7 +1207,7 @@ export default function ParticipantPortalPage() {
       const fd = new FormData();
       fd.append('file', files[i]);
       try {
-        const res = await fetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/upload`, { method: 'POST', body: fd });
+        const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/upload`, { method: 'POST', body: fd });
         if (res.ok) {
           const att = await res.json();
           setChatAttachments(prev => [...prev, att]);
@@ -2629,7 +2631,7 @@ export default function ParticipantPortalPage() {
           bodyData.mentor_profile_step = stepOverride;
         }
       }
-      const res = await fetch(`${API_URL}/api/companies/auth/profile`, {
+      const res = await apiFetch(`${API_URL}/api/companies/auth/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(bodyData),
@@ -2668,7 +2670,7 @@ export default function ParticipantPortalPage() {
     try {
       const fd = new FormData();
       fd.append('avatar', file);
-      const res = await fetch(`${API_URL}/api/companies/auth/avatar`, {
+      const res = await apiFetch(`${API_URL}/api/companies/auth/avatar`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
@@ -2689,7 +2691,7 @@ export default function ParticipantPortalPage() {
     if (!token) return;
     setAvatarUploading(true);
     try {
-      await fetch(`${API_URL}/api/companies/auth/avatar`, {
+      await apiFetch(`${API_URL}/api/companies/auth/avatar`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -3514,14 +3516,14 @@ export default function ParticipantPortalPage() {
     if (!sessionForm.mentee_id) { setSessionFormError('Debes seleccionar un mentee'); return; }
     setSessionCreating(true);
     try {
-      const r = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`, {
+      const r = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sessionForm),
       });
       if (r.ok) {
         setShowSessionForm(false);
         setSessionForm({ mentee_id: '', program_id: '', title: '', description: '', scheduled_at: '', duration_minutes: 60, meeting_url: '' });
-        const res = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
+        const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
         if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
       } else {
         const err = await r.text();
@@ -3535,13 +3537,13 @@ export default function ParticipantPortalPage() {
 
   const handleSaveNotes = async (sessionId: string) => {
     try {
-      await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/notes`, {
+      await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/notes`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sessionNotesForm),
       });
       setShowNotesModal(null);
       // Refresh
-      const res = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
+      const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
       if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
     } catch {}
   };
@@ -3550,7 +3552,7 @@ export default function ParticipantPortalPage() {
     setAiLoading(true);
     setAiSuggestion('');
     try {
-      const r = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/ai-suggest`, { method: 'POST' });
+      const r = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/ai-suggest`, { method: 'POST' });
       if (r.ok) { const d = await r.json(); setAiSuggestion(d.suggestion || ''); }
     } catch {}
     setAiLoading(false);
@@ -3558,15 +3560,15 @@ export default function ParticipantPortalPage() {
 
   const handleCompleteSession = async (sessionId: string) => {
     try {
-      await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/status?status_val=completed`, { method: 'PATCH' });
-      const res = await fetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
+      await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/status?status_val=completed`, { method: 'PATCH' });
+      const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
       if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
     } catch {}
   };
 
   const handleCompleteActivity = async (actId: number) => {
     try {
-      await fetch(`${API_URL}/api/companies/portal/${portalCode}/activities/${actId}/complete`, { method: 'POST' });
+      await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/activities/${actId}/complete`, { method: 'POST' });
       setPortalActivities(prev => prev.map(a => a.id === actId ? { ...a, completed_by_me: true } : a));
     } catch {}
   };
@@ -3771,7 +3773,7 @@ export default function ParticipantPortalPage() {
             <h1 className="dash-title">Mis Actividades</h1>
             <p className="dash-subtitle">{total} actividades en tus programas · {done} completadas · {scheduled} agendadas</p>
           </div>
-          <button onClick={() => { setActivitiesLoading(true); fetch(`${API_URL}/api/companies/portal/${portalCode}/activities`).then(r => r.ok ? r.json() : { activities: [] }).then(d => setPortalActivities(d.activities || [])).finally(() => setActivitiesLoading(false)); }}
+          <button onClick={() => { setActivitiesLoading(true); apiFetch(`${API_URL}/api/companies/portal/${portalCode}/activities`).then(r => r.ok ? r.json() : { activities: [] }).then(d => setPortalActivities(d.activities || [])).finally(() => setActivitiesLoading(false)); }}
             style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontSize: '0.72rem', fontWeight: 600, color: '#0e7490', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0e7490" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             Actualizar

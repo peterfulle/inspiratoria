@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api';
 
 // ============================================================================
 // TYPES
@@ -109,7 +110,7 @@ export default function InternalAccountsPage() {
 
   const loadCompanies = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/companies?account_type=internal`, {
+      const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/companies?account_type=internal`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -142,7 +143,7 @@ export default function InternalAccountsPage() {
     
     setCreating(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/companies/`, {
+      const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/companies/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

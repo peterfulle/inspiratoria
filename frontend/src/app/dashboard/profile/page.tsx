@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { configStyles } from '../configuration/components/styles';
+import { apiFetch } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
@@ -123,7 +124,7 @@ export default function ProfilePage() {
   const fetchProfile = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/companies/auth/profile`, {
+      const res = await apiFetch(`${API}/api/companies/auth/profile`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.ok) {
@@ -148,7 +149,7 @@ export default function ProfilePage() {
     setSaveMsg('');
     setSaveError('');
     try {
-      const res = await fetch(`${API}/api/companies/auth/profile`, {
+      const res = await apiFetch(`${API}/api/companies/auth/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ full_name: fullName, phone, position, department }),
@@ -199,7 +200,7 @@ export default function ProfilePage() {
     try {
       const formData = new FormData();
       formData.append('avatar', avatarFile);
-      const res = await fetch(`${API}/api/companies/auth/avatar`, {
+      const res = await apiFetch(`${API}/api/companies/auth/avatar`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}` },
         body: formData,
@@ -229,7 +230,7 @@ export default function ProfilePage() {
   const handleRemoveAvatar = async () => {
     setSaveError('');
     try {
-      const res = await fetch(`${API}/api/companies/auth/avatar`, {
+      const res = await apiFetch(`${API}/api/companies/auth/avatar`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${getToken()}` },
       });
@@ -255,7 +256,7 @@ export default function ProfilePage() {
     setTotpSuccess('');
     setShowSetup(true);
     try {
-      const res = await fetch(`${API}/api/companies/auth/totp/setup`, {
+      const res = await apiFetch(`${API}/api/companies/auth/totp/setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
       });
@@ -278,7 +279,7 @@ export default function ProfilePage() {
     if (verifyCode.length !== 6) { setTotpError('Ingresa el código de 6 dígitos'); return; }
     setTotpError('');
     try {
-      const res = await fetch(`${API}/api/companies/auth/totp/enable`, {
+      const res = await apiFetch(`${API}/api/companies/auth/totp/enable`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ code: verifyCode }),
@@ -302,7 +303,7 @@ export default function ProfilePage() {
     if (disableCode.length !== 6) { setTotpError('Ingresa el código de 6 dígitos para desactivar'); return; }
     setTotpError('');
     try {
-      const res = await fetch(`${API}/api/companies/auth/totp/disable`, {
+      const res = await apiFetch(`${API}/api/companies/auth/totp/disable`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ code: disableCode }),

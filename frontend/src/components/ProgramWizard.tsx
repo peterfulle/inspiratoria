@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Sparkles, ChevronRight, ChevronLeft, Check, Loader2, Target, Users, Calendar, Settings, Zap } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 type ProgramWizardProps = {
   isOpen: boolean;
@@ -135,7 +136,7 @@ export default function ProgramWizard({ isOpen, onClose, onSubmit, darkMode }: P
 
     setAiLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/ai/generate-program`, {
+      const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/ai/generate-program`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -556,7 +557,7 @@ Capacidad máxima: ${formData.max_participants} participantes`
                     
                     setAiLoading(true);
                     try {
-                      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/ai/generate-objectives`, {
+                      const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/ai/generate-objectives`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -797,7 +798,7 @@ Capacidad máxima: ${formData.max_participants} participantes`
                     
                     setAiLoading(true);
                     try {
-                      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/ai/generate-methodology`, {
+                      const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/ai/generate-methodology`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({

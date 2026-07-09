@@ -270,15 +270,24 @@ async def invite_participant(
     El admin usa este endpoint para invitar mentores/mentees.
     """
     
+    # NOTA: este endpoint está roto independientemente de la autenticación —
+    # get_program_by_id/get_company_by_id/get_user_by_id hacen `.objects.get(id=<int>)`
+    # contra modelos cuyo PK real es UUID (companies.Company, companies.User) o
+    # contra un `Program`/`Participant` legacy con esquema propio, incompatible
+    # con el `Program` (UUID) que usa el resto de la app. `company_id = 1` /
+    # `invited_by_id = 1` nunca matchean un UUID real → esto tira excepción en
+    # cualquier llamada real. No lo reescribí a fondo (es un arreglo de
+    # feature, no de seguridad) pero tampoco tiene sentido "asegurar" código
+    # que no ejecuta — dejar documentado para una reparación aparte.
     try:
         # Validar que el programa existe
         program = await get_program_by_id(request.program_id)
-        
+
         # TODO: Validar que el usuario actual tiene permisos
         # TODO: Obtener company_id del usuario actual
         company_id = 1  # Hardcoded por ahora (SQM)
         invited_by_id = 1  # Hardcoded por ahora
-        
+
         company = await get_company_by_id(company_id)
         invited_by = await get_user_by_id(invited_by_id)
         

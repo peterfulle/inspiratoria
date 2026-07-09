@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { apiFetch } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
@@ -39,7 +40,7 @@ export default function ActivatePage() {
     if (!token) return;
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/api/companies/auth/activate/validate-token`, {
+        const res = await apiFetch(`${API_URL}/api/companies/auth/activate/validate-token`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
@@ -106,7 +107,7 @@ export default function ActivatePage() {
     setError("");
 
     try {
-      const res = await fetch(`${API_URL}/api/companies/auth/activate/verify-otp`, {
+      const res = await apiFetch(`${API_URL}/api/companies/auth/activate/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, otp: code }),
@@ -137,7 +138,7 @@ export default function ActivatePage() {
     setTotpError("");
 
     try {
-      const res = await fetch(`${API_URL}/api/companies/auth/activate/confirm-totp`, {
+      const res = await apiFetch(`${API_URL}/api/companies/auth/activate/confirm-totp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, code: totpCode }),

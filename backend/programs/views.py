@@ -416,16 +416,9 @@ class AuditLogResponse(BaseModel):
 # ============ HELPER FUNCTIONS ============
 
 def _actor(authorization):
-    """Resuelve el actor del token 'Bearer {user_id}:{...}'. Best-effort."""
-    if not authorization:
-        return None
-    import uuid as _u
-    tok = authorization.replace("Bearer ", "").strip()
-    uid = tok.split(":", 1)[0] if ":" in tok else tok
-    try:
-        return User.objects.get(id=_u.UUID(uid))
-    except Exception:
-        return None
+    """Resuelve el actor validando la sesión real (AuthToken), no el UUID crudo."""
+    from companies.services import AuthService
+    return AuthService.verify_session_token(authorization)
 
 
 def _audit_sync(program, actor, action, entity, entity_id=None, details=None):
@@ -474,11 +467,15 @@ def validate_email_format(email: str) -> bool:
 # ============ PARTICIPANT PORTAL (My Programs) ============
 
 @router.get("/my-programs/{user_id}")
-async def get_my_programs(user_id: str):
+async def get_my_programs(user_id: str, authorization: Optional[str] = Header(None)):
     """
     Obtener los programas en los que participa un usuario (vista participante).
     Retorna programas con módulos, actividades, progreso, etc.
     """
+    from companies.auth_deps import get_current_user, require_self_or_admin
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_self_or_admin)(actor, user_id)
+
     def fetch():
         try:
             user = User.objects.get(id=user_id)
@@ -563,11 +560,16 @@ async def list_participants(
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500)
+    limit: int = Query(100, ge=1, le=500),
+    authorization: Optional[str] = Header(None),
 ):
     """
     Listar participantes de un programa con filtros
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def get_participants():
         # Verificar que el programa existe
         try:
@@ -634,10 +636,14 @@ async def list_participants(
 
 
 @router.get("/{program_id}/participants/stats")
-async def get_participants_stats(program_id: str):
+async def get_participants_stats(program_id: str, authorization: Optional[str] = Header(None)):
     """
     Obtener estadísticas del dashboard de participantes
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def get_stats():
         from django.db.models import Count, Q
         from datetime import timedelta
@@ -721,6 +727,10 @@ async def create_participant(program_id: str, payload: ParticipantCreateRequest,
     """
     Agregar un participante al programa
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def add_participant():
         # Verificar programa
         try:
@@ -834,10 +844,14 @@ async def create_participant(program_id: str, payload: ParticipantCreateRequest,
 
 
 @router.put("/{program_id}/participants/{participant_id}", response_model=ParticipantResponse)
-async def update_participant(program_id: str, participant_id: str, payload: ParticipantUpdateRequest):
+async def update_participant(program_id: str, participant_id: str, payload: ParticipantUpdateRequest, authorization: Optional[str] = Header(None)):
     """
     Actualizar datos de un participante
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def update():
         try:
             program = Program.objects.get(id=program_id)
@@ -901,6 +915,10 @@ async def delete_participant(program_id: str, participant_id: str, authorization
     """
     Eliminar participante (soft delete)
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor_checked = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor_checked, program_id)
+
     def delete():
         try:
             program = Program.objects.get(id=program_id)
@@ -934,15 +952,23 @@ async def delete_participant(program_id: str, participant_id: str, authorization
 async def search_users(
     q: str = Query(..., min_length=2),
     exclude_program_id: Optional[str] = Query(None),
-    limit: int = Query(20, ge=1, le=100)
+    limit: int = Query(20, ge=1, le=100),
+    authorization: Optional[str] = Header(None),
 ):
     """
     Buscar usuarios por email, nombre o apellido
     Excluye usuarios que ya están en el programa especificado
     """
+    from companies.auth_deps import get_current_user, is_admin
+    actor = await sync_to_async(get_current_user)(authorization)
+
     def search():
         queryset = User.objects.filter(is_active=True).select_related('company')
-        
+
+        # Usuarios no-admin solo pueden buscar dentro de su propia empresa
+        if not is_admin(actor):
+            queryset = queryset.filter(company_id=actor.company_id)
+
         # Buscar por email, nombre o apellido
         queryset = queryset.filter(
             email__icontains=q
@@ -951,7 +977,7 @@ async def search_users(
         ) | queryset.filter(
             last_name__icontains=q
         )
-        
+
         # Excluir participantes del programa
         if exclude_program_id:
             existing_user_ids = ProgramParticipant.objects.filter(
@@ -978,10 +1004,15 @@ async def search_users(
 
 
 @router.post("/users", response_model=UserSearchResult, status_code=status.HTTP_201_CREATED)
-async def create_user_for_program(request: CreateUserRequest):
+async def create_user_for_program(request: CreateUserRequest, authorization: Optional[str] = Header(None)):
     """
     Crear un nuevo usuario (para flujo de carga individual)
     """
+    from companies.auth_deps import get_current_user, is_admin
+    actor = await sync_to_async(get_current_user)(authorization)
+    if not is_admin(actor) and str(request.company_id or "") != str(actor.company_id or ""):
+        raise HTTPException(status_code=403, detail="No podés crear usuarios para otra empresa")
+
     def create():
         from companies.models import Company
         
@@ -1044,10 +1075,12 @@ async def create_user_for_program(request: CreateUserRequest):
 # ============ BATCH OPERATIONS ============
 
 @router.get("/{program_id}/participants/template")
-async def download_template(program_id: str):
+async def download_template(program_id: str, authorization: Optional[str] = Header(None)):
     """
     Descargar plantilla Excel para carga masiva
     """
+    from companies.auth_deps import get_current_user
+    await sync_to_async(get_current_user)(authorization)
     # Verificar que el programa existe
     def check_program():
         try:
@@ -1088,10 +1121,14 @@ async def download_template(program_id: str):
 
 
 @router.post("/{program_id}/participants/validate-batch", response_model=BatchValidationResult)
-async def validate_batch(program_id: str, file: UploadFile = File(...)):
+async def validate_batch(program_id: str, file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
     """
     Validar archivo Excel antes de importar
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def validate():
         # Verificar programa
         try:
@@ -1215,10 +1252,14 @@ async def validate_batch(program_id: str, file: UploadFile = File(...)):
 
 
 @router.post("/{program_id}/participants/batch", status_code=status.HTTP_201_CREATED)
-async def import_batch(program_id: str, payload: BatchImportRequest):
+async def import_batch(program_id: str, payload: BatchImportRequest, authorization: Optional[str] = Header(None)):
     """
     Importar participantes en lote (después de validación)
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def import_participants():
         # Verificar programa
         try:
@@ -1294,10 +1335,14 @@ async def import_batch(program_id: str, payload: BatchImportRequest):
 # ============ VINCULATIONS ENDPOINTS ============
 
 @router.get("/{program_id}/vinculations")
-async def list_vinculations(program_id: str):
+async def list_vinculations(program_id: str, authorization: Optional[str] = Header(None)):
     """
     Listar todas las vinculaciones del programa
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def _serialize_participant(pp):
         u = pp.user
         full = f"{u.first_name or ''} {u.last_name or ''}".strip() or u.email
@@ -1366,6 +1411,10 @@ async def create_vinculation(program_id: str, payload: VinculationCreateRequest,
     """
     Crear una vinculación entre dos participantes
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def create():
         try:
             program = Program.objects.get(id=program_id)
@@ -1463,6 +1512,10 @@ async def delete_vinculation(program_id: str, vinculation_id: str, authorization
     """
     Eliminar una vinculación
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor_checked = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor_checked, program_id)
+
     def delete():
         try:
             program = Program.objects.get(id=program_id)
@@ -1501,11 +1554,16 @@ async def get_audit_logs(
     action: Optional[str] = Query(None),
     entity_type: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500)
+    limit: int = Query(100, ge=1, le=500),
+    authorization: Optional[str] = Header(None),
 ):
     """
     Obtener logs de auditoría del programa
     """
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def get_logs():
         from django.db import close_old_connections
         close_old_connections()
@@ -1544,11 +1602,14 @@ async def get_audit_logs(
 # ============ CROSS-PROGRAM USER MANAGEMENT ============
 
 @router.get("/users-with-programs")
-async def get_users_with_programs():
+async def get_users_with_programs(authorization: Optional[str] = Header(None)):
     """
     Get all users with their program participation summary.
     Used for cross-program user management interface.
     """
+    from companies.auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
+
     def get_users():
         from django.db.models import Q, Count, Prefetch
         from companies.models import User, Company
@@ -1770,8 +1831,12 @@ async def self_enroll_in_program(program_id: str, payload: SelfEnrollRequest):
 
 
 @router.post("/{program_id}/participants/{participant_id}/resend-invitation")
-async def resend_participant_invitation(program_id: str, participant_id: str):
+async def resend_participant_invitation(program_id: str, participant_id: str, authorization: Optional[str] = Header(None)):
     """Reenvía el email de invitación con un nuevo OTP a un participante existente."""
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def resend():
         try:
             participant = ProgramParticipant.objects.select_related('user').get(
@@ -1899,8 +1964,12 @@ def _pair_payload(program, mentor_id, mentee_id):
 
 
 @router.get("/{program_id}/pair-progress")
-async def pair_progress(program_id: str, mentor_id: str = Query(...), mentee_id: str = Query(...)):
+async def pair_progress(program_id: str, mentor_id: str = Query(...), mentee_id: str = Query(...), authorization: Optional[str] = Header(None)):
     """Progreso de una dupla: bitácora de sesiones + métricas derivadas."""
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def build():
         from django.db import close_old_connections; close_old_connections()
         try:
@@ -1912,7 +1981,11 @@ async def pair_progress(program_id: str, mentor_id: str = Query(...), mentee_id:
 
 
 @router.post("/{program_id}/sessions", status_code=status.HTTP_201_CREATED)
-async def create_session(program_id: str, payload: SessionCreateIn):
+async def create_session(program_id: str, payload: SessionCreateIn, authorization: Optional[str] = Header(None)):
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def create():
         from django.db import close_old_connections; close_old_connections()
         from .models import MentoringSession
@@ -1939,7 +2012,11 @@ async def create_session(program_id: str, payload: SessionCreateIn):
 
 
 @router.patch("/{program_id}/sessions/{session_id}")
-async def update_session(program_id: str, session_id: str, payload: SessionUpdateIn):
+async def update_session(program_id: str, session_id: str, payload: SessionUpdateIn, authorization: Optional[str] = Header(None)):
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def update():
         from django.db import close_old_connections; close_old_connections()
         from .models import MentoringSession
@@ -1955,7 +2032,11 @@ async def update_session(program_id: str, session_id: str, payload: SessionUpdat
 
 
 @router.delete("/{program_id}/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_session(program_id: str, session_id: str):
+async def delete_session(program_id: str, session_id: str, authorization: Optional[str] = Header(None)):
+    from companies.auth_deps import get_current_user, require_program_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
     def remove():
         from django.db import close_old_connections; close_old_connections()
         from .models import MentoringSession
@@ -1966,8 +2047,12 @@ async def delete_session(program_id: str, session_id: str):
 
 
 @router.get("/my-progress/{user_id}")
-async def my_progress(user_id: str):
+async def my_progress(user_id: str, authorization: Optional[str] = Header(None)):
     """Duplas del usuario (como mentor o mentee) con su progreso real."""
+    from companies.auth_deps import get_current_user, require_self_or_admin
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_self_or_admin)(actor, user_id)
+
     def build():
         from django.db import close_old_connections; close_old_connections()
         vincs = Vinculation.objects.select_related(

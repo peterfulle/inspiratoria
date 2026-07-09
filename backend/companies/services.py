@@ -392,9 +392,61 @@ class AuthService:
             return None, 'server_error'
     
     @staticmethod
-    def generate_session_token(user: User) -> str:
+    def generate_session_token(user: User, hours: Optional[int] = 24 * 30) -> str:
         """
-        Generar token de sesión (simplificado para demo)
-        En producción usar JWT o similar
+        Genera un token de sesión real: crea un AuthToken en la base de datos
+        (guardando solo el hash SHA-256, nunca el valor crudo) y devuelve el
+        token en claro — es la única vez que existe sin hashear.
         """
-        return f"{user.id}:{secrets.token_urlsafe(32)}"
+        import hashlib
+        from .models import AuthToken
+
+        raw_token = f"{user.id}:{secrets.token_urlsafe(32)}"
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        AuthToken.objects.create(
+            user=user,
+            token_hash=token_hash,
+            expires_at=(timezone.now() + timedelta(hours=hours)) if hours else None,
+        )
+        return raw_token
+
+    @staticmethod
+    def verify_session_token(authorization: Optional[str]) -> Optional[User]:
+        """
+        Valida un token contra las sesiones reales emitidas por
+        generate_session_token. Devuelve el User si es válido, no expiró y
+        no fue revocado; None en cualquier otro caso (nunca lanza).
+        """
+        import hashlib
+        from .models import AuthToken
+
+        if not authorization:
+            return None
+        raw_token = authorization.replace("Bearer ", "").strip()
+        if not raw_token:
+            return None
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        try:
+            at = AuthToken.objects.select_related("user", "user__company").get(token_hash=token_hash)
+        except AuthToken.DoesNotExist:
+            return None
+        if at.revoked_at is not None:
+            return None
+        if at.expires_at is not None and at.expires_at < timezone.now():
+            return None
+        at.last_used_at = timezone.now()
+        at.save(update_fields=["last_used_at"])
+        return at.user
+
+    @staticmethod
+    def revoke_session_token(authorization: Optional[str]) -> bool:
+        """Revoca (invalida) una sesión — usado en logout. Devuelve True si existía."""
+        import hashlib
+        from .models import AuthToken
+
+        if not authorization:
+            return False
+        raw_token = authorization.replace("Bearer ", "").strip()
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        updated = AuthToken.objects.filter(token_hash=token_hash, revoked_at__isnull=True).update(revoked_at=timezone.now())
+        return updated > 0

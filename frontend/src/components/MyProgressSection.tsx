@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
@@ -29,7 +30,7 @@ export default function MyProgressSection({ title = "Mi avance" }: { title?: str
     if (!uid) return;
     (async () => {
       try {
-        const r = await fetch(`${API}/api/programs/my-progress/${uid}`);
+        const r = await apiFetch(`${API}/api/programs/my-progress/${uid}`);
         if (r.ok) setItems(await r.json());
       } catch {
         /* noop */

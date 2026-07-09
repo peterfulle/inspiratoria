@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { apiFetch } from "@/lib/api";
 
 interface Company {
   id: string;
@@ -30,7 +31,7 @@ export default function ClientConfigPage() {
 
   const loadData = async () => {
     try {
-      const companyRes = await fetch(
+      const companyRes = await apiFetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${companyId}`
       );
       if (companyRes.ok) {
@@ -48,7 +49,7 @@ export default function ClientConfigPage() {
 
   const handleSaveColors = async () => {
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${companyId}`,
         {
           method: "PUT",
@@ -80,7 +81,7 @@ export default function ClientConfigPage() {
     }
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${companyId}`,
         {
           method: "DELETE",

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { apiFetch } from "@/lib/api";
 
 // Types
 interface RegistrationData {
@@ -352,7 +353,7 @@ export default function RegisterPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
-      const response = await fetch(`${apiUrl}/api/companies/auth/register-company`, {
+      const response = await apiFetch(`${apiUrl}/api/companies/auth/register-company`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -374,7 +375,7 @@ export default function RegisterPage() {
         // Send welcome email with credentials
         if (formData.account_type === "core") {
           try {
-            await fetch("/api/core-welcome", {
+            await apiFetch("/api/core-welcome", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -419,7 +420,7 @@ export default function RegisterPage() {
       // 1. Register in backend DB (creates Company record with type='studio')
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
       try {
-        await fetch(`${API_URL}/api/companies/auth/register-studio`, {
+        await apiFetch(`${API_URL}/api/companies/auth/register-studio`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(submitData),
@@ -429,7 +430,7 @@ export default function RegisterPage() {
       }
 
       // 2. Send notification emails via internal API
-      const response = await fetch("/api/studio-inquiry", {
+      const response = await apiFetch("/api/studio-inquiry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitData),

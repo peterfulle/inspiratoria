@@ -216,10 +216,13 @@ async def register_studio(payload: RegisterStudioRequest):
 
 
 @router.post("/auth/register-inspiratoria-admin", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
-async def register_inspiratoria_admin(payload: InspiratoriaAdminCreateRequest):
+async def register_inspiratoria_admin(payload: InspiratoriaAdminCreateRequest, authorization: Optional[str] = Header(None)):
     """
-    Registro de administrador de Inspiratoria (sin empresa asociada)
+    Registro de administrador de Inspiratoria (sin empresa asociada).
+    Requiere estar autenticado como admin — antes era público y cualquiera
+    podía autoregistrarse como superadmin de toda la plataforma.
     """
+    await _require_admin(authorization or "")
     try:
         user = await sync_to_async(OnboardingService.create_inspiratoria_admin)(
             username=payload.username,
@@ -291,19 +294,17 @@ async def login(payload: LoginRequest):
 # ============ USER INVITATION ENDPOINTS ============
 
 @router.post("/invitations", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
-async def invite_user(payload: InviteUserRequest, user_id: uuid.UUID):
+async def invite_user(payload: InviteUserRequest, authorization: Optional[str] = Header(None)):
     """
-    Invitar nuevo usuario a la empresa
-    Requiere: user_id del invitador en query param
+    Invitar nuevo usuario a la empresa. El invitador se resuelve de la sesión
+    autenticada — antes se aceptaba cualquier user_id por query param, lo que
+    permitía invitar gente en nombre de otra persona/empresa.
     """
-    try:
-        user = await sync_to_async(User.objects.select_related('company').get)(id=user_id)
-    except User.DoesNotExist:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no encontrado"
-        )
-    
+    from .auth_deps import get_current_user
+    user = await sync_to_async(get_current_user)(authorization)
+    if not user.company_id:
+        raise HTTPException(status_code=403, detail="Tu usuario no tiene una empresa asociada")
+
     try:
         invitation = await sync_to_async(OnboardingService.invite_user)(
             company=user.company,
@@ -320,10 +321,13 @@ async def invite_user(payload: InviteUserRequest, user_id: uuid.UUID):
 
 
 @router.get("/invitations/{company_id}", response_model=List[InvitationResponse])
-async def list_invitations(company_id: uuid.UUID):
+async def list_invitations(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Listar invitaciones de una empresa
     """
+    from .auth_deps import get_current_user, require_company_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_company_access)(actor, company_id)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
     except Company.DoesNotExist:
@@ -371,10 +375,12 @@ async def accept_invitation(payload: AcceptInvitationRequest):
 # ============ COMPANY MANAGEMENT ENDPOINTS ============
 
 @router.get("/stats")
-async def get_account_stats():
+async def get_account_stats(authorization: Optional[str] = Header(None)):
     """
     Estadísticas generales de cuentas para el dashboard
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         # Active accounts only (not pending)
         active_qs = Company.objects.exclude(status="pending")
@@ -400,10 +406,12 @@ async def get_account_stats():
 
 
 @router.get("/solicitudes", response_model=List[CompanyResponse])
-async def list_solicitudes():
+async def list_solicitudes(authorization: Optional[str] = Header(None)):
     """
     Listar solicitudes pendientes (status=pending)
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         companies = await sync_to_async(list)(
             Company.objects.filter(status="pending").order_by('-created_at')
@@ -417,10 +425,12 @@ async def list_solicitudes():
 
 
 @router.post("/solicitudes/{company_id}/approve", response_model=CompanyResponse)
-async def approve_solicitud(company_id: uuid.UUID):
+async def approve_solicitud(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Aprobar una solicitud: cambia status de 'pending' a 'active'
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
         if company.status != "pending":
@@ -453,10 +463,12 @@ async def approve_solicitud(company_id: uuid.UUID):
 
 
 @router.delete("/solicitudes/{company_id}")
-async def delete_solicitud(company_id: uuid.UUID):
+async def delete_solicitud(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Eliminar una solicitud pendiente
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
         if company.status != "pending":
@@ -473,15 +485,17 @@ async def delete_solicitud(company_id: uuid.UUID):
 # ============ STUDIO ACCOUNT CREATION ============
 
 @router.post("/solicitudes/{company_id}/create-account")
-async def create_studio_account(company_id: uuid.UUID, payload: CreateStudioAccountRequest):
+async def create_studio_account(company_id: uuid.UUID, payload: CreateStudioAccountRequest, authorization: Optional[str] = Header(None)):
     """
     Crear cuenta Studio: genera usuario admin, credenciales, hash de acceso.
     Cambia status de pending a active.
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     from .models import StudioAccount, AccountChangeLog
     import secrets
     import string
-    
+
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
         
@@ -572,11 +586,13 @@ async def create_studio_account(company_id: uuid.UUID, payload: CreateStudioAcco
 
 
 @router.get("/studio-accounts/{company_id}")
-async def get_studio_account(company_id: uuid.UUID):
+async def get_studio_account(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
-    Obtener datos de la cuenta Studio de una empresa
+    Obtener datos de la cuenta Studio de una empresa (incluye access_hash — sensible, solo admin)
     """
+    from .auth_deps import require_admin
     from .models import StudioAccount
+    await sync_to_async(require_admin)(authorization)
     try:
         def get_sync():
             sa = StudioAccount.objects.select_related('company', 'admin_user').get(company_id=company_id)
@@ -648,11 +664,13 @@ def _send_assignment_email(company, program):
 # ============ PROGRAM ASSIGNMENT ============
 
 @router.post("/programs/assign")
-async def assign_program_to_company(payload: AssignProgramRequest):
+async def assign_program_to_company(payload: AssignProgramRequest, authorization: Optional[str] = Header(None)):
     """
     Asignar un programa existente a una empresa.
     Solo si la empresa existe y está activa.
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     from programs.models import Program
     
     try:
@@ -715,12 +733,14 @@ class AssignTemplateRequest(BaseModel):
 
 
 @router.post("/account/{company_id}/assign-template")
-async def assign_template_to_company(company_id: uuid.UUID, payload: AssignTemplateRequest):
+async def assign_template_to_company(company_id: uuid.UUID, payload: AssignTemplateRequest, authorization: Optional[str] = Header(None)):
     """
     Instancia una ProgramTemplate como un Program para la company indicada.
     Crea Activities derivadas de los módulos del template y registra changelog.
     Operación 100% backend: sólo recibe template_id + company_id.
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     from programs.models import Program, ProgramTemplate, Activity
     from .models import AccountChangeLog
 
@@ -807,10 +827,12 @@ async def assign_template_to_company(company_id: uuid.UUID, payload: AssignTempl
 
 
 @router.get("/active-companies")
-async def list_active_companies():
+async def list_active_companies(authorization: Optional[str] = Header(None)):
     """
     Listar empresas activas (para selector de asignación de programas)
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         companies = await sync_to_async(list)(
             Company.objects.filter(status__in=["active", "trial"]).order_by('name')
@@ -821,10 +843,12 @@ async def list_active_companies():
 
 
 @router.get("/dashboard-overview")
-async def get_dashboard_overview():
+async def get_dashboard_overview(authorization: Optional[str] = Header(None)):
     """
     Dashboard overview: empresas, programas asignados, stats reales
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     from programs.models import Program, ProgramParticipant
     try:
         def build_overview():
@@ -967,9 +991,9 @@ async def studio_login(payload: LoginRequest):
             user.save(update_fields=["last_login_at"])
             
             # Generate token
-            import secrets
-            token = f"{user.id}:{secrets.token_hex(16)}"
-            
+            from .services import AuthService
+            token = AuthService.generate_session_token(user)
+
             return {
                 "token": token,
                 "user": {
@@ -1107,10 +1131,12 @@ class UpdateCompanyStatusRequest(BaseModel):
 
 
 @router.get("/account/{company_id}/detail")
-async def get_account_detail(company_id: uuid.UUID):
+async def get_account_detail(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Detalle completo de una cuenta/cliente con PM, bitácora, changelog, suscripción
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         company = await sync_to_async(Company.objects.select_related('assigned_pm').get)(id=company_id)
     except Company.DoesNotExist:
@@ -1209,10 +1235,12 @@ async def get_account_detail(company_id: uuid.UUID):
 
 
 @router.get("/account/{company_id}/bitacora")
-async def get_bitacora(company_id: uuid.UUID):
+async def get_bitacora(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Obtener bitácora completa de un cliente
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
     except Company.DoesNotExist:
@@ -1239,18 +1267,22 @@ async def get_bitacora(company_id: uuid.UUID):
 
 
 @router.post("/account/{company_id}/bitacora")
-async def add_bitacora_note(company_id: uuid.UUID, payload: NoteCreateRequest):
+async def add_bitacora_note(company_id: uuid.UUID, payload: NoteCreateRequest, authorization: Optional[str] = Header(None)):
     """
     Agregar nota a la bitácora de un cliente
     """
+    from .auth_deps import require_admin
+    actor = await sync_to_async(require_admin)(authorization)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
     except Company.DoesNotExist:
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
 
     def create_note():
-        # Use first admin as default author
-        author = User.objects.filter(role__in=["superadmin", "admin_root"]).first() or User.objects.filter(is_superuser=True).first()
+        # Autor real de la sesión — antes se usaba "el primer admin que
+        # encuentre" como autor por defecto, sin relación con quién realmente
+        # escribió la nota.
+        author = actor
         note = AccountNote.objects.create(
             company=company,
             author=author,
@@ -1277,10 +1309,12 @@ async def add_bitacora_note(company_id: uuid.UUID, payload: NoteCreateRequest):
 
 
 @router.delete("/account/{company_id}/bitacora/{note_id}")
-async def delete_bitacora_note(company_id: uuid.UUID, note_id: uuid.UUID):
+async def delete_bitacora_note(company_id: uuid.UUID, note_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Eliminar nota de la bitácora
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         note = await sync_to_async(AccountNote.objects.get)(id=note_id, company_id=company_id)
         await sync_to_async(note.delete)()
@@ -1290,10 +1324,12 @@ async def delete_bitacora_note(company_id: uuid.UUID, note_id: uuid.UUID):
 
 
 @router.patch("/account/{company_id}/bitacora/{note_id}/pin")
-async def toggle_pin_note(company_id: uuid.UUID, note_id: uuid.UUID):
+async def toggle_pin_note(company_id: uuid.UUID, note_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Fijar/desfijar nota en la bitácora
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         note = await sync_to_async(AccountNote.objects.get)(id=note_id, company_id=company_id)
         note.is_pinned = not note.is_pinned
@@ -1304,10 +1340,12 @@ async def toggle_pin_note(company_id: uuid.UUID, note_id: uuid.UUID):
 
 
 @router.get("/account/{company_id}/changelog")
-async def get_changelog(company_id: uuid.UUID):
+async def get_changelog(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Obtener historial de cambios de un cliente
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
     except Company.DoesNotExist:
@@ -1334,10 +1372,12 @@ async def get_changelog(company_id: uuid.UUID):
 
 
 @router.post("/account/{company_id}/assign-pm")
-async def assign_pm(company_id: uuid.UUID, payload: AssignPMRequest):
+async def assign_pm(company_id: uuid.UUID, payload: AssignPMRequest, authorization: Optional[str] = Header(None)):
     """
     Asignar o desasignar PM a una cuenta
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
     except Company.DoesNotExist:
@@ -1388,10 +1428,13 @@ async def assign_pm(company_id: uuid.UUID, payload: AssignPMRequest):
 
 
 @router.get("/pms")
-async def list_pms():
+async def list_pms(authorization: Optional[str] = Header(None)):
     """
     Listar PMs disponibles (superadmin + inspiratoria_admin)
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
+
     def get_pms():
         pms = User.objects.filter(
             role__in=["superadmin", "admin_root", "inspiratoria_admin"]
@@ -1409,8 +1452,12 @@ async def list_pms():
 
 
 @router.get("/company/{company_id}/pm")
-async def get_company_pm(company_id: uuid.UUID):
+async def get_company_pm(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """Obtener el Project Manager asignado a una empresa (para vista Core)."""
+    from .auth_deps import get_current_user, require_company_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_company_access)(actor, company_id)
+
     def _get_pm():
         try:
             company = Company.objects.select_related('assigned_pm').get(id=company_id)
@@ -1434,7 +1481,7 @@ async def get_company_pm(company_id: uuid.UUID):
 
 
 @router.get("/pm/{pm_id}/activity")
-async def get_pm_activity(pm_id: uuid.UUID):
+async def get_pm_activity(pm_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Obtener perfil y actividad completa de un PM:
     - Datos de perfil
@@ -1442,6 +1489,9 @@ async def get_pm_activity(pm_id: uuid.UUID):
     - Cuentas gestionadas
     - Historial de acciones (changelog)
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
+
     def _build_activity():
         try:
             pm = User.objects.get(id=pm_id)
@@ -1501,10 +1551,12 @@ async def get_pm_activity(pm_id: uuid.UUID):
 
 
 @router.post("/account/{company_id}/status")
-async def update_account_status(company_id: uuid.UUID, payload: UpdateCompanyStatusRequest):
+async def update_account_status(company_id: uuid.UUID, payload: UpdateCompanyStatusRequest, authorization: Optional[str] = Header(None)):
     """
     Cambiar estado/plan de una cuenta con registro en changelog
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     valid_statuses = ["pending", "trial", "active", "suspended", "cancelled"]
     if payload.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Estado inválido. Opciones: {valid_statuses}")
@@ -1558,10 +1610,12 @@ async def update_account_status(company_id: uuid.UUID, payload: UpdateCompanySta
 
 
 @router.post("/account/{company_id}/contract")
-async def update_contract(company_id: uuid.UUID, payload: UpdateContractRequest):
+async def update_contract(company_id: uuid.UUID, payload: UpdateContractRequest, authorization: Optional[str] = Header(None)):
     """
     Actualizar datos de contrato
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
     except Company.DoesNotExist:
@@ -1612,11 +1666,13 @@ async def update_contract(company_id: uuid.UUID, payload: UpdateContractRequest)
 # ============ BILLING ENDPOINTS ============
 
 @router.get("/billing/overview")
-async def get_billing_overview():
+async def get_billing_overview(authorization: Optional[str] = Header(None)):
     """
     Billing overview: datos de facturación de todas las cuentas Studio
     con desglose de usuarios por rol, programas, plan, fechas, etc.
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     from programs.models import Program
     try:
         def build_billing():
@@ -1751,11 +1807,13 @@ async def get_billing_overview():
 
 
 @router.post("/billing/invoice")
-async def create_invoice(payload: dict):
+async def create_invoice(payload: dict, authorization: Optional[str] = Header(None)):
     """
     Crear una factura/orden de pago para un cliente
     Payload: { company_id, amount, description, due_date, period }
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     company_id = payload.get("company_id")
     if not company_id:
         raise HTTPException(status_code=400, detail="company_id requerido")
@@ -1789,11 +1847,13 @@ async def create_invoice(payload: dict):
 
 
 @router.post("/billing/payment-order")
-async def create_payment_order(payload: dict):
+async def create_payment_order(payload: dict, authorization: Optional[str] = Header(None)):
     """
     Crear una orden de pago para un cliente
     Payload: { company_id, amount, concept, due_date }
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     company_id = payload.get("company_id")
     if not company_id:
         raise HTTPException(status_code=400, detail="company_id requerido")
@@ -1827,13 +1887,16 @@ async def list_companies(
     skip: int = 0,
     limit: int = 100,
     company_status: Optional[str] = None,
-    account_type: Optional[str] = None
+    account_type: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
 ):
     """
     Listar todas las empresas (Admin Root only)
     Filtros: company_status, account_type (internal/core/studio)
     Incluye datos del PM asignado.
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     from fastapi import status as http_status
     try:
         queryset = Company.objects.all()
@@ -1875,10 +1938,12 @@ async def list_companies(
 
 
 @router.post("/", response_model=CompanyResponse, status_code=status.HTTP_201_CREATED)
-async def create_company(payload: CompanyCreateRequest):
+async def create_company(payload: CompanyCreateRequest, authorization: Optional[str] = Header(None)):
     """
     Crear nueva empresa (Admin Root only)
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         company = await sync_to_async(OnboardingService.create_company_step1)(
             name=payload.name,
@@ -2023,19 +2088,11 @@ def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bo
 
 
 async def _require_admin(token: str) -> User:
-    """Valida que el token pertenezca a un admin"""
-    if not token:
-        raise HTTPException(status_code=401, detail="Token requerido")
-    clean_token = token.replace("Bearer ", "").strip()
-    # Token format: {user_id}:{random_token}
-    parts = clean_token.split(":", 1)
-    if len(parts) != 2:
-        raise HTTPException(status_code=401, detail="Token inválido")
-    user_id = parts[0]
-    try:
-        user = await sync_to_async(User.objects.get)(id=user_id)
-    except (User.DoesNotExist, Exception):
-        raise HTTPException(status_code=401, detail="Token inválido")
+    """Valida que el token pertenezca a una sesión real y que sea de un admin."""
+    from .services import AuthService
+    user = await sync_to_async(AuthService.verify_session_token)(token)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
     admin_roles = ['superadmin', 'admin_root', 'inspiratoria_admin']
     if user.role not in admin_roles and not user.is_superuser:
         raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
@@ -2443,17 +2500,10 @@ async def request_login_otp(payload: RequestLoginOTPRequest):
 @router.get("/auth/me")
 async def get_current_user_profile(authorization: Optional[str] = Header(None)):
     """Retorna el perfil actual del usuario autenticado, incluyendo view_permissions frescos de DB."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Token requerido")
-    clean_token = authorization.replace("Bearer ", "").strip()
-    parts = clean_token.split(":", 1)
-    if len(parts) != 2:
-        raise HTTPException(status_code=401, detail="Token inválido")
-    user_id = parts[0]
-    try:
-        user = await sync_to_async(User.objects.get)(id=user_id)
-    except (User.DoesNotExist, Exception):
-        raise HTTPException(status_code=401, detail="Token inválido")
+    from .services import AuthService
+    user = await sync_to_async(AuthService.verify_session_token)(authorization)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
     return {
         "id": str(user.id),
         "username": user.username,
@@ -2470,19 +2520,23 @@ async def get_current_user_profile(authorization: Optional[str] = Header(None)):
     }
 
 
+@router.post("/auth/logout")
+async def logout(authorization: Optional[str] = Header(None)):
+    """Revoca la sesión actual — el token deja de ser válido de inmediato."""
+    from .services import AuthService
+    await sync_to_async(AuthService.revoke_session_token)(authorization)
+    return {"success": True}
+
+
 # ── Helper: extract authenticated user from token ──
+# Valida contra las sesiones reales emitidas por AuthService.generate_session_token
+# (AuthToken en DB) — antes solo confiaba en el UUID embebido en el token, lo
+# que permitía impersonar a cualquier usuario conociendo su id.
 async def _get_user_from_token(authorization: Optional[str]) -> "User":
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Token requerido")
-    clean_token = authorization.replace("Bearer ", "").strip()
-    parts = clean_token.split(":", 1)
-    if len(parts) != 2:
-        raise HTTPException(status_code=401, detail="Token inválido")
-    user_id = parts[0]
-    try:
-        user = await sync_to_async(User.objects.get)(id=user_id)
-    except (User.DoesNotExist, Exception):
-        raise HTTPException(status_code=401, detail="Token inválido")
+    from .services import AuthService
+    user = await sync_to_async(AuthService.verify_session_token)(authorization)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
     return user
 
 
@@ -2718,8 +2772,11 @@ async def delete_avatar(authorization: Optional[str] = Header(None)):
 
 
 @router.post("/{company_id}/logo")
-async def upload_company_logo(company_id: uuid.UUID, logo: UploadFile = FastAPIFile(...)):
+async def upload_company_logo(company_id: uuid.UUID, logo: UploadFile = FastAPIFile(...), authorization: Optional[str] = Header(None)):
     """Subir o reemplazar el logo de la empresa. Se guarda como base64 en la DB."""
+    from .auth_deps import get_current_user, require_company_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_company_access)(actor, company_id)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
     except Company.DoesNotExist:
@@ -2744,8 +2801,11 @@ async def upload_company_logo(company_id: uuid.UUID, logo: UploadFile = FastAPIF
 
 
 @router.delete("/{company_id}/logo")
-async def delete_company_logo(company_id: uuid.UUID):
+async def delete_company_logo(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """Eliminar el logo de la empresa."""
+    from .auth_deps import get_current_user, require_company_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_company_access)(actor, company_id)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
     except Company.DoesNotExist:
@@ -3741,10 +3801,13 @@ async def get_company_by_slug(slug: str):
 
 
 @router.get("/{company_id}", response_model=CompanyResponse)
-async def get_company(company_id: uuid.UUID):
+async def get_company(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Obtener información de la empresa
     """
+    from .auth_deps import get_current_user, require_company_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_company_access)(actor, company_id)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
         return CompanyResponse.model_validate(company)
@@ -3756,11 +3819,12 @@ async def get_company(company_id: uuid.UUID):
 
 
 @router.patch("/{company_id}", response_model=CompanyResponse)
-async def update_company(company_id: uuid.UUID, payload: dict):
+async def update_company(company_id: uuid.UUID, payload: dict, authorization: Optional[str] = Header(None)):
     """
     Actualizar información de empresa (Admin Root only)
     Acepta cualquier campo de CompanyUpdateRequest
     """
+    await _require_admin(authorization or "")
     from fastapi import status as http_status
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
@@ -3893,7 +3957,7 @@ def _send_account_deleted_email(
 
 
 @router.delete("/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_company(company_id: uuid.UUID, request: Request):
+async def delete_company(company_id: uuid.UUID, request: Request, authorization: Optional[str] = Header(None)):
     """
     Eliminar empresa y todos sus datos asociados (Admin Root only)
     PELIGRO: Esta acción es irreversible y eliminará:
@@ -3902,6 +3966,7 @@ async def delete_company(company_id: uuid.UUID, request: Request):
     - Todos los programas de la empresa
     - Todos los datos asociados
     """
+    await _require_admin(authorization or "")
     from fastapi import status as http_status
     import json
     try:
@@ -3979,10 +4044,13 @@ async def delete_company(company_id: uuid.UUID, request: Request):
 
 
 @router.get("/{company_id}/users")
-async def list_company_users(company_id: uuid.UUID):
+async def list_company_users(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Listar usuarios de una empresa
     """
+    from .auth_deps import get_current_user, require_company_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_company_access)(actor, company_id)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
     except Company.DoesNotExist:
@@ -4017,11 +4085,14 @@ async def list_all_users(
     company_id: Optional[uuid.UUID] = None,
     role: Optional[str] = None,
     skip: int = 0,
-    limit: int = 100
+    limit: int = 100,
+    authorization: Optional[str] = Header(None),
 ):
     """
     Listar todos los usuarios (con filtros opcionales)
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     queryset = User.objects.all()
     
     if company_id:
@@ -4037,12 +4108,16 @@ async def list_all_users(
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
-async def get_user(user_id: uuid.UUID):
+async def get_user(user_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Obtener información de un usuario específico
     """
+    from .auth_deps import get_current_user, is_admin
+    actor = await sync_to_async(get_current_user)(authorization)
     try:
         user = await sync_to_async(User.objects.select_related('company').get)(id=user_id)
+        if not is_admin(actor) and str(actor.id) != str(user.id) and (actor.company_id is None or actor.company_id != user.company_id):
+            raise HTTPException(status_code=403, detail="No tenés acceso a este usuario")
         return UserResponse.model_validate(user)
     except User.DoesNotExist:
         raise HTTPException(
@@ -4052,10 +4127,12 @@ async def get_user(user_id: uuid.UUID):
 
 
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_user(payload: UserCreateRequest):
+async def create_user(payload: UserCreateRequest, authorization: Optional[str] = Header(None)):
     """
     Crear un nuevo usuario (requiere permisos de admin)
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     # Verificar si el username o email ya existen
     username_exists = await sync_to_async(User.objects.filter(username=payload.username).exists)()
     if username_exists:
@@ -4103,10 +4180,13 @@ async def create_user(payload: UserCreateRequest):
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
-async def update_user(user_id: uuid.UUID, payload: UserUpdateRequest):
+async def update_user(user_id: uuid.UUID, payload: UserUpdateRequest, authorization: Optional[str] = Header(None)):
     """
-    Actualizar información de un usuario
+    Actualizar información de un usuario (rol, permisos, etc. — requiere admin;
+    para que un usuario edite su propio perfil existe /auth/profile)
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         user = await sync_to_async(User.objects.get)(id=user_id)
     except User.DoesNotExist:
@@ -4129,10 +4209,12 @@ async def update_user(user_id: uuid.UUID, payload: UserUpdateRequest):
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user_id: uuid.UUID):
+async def delete_user(user_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Eliminar un usuario
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         user = await sync_to_async(User.objects.get)(id=user_id)
     except User.DoesNotExist:
@@ -4149,10 +4231,12 @@ class PasswordResetRequest(BaseModel):
 
 
 @router.post("/users/{user_id}/reset-password")
-async def reset_user_password(user_id: uuid.UUID, payload: PasswordResetRequest):
+async def reset_user_password(user_id: uuid.UUID, payload: PasswordResetRequest, authorization: Optional[str] = Header(None)):
     """
     Resetear contraseña de un usuario (admin only)
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     try:
         user = await sync_to_async(User.objects.get)(id=user_id)
     except User.DoesNotExist:
@@ -4170,10 +4254,13 @@ async def reset_user_password(user_id: uuid.UUID, payload: PasswordResetRequest)
 
 
 @router.get("/users/stats/summary")
-async def get_users_stats():
+async def get_users_stats(authorization: Optional[str] = Header(None)):
     """
     Obtener estadísticas generales de usuarios
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
+
     def get_stats_sync():
         from django.db.models import Count
         
@@ -4197,11 +4284,14 @@ async def get_users_stats():
 # ============ PLAN & BILLING ENDPOINTS ============
 
 @router.get("/{company_id}/plan")
-async def get_company_plan(company_id: uuid.UUID):
+async def get_company_plan(company_id: uuid.UUID, authorization: Optional[str] = Header(None)):
     """
     Obtener información del plan de una empresa
     Incluye: plan actual, límites, features, uso actual
     """
+    from .auth_deps import get_current_user, require_company_access
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_company_access)(actor, company_id)
     try:
         company = await sync_to_async(Company.objects.get)(id=company_id)
     except Company.DoesNotExist:
@@ -4238,10 +4328,12 @@ async def get_company_plan(company_id: uuid.UUID):
 
 
 @router.post("/{company_id}/plan/upgrade")
-async def upgrade_company_plan(company_id: uuid.UUID, new_plan: str):
+async def upgrade_company_plan(company_id: uuid.UUID, new_plan: str, authorization: Optional[str] = Header(None)):
     """
-    Actualizar plan de una empresa
+    Actualizar plan de una empresa (decisión de billing — solo admin)
     """
+    from .auth_deps import require_admin
+    await sync_to_async(require_admin)(authorization)
     if new_plan not in ["starter", "growth", "enterprise"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -4377,19 +4469,10 @@ async def setup_totp(authorization: Optional[str] = Header(None)):
     import io
     import base64
 
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Token requerido")
-
-    clean_token = authorization.replace("Bearer ", "").strip()
-    parts = clean_token.split(":", 1)
-    if len(parts) != 2:
-        raise HTTPException(status_code=401, detail="Token inválido")
-    user_id = parts[0]
-
-    try:
-        user = await sync_to_async(User.objects.get)(id=user_id)
-    except (User.DoesNotExist, Exception):
-        raise HTTPException(status_code=401, detail="Token inválido")
+    from .services import AuthService
+    user = await sync_to_async(AuthService.verify_session_token)(authorization)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
     # Generar nuevo secreto TOTP
     secret = pyotp.random_base32()
@@ -4438,19 +4521,10 @@ async def enable_totp(
     """
     import pyotp
 
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Token requerido")
-
-    clean_token = authorization.replace("Bearer ", "").strip()
-    parts = clean_token.split(":", 1)
-    if len(parts) != 2:
-        raise HTTPException(status_code=401, detail="Token inválido")
-    user_id = parts[0]
-
-    try:
-        user = await sync_to_async(User.objects.get)(id=user_id)
-    except (User.DoesNotExist, Exception):
-        raise HTTPException(status_code=401, detail="Token inválido")
+    from .services import AuthService
+    user = await sync_to_async(AuthService.verify_session_token)(authorization)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
     if not user.totp_secret:
         raise HTTPException(status_code=400, detail="Primero configura TOTP con /auth/totp/setup")
@@ -4482,19 +4556,10 @@ async def disable_totp(
     """
     import pyotp
 
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Token requerido")
-
-    clean_token = authorization.replace("Bearer ", "").strip()
-    parts = clean_token.split(":", 1)
-    if len(parts) != 2:
-        raise HTTPException(status_code=401, detail="Token inválido")
-    user_id = parts[0]
-
-    try:
-        user = await sync_to_async(User.objects.get)(id=user_id)
-    except (User.DoesNotExist, Exception):
-        raise HTTPException(status_code=401, detail="Token inválido")
+    from .services import AuthService
+    user = await sync_to_async(AuthService.verify_session_token)(authorization)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
     if not user.totp_enabled:
         raise HTTPException(status_code=400, detail="TOTP no está activado")

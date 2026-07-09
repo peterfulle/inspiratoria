@@ -2,20 +2,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  CheckCircle, 
-  User, 
-  Lock, 
-  Linkedin, 
-  FileText, 
-  Settings, 
-  ChevronRight, 
+import {
+  CheckCircle,
+  User,
+  Lock,
+  Linkedin,
+  FileText,
+  Settings,
+  ChevronRight,
   ChevronLeft,
   Loader2,
   AlertCircle,
   RefreshCw,
   Sparkles
 } from 'lucide-react';
+import { apiFetch } from "@/lib/api";
 
 // Types
 interface InvitationData {
@@ -132,7 +133,7 @@ export default function OnboardingWizard({ token }: { token: string }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/invitations/validate', {
+      const response = await apiFetch('/api/invitations/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token })
@@ -167,7 +168,7 @@ export default function OnboardingWizard({ token }: { token: string }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/invitations/create-account', {
+      const response = await apiFetch('/api/invitations/create-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -196,7 +197,7 @@ export default function OnboardingWizard({ token }: { token: string }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/invitations/linkedin/auth-url?state=${token}`);
+      const response = await apiFetch(`/api/invitations/linkedin/auth-url?state=${token}`);
       if (!response.ok) throw new Error('Error al generar URL de LinkedIn');
       
       const data = await response.json();
@@ -211,7 +212,7 @@ export default function OnboardingWizard({ token }: { token: string }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/invitations/skip-linkedin', {
+      const response = await apiFetch('/api/invitations/skip-linkedin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token })
@@ -274,7 +275,7 @@ export default function OnboardingWizard({ token }: { token: string }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/invitations/complete', {
+      const response = await apiFetch('/api/invitations/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

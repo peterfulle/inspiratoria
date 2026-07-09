@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
-import { backendUrl } from "@/lib/api";
-
+import { backendUrl, apiFetch } from "@/lib/api";
 // Modern SVG Icons
 const IconProgram = () => (
   <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -161,8 +160,8 @@ export default function DashboardStatsCards({ darkMode }: DashboardStatsCardsPro
       const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [statsRes, timelineRes] = await Promise.all([
-        fetch(`${backendUrl}/api/stats/dashboard`, { headers }),
-        fetch(`${backendUrl}/api/stats/timeline?days=30`, { headers }),
+        apiFetch(`${backendUrl}/api/stats/dashboard`, { headers }),
+        apiFetch(`${backendUrl}/api/stats/timeline?days=30`, { headers }),
       ]);
 
       if (!statsRes.ok || !timelineRes.ok) {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { apiFetch } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -28,14 +29,14 @@ export default function ParticipantRoleDashboardPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const participantRes = await fetch(`${API_URL}/api/programs/${programId}/participants`);
+        const participantRes = await apiFetch(`${API_URL}/api/programs/${programId}/participants`);
         if (participantRes.ok) {
           const participantList = await participantRes.json();
           const found = (participantList || []).find((p: any) => p.id === participantId);
           if (found) setParticipant(found);
         }
 
-        const programRes = await fetch(`${API_URL}/api/programs/${programId}`);
+        const programRes = await apiFetch(`${API_URL}/api/programs/${programId}`);
         if (programRes.ok) {
           const programData = await programRes.json();
           setProgram(programData);

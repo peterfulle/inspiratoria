@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
@@ -97,7 +98,7 @@ export default function StudioDashboard() {
       const hash = studio.access_hash;
       if (!hash) return;
 
-      const res = await fetch(`${API_URL}/api/companies/studio/dashboard/${hash}`);
+      const res = await apiFetch(`${API_URL}/api/companies/studio/dashboard/${hash}`);
       if (!res.ok) throw new Error("Error al cargar datos");
       const result = await res.json();
       setData(result);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { apiFetch } from "@/lib/api";
 
 interface User {
   id: string;
@@ -36,7 +37,7 @@ export default function ClientUsersPage() {
   const loadData = async () => {
     try {
       // Cargar empresa
-      const companyRes = await fetch(
+      const companyRes = await apiFetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${companyId}`
       );
       if (companyRes.ok) {
@@ -45,7 +46,7 @@ export default function ClientUsersPage() {
       }
 
       // Cargar usuarios
-      const usersRes = await fetch(
+      const usersRes = await apiFetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${companyId}/users`
       );
       if (usersRes.ok) {

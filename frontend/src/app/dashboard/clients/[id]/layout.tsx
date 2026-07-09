@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api";
 
 interface Company {
   id: string;
@@ -31,7 +32,7 @@ export default function ClientLayout({
 
   const loadCompany = async () => {
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${companyId}`
       );
       if (response.ok) {

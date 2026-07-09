@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { hasPermission, isAdmin, isFacilitator, isParticipant } from "@/lib/permissions";
 import type { UserRole } from "@/lib/permissions";
+import { apiFetch } from "@/lib/api";
 
 type SidebarProps = {
   username: string;
@@ -244,7 +245,7 @@ export default function Sidebar({ username, role, userId = 1 }: SidebarProps) {
         const token = localStorage.getItem("auth_token");
         if (!token) return;
         const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
-        const res = await fetch(`${API_URL}/api/companies/auth/me`, {
+        const res = await apiFetch(`${API_URL}/api/companies/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;

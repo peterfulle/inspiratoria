@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { apiFetch } from "@/lib/api";
 
 // ─── SVG Icons ───
 const IconArrowLeft = ({ className = "w-5 h-5" }: { className?: string }) => (
@@ -273,11 +274,11 @@ export default function AccountDetailPage() {
   const fetchAll = useCallback(async () => {
     try {
       const [detailRes, notesRes, changelogRes, pmsRes, programsRes] = await Promise.all([
-        fetch(`${API}/api/companies/account/${companyId}/detail`),
-        fetch(`${API}/api/companies/account/${companyId}/bitacora`),
-        fetch(`${API}/api/companies/account/${companyId}/changelog`),
-        fetch(`${API}/api/companies/pms`),
-        fetch(`${API}/api/programs?company_id=${companyId}`),
+        apiFetch(`${API}/api/companies/account/${companyId}/detail`),
+        apiFetch(`${API}/api/companies/account/${companyId}/bitacora`),
+        apiFetch(`${API}/api/companies/account/${companyId}/changelog`),
+        apiFetch(`${API}/api/companies/pms`),
+        apiFetch(`${API}/api/programs?company_id=${companyId}`),
       ]);
       if (detailRes.ok) setDetail(await detailRes.json());
       if (notesRes.ok) setNotes(await notesRes.json());
@@ -289,7 +290,7 @@ export default function AccountDetailPage() {
         const withStats = await Promise.all(
           progs.map(async (p) => {
             try {
-              const statsRes = await fetch(`${API}/api/programs/${p.id}/participants/stats`);
+              const statsRes = await apiFetch(`${API}/api/programs/${p.id}/participants/stats`);
               if (statsRes.ok) p.stats = await statsRes.json();
             } catch {}
             return p;
@@ -313,7 +314,7 @@ export default function AccountDetailPage() {
     if (templates.length === 0) {
       setTemplatesLoading(true);
       try {
-        const res = await fetch(`${API}/api/program-templates`);
+        const res = await apiFetch(`${API}/api/program-templates`);
         if (res.ok) {
           const data = await res.json();
           setTemplates(Array.isArray(data) ? data : []);
@@ -330,7 +331,7 @@ export default function AccountDetailPage() {
     setAssigningTemplateId(templateId);
     setAssignBanner(null);
     try {
-      const res = await fetch(`${API}/api/companies/account/${companyId}/assign-template`, {
+      const res = await apiFetch(`${API}/api/companies/account/${companyId}/assign-template`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ template_id: templateId }),
@@ -352,7 +353,7 @@ export default function AccountDetailPage() {
     if (!newNote.trim()) return;
     setNoteSubmitting(true);
     try {
-      const res = await fetch(`${API}/api/companies/account/${companyId}/bitacora`, {
+      const res = await apiFetch(`${API}/api/companies/account/${companyId}/bitacora`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: newNote, note_type: newNoteType }),
@@ -370,12 +371,12 @@ export default function AccountDetailPage() {
 
   const deleteNote = async (noteId: string) => {
     if (!confirm('¿Eliminar esta nota?')) return;
-    const res = await fetch(`${API}/api/companies/account/${companyId}/bitacora/${noteId}`, { method: 'DELETE' });
+    const res = await apiFetch(`${API}/api/companies/account/${companyId}/bitacora/${noteId}`, { method: 'DELETE' });
     if (res.ok) setNotes(prev => prev.filter(n => n.id !== noteId));
   };
 
   const togglePin = async (noteId: string) => {
-    const res = await fetch(`${API}/api/companies/account/${companyId}/bitacora/${noteId}/pin`, { method: 'PATCH' });
+    const res = await apiFetch(`${API}/api/companies/account/${companyId}/bitacora/${noteId}/pin`, { method: 'PATCH' });
     if (res.ok) {
       const data = await res.json();
       setNotes(prev => prev.map(n => n.id === noteId ? { ...n, is_pinned: data.is_pinned } : n));
@@ -383,7 +384,7 @@ export default function AccountDetailPage() {
   };
 
   const assignPM = async (pmId: string | null) => {
-    const res = await fetch(`${API}/api/companies/account/${companyId}/assign-pm`, {
+    const res = await apiFetch(`${API}/api/companies/account/${companyId}/assign-pm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pm_id: pmId }),
@@ -395,7 +396,7 @@ export default function AccountDetailPage() {
   };
 
   const updateStatus = async (newStatus: string) => {
-    const res = await fetch(`${API}/api/companies/account/${companyId}/status`, {
+    const res = await apiFetch(`${API}/api/companies/account/${companyId}/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
@@ -431,7 +432,7 @@ export default function AccountDetailPage() {
         }
       } catch {}
 
-      const res = await fetch(`${API}/api/companies/${companyId}`, {
+      const res = await apiFetch(`${API}/api/companies/${companyId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -459,7 +460,7 @@ export default function AccountDetailPage() {
     if (!editName.trim() || editName.trim() === detail?.name) { setEditingName(false); return; }
     setSavingName(true);
     try {
-      const res = await fetch(`${API}/api/companies/${companyId}`, {
+      const res = await apiFetch(`${API}/api/companies/${companyId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editName.trim() }),
@@ -484,7 +485,7 @@ export default function AccountDetailPage() {
   const saveCompanyInfo = async () => {
     setSavingInfo(true);
     try {
-      const res = await fetch(`${API}/api/companies/${companyId}`, {
+      const res = await apiFetch(`${API}/api/companies/${companyId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editFields),
@@ -502,7 +503,7 @@ export default function AccountDetailPage() {
     try {
       const formData = new FormData();
       formData.append('logo', file);
-      const res = await fetch(`${API}/api/companies/${companyId}/logo`, {
+      const res = await apiFetch(`${API}/api/companies/${companyId}/logo`, {
         method: 'POST',
         body: formData,
       });
@@ -514,7 +515,7 @@ export default function AccountDetailPage() {
 
   const deleteLogo = async () => {
     try {
-      const res = await fetch(`${API}/api/companies/${companyId}/logo`, { method: 'DELETE' });
+      const res = await apiFetch(`${API}/api/companies/${companyId}/logo`, { method: 'DELETE' });
       if (res.ok) await fetchAll();
     } catch { alert('Error de conexión'); }
   };

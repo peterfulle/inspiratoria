@@ -6,6 +6,7 @@ import { pageStyles } from "../styles";
 import { Icon } from "../icons";
 import { ProgramTemplate } from "../types";
 import { getTemplateCompleteness, programStatusMeta } from "../data";
+import { apiFetch } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
@@ -48,7 +49,7 @@ export default function AssignmentsPage() {
 
   const fetchTemplates = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/program-templates`);
+      const res = await apiFetch(`${API_URL}/api/program-templates`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) setTemplates(data);
@@ -63,7 +64,7 @@ export default function AssignmentsPage() {
   const fetchPrograms = async () => {
     setProgramsLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/programs`);
+      const res = await apiFetch(`${API_URL}/api/programs`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) setPrograms(data);
@@ -84,7 +85,7 @@ export default function AssignmentsPage() {
     setCompaniesLoading(true);
     try {
       const token = localStorage.getItem("auth_token");
-      const res = await fetch(`${API_URL}/api/companies/active-companies`, {
+      const res = await apiFetch(`${API_URL}/api/companies/active-companies`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -113,7 +114,7 @@ export default function AssignmentsPage() {
 
       // El backend autoconstruye el nombre ({plantilla} · {empresa} {año}),
       // congela el diseño completo (design_snapshot) y vincula la plantilla.
-      const createRes = await fetch(`${API_URL}/api/programs`, {
+      const createRes = await apiFetch(`${API_URL}/api/programs`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -333,16 +334,6 @@ export default function AssignmentsPage() {
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 flex-shrink-0 lg:pl-4 lg:border-l border-neutral-100">
-                          {p.template?.name && (
-                            <button
-                              onClick={() => router.push(`/dashboard/programs/preview/${p.template?.slug || ""}`)}
-                              className="btn-secondary flex items-center gap-2 text-sm py-2 px-4"
-                              title="Ver plantilla de origen"
-                            >
-                              <Icon.Eye className="w-4 h-4" />
-                              <span className="hidden sm:inline">Plantilla</span>
-                            </button>
-                          )}
                           <button
                             onClick={() => window.open(
                               p.company?.slug
@@ -353,8 +344,8 @@ export default function AssignmentsPage() {
                             )}
                             className="btn-primary flex items-center gap-2 text-sm py-2 px-4"
                           >
-                            <Icon.Link className="w-4 h-4" />
-                            Abrir
+                            <Icon.Settings className="w-4 h-4" />
+                            Gestionar
                           </button>
                         </div>
                       </div>

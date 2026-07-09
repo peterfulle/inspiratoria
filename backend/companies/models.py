@@ -659,3 +659,26 @@ class TeamChatMessage(models.Model):
 
     def __str__(self) -> str:
         return f"{self.sender.email}: {self.content[:50]}"
+
+
+class AuthToken(models.Model):
+    """
+    Sesión de autenticación real. Reemplaza el esquema anterior donde el
+    "token" era literalmente `{user_id}:{random}` sin nada verificado del
+    lado del servidor — cualquier UUID de usuario válido bastaba para
+    impersonarlo. Acá se guarda solo el hash (SHA-256) del token emitido;
+    el valor crudo se conoce una única vez, en el momento del login.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="auth_tokens")
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["token_hash"])]
+
+    def __str__(self) -> str:
+        return f"AuthToken({self.user.email}, creado {self.created_at})"

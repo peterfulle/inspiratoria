@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import React from "react";
+import { apiFetch } from "@/lib/api";
 
 // ================================================================================
 // INTERFACES
@@ -72,7 +73,7 @@ export default function ParticipantsManagementPage() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
       
-      const response = await fetch(`${apiUrl}/api/programs/users-with-programs`);
+      const response = await apiFetch(`${apiUrl}/api/programs/users-with-programs`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -89,7 +90,7 @@ export default function ParticipantsManagementPage() {
   const loadPrograms = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
-      const response = await fetch(`${apiUrl}/api/programs`);
+      const response = await apiFetch(`${apiUrl}/api/programs`);
       if (response.ok) {
         const data = await response.json();
         setPrograms(data);
@@ -102,7 +103,7 @@ export default function ParticipantsManagementPage() {
   const loadCompanies = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
-      const response = await fetch(`${apiUrl}/api/companies/`);
+      const response = await apiFetch(`${apiUrl}/api/companies/`);
       if (response.ok) {
         const data = await response.json();
         setCompanies(data);
@@ -1069,7 +1070,7 @@ function ProgramDetailModal({ program, onClose }: { program: any; onClose: () =>
     const loadParticipants = async () => {
       try {
         setLoadingParticipants(true);
-        const response = await fetch(`/api/programs/${program.id}/participants`);
+        const response = await apiFetch(`/api/programs/${program.id}/participants`);
         if (!response.ok) throw new Error('Error al cargar participantes');
         const data = await response.json();
         setParticipants(Array.isArray(data) ? data : []);

@@ -12,10 +12,10 @@ export default async function ManageProgramRedirect({ params }: { params: { id: 
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
   let slug = "";
   try {
-    const res = await fetch(`${API}/api/programs/${params.id}`, { cache: "no-store" });
+    const res = await fetch(`${API}/api/programs/${params.id}/company-slug`, { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
-      slug = data?.company?.slug || "";
+      slug = data?.slug || "";
     }
   } catch {
     // ignorar: si falla, caemos al listado

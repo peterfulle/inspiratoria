@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { apiFetch } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 const ADMIN_ROLES = new Set(['superadmin', 'admin_root', 'inspiratoria_admin', 'admin']);
@@ -14,6 +15,8 @@ const ADMIN_ROLES = new Set(['superadmin', 'admin_root', 'inspiratoria_admin', '
 interface ProgramModule {
   id: number; title: string; description: string; order: number;
   duration_minutes: number; is_published: boolean; materials_url: string;
+  requires_evaluation: boolean; minimum_score: number;
+  start_date: string | null; end_date: string | null;
 }
 interface ProgramActivity {
   id: number | string; type: string; name: string; description: string; category: string;
@@ -150,6 +153,14 @@ export default function ProgramManagerConsole() {
   const [activeTab, setActiveTab] = useState<'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes'>('resumen');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
+  // Deep-link ?tab=<id> — usado por las redirecciones legacy (ex /activities, /participants, etc.)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    const valid = ['resumen', 'info', 'cronograma', 'actividades', 'participantes', 'duplas', 'gobierno', 'reportes'];
+    if (tab && valid.includes(tab)) setActiveTab(tab as typeof activeTab);
+  }, []);
+
   // ── Auth gate ──
   useEffect(() => {
     try {
@@ -169,9 +180,9 @@ export default function ProgramManagerConsole() {
   const fetchProgram = useCallback(async () => {
     try {
       const [progRes, partRes, pmsRes] = await Promise.all([
-        fetch(`${API_URL}/api/programs/${programId}`),
-        fetch(`${API_URL}/api/programs/${programId}/participants`),
-        fetch(`${API_URL}/api/companies/pms`),
+        apiFetch(`${API_URL}/api/programs/${programId}`),
+        apiFetch(`${API_URL}/api/programs/${programId}/participants`),
+        apiFetch(`${API_URL}/api/companies/pms`),
       ]);
       if (!progRes.ok) throw new Error('No se pudo cargar el programa');
       const progData: ProgramDetail = await progRes.json();
@@ -179,7 +190,7 @@ export default function ProgramManagerConsole() {
       if (partRes.ok) setParticipants(await partRes.json());
       if (pmsRes.ok) setPms(await pmsRes.json());
       if (progData.company_id) {
-        const pmRes = await fetch(`${API_URL}/api/companies/company/${progData.company_id}/pm`);
+        const pmRes = await apiFetch(`${API_URL}/api/companies/company/${progData.company_id}/pm`);
         if (pmRes.ok) {
           const pmData = await pmRes.json();
           setAssignedPM(pmData.assigned_pm || null);
@@ -205,7 +216,7 @@ export default function ProgramManagerConsole() {
   const transitionStatus = async (newStatus: string) => {
     if (!program) return;
     try {
-      const res = await fetch(`${API_URL}/api/programs/${programId}/status?status=${newStatus}`, { method: 'PATCH' });
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/status?status=${newStatus}`, { method: 'PATCH' });
       if (!res.ok) throw new Error(await res.text());
       setProgram({ ...program, status: newStatus });
       showToast(`Programa movido a "${STATUS_META[newStatus]?.label ?? newStatus}"`);
@@ -215,7 +226,7 @@ export default function ProgramManagerConsole() {
   const launchProgram = async () => {
     if (!program) return;
     try {
-      const res = await fetch(`${API_URL}/api/programs/${programId}/launch`, { method: 'POST' });
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/launch`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'No se pudo lanzar');
       showToast('Programa lanzado en producción');
@@ -226,7 +237,7 @@ export default function ProgramManagerConsole() {
   const patchInfo = async (patch: Partial<{ name: string; description: string; theme: string; requires_certification: boolean }>) => {
     if (!program) return;
     try {
-      const res = await fetch(`${API_URL}/api/programs/${programId}`, {
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -239,7 +250,7 @@ export default function ProgramManagerConsole() {
   const assignPM = async (pmId: string | null) => {
     if (!program?.company_id) return;
     try {
-      const res = await fetch(`${API_URL}/api/companies/account/${program.company_id}/assign-pm`, {
+      const res = await apiFetch(`${API_URL}/api/companies/account/${program.company_id}/assign-pm`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pm_id: pmId }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -401,7 +412,7 @@ export default function ProgramManagerConsole() {
         )}
 
         <div className="px-8 py-7 w-full">
-          {activeTab === 'resumen' && <TabResumen program={program} participants={participants} assignedPM={assignedPM} pms={pms} onAssignPM={assignPM} />}
+          {activeTab === 'resumen' && <TabResumen program={program} participants={participants} assignedPM={assignedPM} pms={pms} onAssignPM={assignPM} onTab={setActiveTab} />}
           {activeTab === 'info' && <TabInfo program={program} onSave={patchInfo} />}
           {activeTab === 'cronograma' && <TabCronograma programId={programId} activities={program.activities} onChange={fetchProgram} showToast={showToast} />}
           {activeTab === 'actividades' && <TabActividades programId={programId} activities={program.activities} onChange={fetchProgram} showToast={showToast} />}
@@ -504,9 +515,9 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab }: {
         </div>
 
         <div className="mt-5 pt-4 border-t border-zinc-200/70 space-y-0.5">
-          <Link href={`/studio/${slug}`} className="w-full flex items-center gap-2.5 pl-3 pr-2 py-[7px] rounded-lg text-[12px] text-zinc-500 hover:bg-white/70 hover:text-zinc-900 transition-colors">
+          <Link href={`/studio/${slug}/dashboard`} className="w-full flex items-center gap-2.5 pl-3 pr-2 py-[7px] rounded-lg text-[12px] text-zinc-500 hover:bg-white/70 hover:text-zinc-900 transition-colors">
             <I.Layout className="w-[15px] h-[15px] text-zinc-400" />
-            Vista de Studio
+            Vista Corporativa
           </Link>
           <Link href="/dashboard" className="w-full flex items-center gap-2.5 pl-3 pr-2 py-[7px] rounded-lg text-[12px] text-zinc-500 hover:bg-white/70 hover:text-zinc-900 transition-colors">
             <I.Home className="w-[15px] h-[15px] text-zinc-400" />
@@ -671,7 +682,9 @@ function CompositionBar({ label, count, total, color }: { label: string; count: 
   );
 }
 
-function TabResumen({ program, participants, assignedPM, pms, onAssignPM }: { program: ProgramDetail; participants: Participant[]; assignedPM: AssignedPM | null; pms: PM[]; onAssignPM: (id: string | null) => void }) {
+type StudioTab = 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes';
+
+function TabResumen({ program, participants, assignedPM, pms, onAssignPM, onTab }: { program: ProgramDetail; participants: Participant[]; assignedPM: AssignedPM | null; pms: PM[]; onAssignPM: (id: string | null) => void; onTab: (t: StudioTab) => void }) {
   const acts = program.activities || [];
   const totalActs = acts.length;
   const completedActs = acts.filter(a => a.status === 'completed').length;
@@ -702,8 +715,31 @@ function TabResumen({ program, participants, assignedPM, pms, onAssignPM }: { pr
   const snapModules: any[] = Array.isArray(snap.modules) ? snap.modules : [];
   const snapMilestones: any[] = Array.isArray(snap.milestones) ? snap.milestones : [];
 
+  const QUICK_ACTIONS: { tab: StudioTab; label: string; icon: React.ReactNode }[] = [
+    { tab: 'info', label: 'Editar información', icon: <I.Edit className="w-4 h-4" /> },
+    { tab: 'actividades', label: 'Actividades y módulos', icon: <I.Module className="w-4 h-4" /> },
+    { tab: 'participantes', label: 'Participantes', icon: <I.Users className="w-4 h-4" /> },
+    { tab: 'duplas', label: 'Duplas', icon: <I.Link className="w-4 h-4" /> },
+    { tab: 'gobierno', label: 'Estado y PM', icon: <I.Settings className="w-4 h-4" /> },
+  ];
+
   return (
     <div className="space-y-5">
+      {/* Acciones rápidas — a dónde ir para editar cada cosa */}
+      <Card title="Gestionar este programa" subtitle="Esta vista es solo de lectura — edita desde acá">
+        <div className="flex flex-wrap gap-2">
+          {QUICK_ACTIONS.map(a => (
+            <button
+              key={a.tab}
+              onClick={() => onTab(a.tab)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-zinc-100 hover:bg-zinc-900 hover:text-white text-zinc-700 text-[12.5px] font-semibold transition"
+            >
+              {a.icon}{a.label}
+            </button>
+          ))}
+        </div>
+      </Card>
+
       {/* Progreso general (full width) */}
       <Card title="Progreso del programa" subtitle="Avance general de la cohorte">
         <div className="grid sm:grid-cols-3 gap-6">
@@ -1003,7 +1039,7 @@ type WizardState = {
 const CADENCE_LABELS: Record<WizardState['cadence'], string> = { weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensual' };
 
 async function patchActivityDates(programId: string, a: ProgramActivity, start: Date | null, end: Date | null): Promise<void> {
-  const res = await fetch(`${API_URL}/api/activities/${a.id}`, {
+  const res = await apiFetch(`${API_URL}/api/activities/${a.id}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       program_id: programId, name: a.name, description: a.description,
@@ -1280,6 +1316,7 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
   const [editingId, setEditingId] = useState<number | string | null>(null);
   const [form, setForm] = useState<ActivityFormState>(EMPTY_ACTIVITY);
   const [saving, setSaving] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | string | null>(null);
 
   const startEdit = (a: ProgramActivity) => {
     setEditingId(a.id);
@@ -1305,7 +1342,7 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
         is_mandatory: false, is_certificate_issued: form.is_certificate_issued, meeting_url: form.meeting_url, location_address: form.location_address,
       };
       const url = editingId ? `${API_URL}/api/activities/${editingId}` : `${API_URL}/api/activities/create`;
-      const res = await fetch(url, { method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await apiFetch(url, { method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error(await res.text());
       showToast(editingId ? 'Actividad actualizada' : 'Actividad creada');
       cancel(); onChange();
@@ -1316,7 +1353,7 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
   const remove = async (id: number | string) => {
     if (!confirm('¿Eliminar esta actividad?')) return;
     try {
-      const res = await fetch(`${API_URL}/api/activities/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`${API_URL}/api/activities/${id}`, { method: 'DELETE' });
       if (!res.ok && res.status !== 204) throw new Error(await res.text());
       showToast('Actividad eliminada'); onChange();
     } catch (e: unknown) { showToast(e instanceof Error ? e.message : 'Error', 'error'); }
@@ -1383,33 +1420,191 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
         <div className="space-y-2">
           {activities.map(a => {
             const aMeta = ACTIVITY_STATUS_META[a.status] || { label: a.status, color: '#64748b', bg: '#f1f5f9' };
+            const isExpanded = expandedId === a.id;
             return (
-              <div key={a.id} className="flex items-center gap-4 p-4 rounded-xl bg-white border border-zinc-200 hover:border-zinc-200 hover:shadow-sm transition">
-                <div className="w-10 h-10 rounded-lg bg-zinc-100 text-zinc-800 flex items-center justify-center flex-shrink-0">
-                  {a.type === 'training' ? <I.Module className="w-5 h-5" /> : <I.Calendar className="w-5 h-5" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="text-[13.5px] font-bold text-zinc-900">{a.name}</div>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider" style={{ background: aMeta.bg, color: aMeta.color }}>{aMeta.label}</span>
+              <div key={a.id} className="rounded-xl bg-white border border-zinc-200 hover:shadow-sm transition overflow-hidden">
+                <div className="flex items-center gap-4 p-4">
+                  <div className="w-10 h-10 rounded-lg bg-zinc-100 text-zinc-800 flex items-center justify-center flex-shrink-0">
+                    {a.type === 'training' ? <I.Module className="w-5 h-5" /> : <I.Calendar className="w-5 h-5" />}
                   </div>
-                  <div className="flex flex-wrap items-center gap-3 text-[11.5px] text-zinc-500">
-                    {a.start_date && <span className="inline-flex items-center gap-1"><I.Calendar className="w-3 h-3" />{new Date(a.start_date).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}</span>}
-                    <span className="inline-flex items-center gap-1"><I.Globe className="w-3 h-3" />{MODALITY_META[a.modality]?.label || a.modality}</span>
-                    <span className="inline-flex items-center gap-1"><I.Module className="w-3 h-3" />{a.modules?.length || 0} módulos</span>
-                    {a.is_certificate_issued && <span className="inline-flex items-center gap-1 text-amber-600"><I.Award className="w-3 h-3" />Certifica</span>}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="text-[13.5px] font-bold text-zinc-900">{a.name}</div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider" style={{ background: aMeta.bg, color: aMeta.color }}>{aMeta.label}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-[11.5px] text-zinc-500">
+                      {a.start_date && <span className="inline-flex items-center gap-1"><I.Calendar className="w-3 h-3" />{new Date(a.start_date).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}</span>}
+                      <span className="inline-flex items-center gap-1"><I.Globe className="w-3 h-3" />{MODALITY_META[a.modality]?.label || a.modality}</span>
+                      <span className="inline-flex items-center gap-1"><I.Module className="w-3 h-3" />{a.modules?.length || 0} módulos</span>
+                      {a.is_certificate_issued && <span className="inline-flex items-center gap-1 text-amber-600"><I.Award className="w-3 h-3" />Certifica</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    {a.type !== 'event' && (
+                      <button
+                        onClick={() => setExpandedId(isExpanded ? null : a.id)}
+                        className="px-3 py-2 rounded-lg text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition inline-flex items-center gap-1.5 text-[12px] font-semibold"
+                      >
+                        <I.Layers className="w-3.5 h-3.5" />
+                        Módulos
+                        <I.Chevron className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
+                    <button onClick={() => startEdit(a)} className="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition"><I.Edit className="w-4 h-4" /></button>
+                    <button onClick={() => remove(a.id)} className="p-2 rounded-lg text-zinc-500 hover:bg-red-50 hover:text-red-600 transition"><I.Trash className="w-4 h-4" /></button>
                   </div>
                 </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <button onClick={() => startEdit(a)} className="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition"><I.Edit className="w-4 h-4" /></button>
-                  <button onClick={() => remove(a.id)} className="p-2 rounded-lg text-zinc-500 hover:bg-red-50 hover:text-red-600 transition"><I.Trash className="w-4 h-4" /></button>
-                </div>
+                {isExpanded && a.type !== 'event' && (
+                  <ModuleManager activityId={a.id} modules={a.modules || []} onChange={onChange} showToast={showToast} />
+                )}
               </div>
             );
           })}
         </div>
       )}
     </Card>
+  );
+}
+
+interface ModuleFormState {
+  title: string; description: string; duration_minutes: number;
+  requires_evaluation: boolean; minimum_score: number;
+  start_date: string; end_date: string;
+}
+const EMPTY_MODULE: ModuleFormState = {
+  title: '', description: '', duration_minutes: 60,
+  requires_evaluation: false, minimum_score: 70,
+  start_date: '', end_date: '',
+};
+
+function ModuleManager({ activityId, modules, onChange, showToast }: { activityId: number | string; modules: ProgramModule[]; onChange: () => void; showToast: (m: string, t?: 'success' | 'error') => void }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<ModuleFormState>(EMPTY_MODULE);
+  const [saving, setSaving] = useState(false);
+
+  const startCreate = () => { setEditingId(null); setForm(EMPTY_MODULE); setShowForm(true); };
+  const startEdit = (m: ProgramModule) => {
+    setEditingId(m.id);
+    setForm({
+      title: m.title, description: m.description, duration_minutes: m.duration_minutes,
+      requires_evaluation: m.requires_evaluation, minimum_score: m.minimum_score,
+      start_date: m.start_date ? m.start_date.slice(0, 16) : '', end_date: m.end_date ? m.end_date.slice(0, 16) : '',
+    });
+    setShowForm(true);
+  };
+  const cancel = () => { setShowForm(false); setEditingId(null); };
+
+  const submit = async () => {
+    if (!form.title.trim()) { showToast('El título del módulo es obligatorio', 'error'); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        title: form.title, description: form.description, duration_minutes: form.duration_minutes,
+        requires_evaluation: form.requires_evaluation, minimum_score: form.minimum_score,
+        start_date: form.start_date ? new Date(form.start_date).toISOString() : null,
+        end_date: form.end_date ? new Date(form.end_date).toISOString() : null,
+      };
+      const url = editingId ? `${API_URL}/api/modules/${editingId}` : `${API_URL}/api/activities/${activityId}/modules`;
+      const res = await apiFetch(url, { method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error(await res.text());
+      showToast(editingId ? 'Módulo actualizado' : 'Módulo creado');
+      cancel(); onChange();
+    } catch (e: unknown) { showToast(e instanceof Error ? e.message : 'Error', 'error'); }
+    finally { setSaving(false); }
+  };
+
+  const remove = async (id: number) => {
+    if (!confirm('¿Eliminar este módulo? Esta acción no se puede deshacer.')) return;
+    try {
+      const res = await apiFetch(`${API_URL}/api/modules/${id}`, { method: 'DELETE' });
+      if (!res.ok && res.status !== 204) throw new Error(await res.text());
+      showToast('Módulo eliminado'); onChange();
+    } catch (e: unknown) { showToast(e instanceof Error ? e.message : 'Error', 'error'); }
+  };
+
+  const togglePublish = async (m: ProgramModule) => {
+    try {
+      const res = await apiFetch(`${API_URL}/api/modules/${m.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_published: !m.is_published }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showToast(m.is_published ? 'Módulo despublicado' : 'Módulo publicado'); onChange();
+    } catch (e: unknown) { showToast(e instanceof Error ? e.message : 'Error', 'error'); }
+  };
+
+  const sorted = [...modules].sort((a, b) => a.order - b.order);
+
+  return (
+    <div className="border-t border-zinc-200 bg-zinc-50/60 p-4">
+      {showForm && (
+        <div className="mb-4 p-4 rounded-xl bg-white border border-zinc-200">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-[13px] font-bold text-zinc-900">{editingId ? 'Editar módulo' : 'Nuevo módulo'}</h4>
+            <button onClick={cancel} className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-100"><I.Close className="w-4 h-4" /></button>
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            <div className="md:col-span-2"><Field label="Título"><input className={inputCls} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></Field></div>
+            <div className="md:col-span-2"><Field label="Descripción"><textarea className={inputCls} rows={2} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></Field></div>
+            <Field label="Duración (minutos)"><input type="number" min={1} className={inputCls} value={form.duration_minutes} onChange={e => setForm({ ...form, duration_minutes: Number(e.target.value) })} /></Field>
+            <Field label="Puntaje mínimo de aprobación (%)"><input type="number" min={0} max={100} className={inputCls} value={form.minimum_score} onChange={e => setForm({ ...form, minimum_score: Number(e.target.value) })} disabled={!form.requires_evaluation} /></Field>
+            <Field label="Inicio"><input type="datetime-local" className={inputCls} value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} /></Field>
+            <Field label="Fin"><input type="datetime-local" className={inputCls} value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} /></Field>
+            <div className="md:col-span-2">
+              <label className="inline-flex items-center gap-2.5 text-[12.5px] text-zinc-700 cursor-pointer">
+                <input type="checkbox" checked={form.requires_evaluation} onChange={e => setForm({ ...form, requires_evaluation: e.target.checked })} className="w-4 h-4 accent-blue-600" />
+                Requiere evaluación para aprobar
+              </label>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-zinc-200">
+            <button onClick={cancel} className="px-3.5 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:bg-zinc-50">Cancelar</button>
+            <button onClick={submit} disabled={saving} className="px-3.5 py-2 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold disabled:opacity-50">{saving ? 'Guardando…' : editingId ? 'Guardar cambios' : 'Crear módulo'}</button>
+          </div>
+        </div>
+      )}
+
+      {sorted.length === 0 && !showForm ? (
+        <div className="text-center py-6">
+          <p className="text-[12.5px] text-zinc-500 mb-3">Esta actividad todavía no tiene módulos.</p>
+          <button onClick={startCreate} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold hover:bg-zinc-800 transition">
+            <I.Plus className="w-3.5 h-3.5" />Agregar módulo
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-2">
+            {sorted.map((m, i) => (
+              <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg bg-white border border-zinc-200">
+                <div className="w-6 h-6 rounded-full bg-zinc-100 text-zinc-600 text-[11px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12.5px] font-semibold text-zinc-900 truncate">{m.title}</span>
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9.5px] font-bold uppercase tracking-wider ${m.is_published ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
+                      {m.is_published ? 'Publicado' : 'Borrador'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-zinc-500 mt-0.5">
+                    <span className="inline-flex items-center gap-1"><I.Clock className="w-3 h-3" />{m.duration_minutes} min</span>
+                    {m.requires_evaluation && <span className="inline-flex items-center gap-1"><I.Award className="w-3 h-3" />Aprobar con {m.minimum_score}%</span>}
+                  </div>
+                </div>
+                <div className="flex gap-1 flex-shrink-0">
+                  <button onClick={() => togglePublish(m)} className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition" title={m.is_published ? 'Despublicar' : 'Publicar'}><I.Check className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => startEdit(m)} className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition"><I.Edit className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => remove(m.id)} className="p-1.5 rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-600 transition"><I.Trash className="w-3.5 h-3.5" /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {!showForm && (
+            <button onClick={startCreate} className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:bg-zinc-50 transition">
+              <I.Plus className="w-3.5 h-3.5" />Agregar módulo
+            </button>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -1471,7 +1666,7 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
     if (!confirm('¿Quitar este participante del programa?')) return;
     try {
       setBusyId(id);
-      const res = await fetch(`${API_URL}/api/programs/${programId}/participants/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/participants/${id}`, { method: 'DELETE' });
       if (!res.ok && res.status !== 204) throw new Error(await res.text());
       showToast('Participante removido'); onChange();
     } catch (e: unknown) {
@@ -1482,7 +1677,7 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
   const resend = async (id: string, email: string) => {
     try {
       setBusyId(id);
-      const res = await fetch(`${API_URL}/api/programs/${programId}/participants/${id}/resend-invitation`, { method: 'POST' });
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/participants/${id}/resend-invitation`, { method: 'POST' });
       if (!res.ok) throw new Error(await res.text());
       showToast(`Invitación reenviada a ${email}`);
       onChange();
@@ -1664,7 +1859,7 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
     const t = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(`${API_URL}/api/programs/users/search?q=${encodeURIComponent(query.trim())}&exclude_program_id=${programId}&limit=10`);
+        const res = await apiFetch(`${API_URL}/api/programs/users/search?q=${encodeURIComponent(query.trim())}&exclude_program_id=${programId}&limit=10`);
         if (res.ok) setHits(await res.json());
       } finally { setSearching(false); }
     }, 250);
@@ -1674,7 +1869,7 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
   const enroll = async (userId: string) => {
     try {
       setSubmitting(true);
-      const res = await fetch(`${API_URL}/api/programs/${programId}/participants`, {
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/participants`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId, role, status: sendInvitation ? 'pending' : 'active', send_invitation: sendInvitation }),
@@ -1694,7 +1889,7 @@ function AddParticipantModal({ programId, onClose, onAdded, showToast }: { progr
     e.preventDefault();
     try {
       setSubmitting(true);
-      const userRes = await fetch(`${API_URL}/api/programs/users`, {
+      const userRes = await apiFetch(`${API_URL}/api/programs/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), first_name: firstName.trim(), last_name: lastName.trim(), role }),
@@ -2002,7 +2197,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
   const loadVincs = React.useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/programs/${programId}/vinculations`);
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/vinculations`);
       if (res.ok) {
         const data = await res.json();
         setVincs(Array.isArray(data) ? data.filter((v: any) => v.status === 'active') : []);
@@ -2016,7 +2211,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
   const removeVinc = async (vid: number) => {
     if (!confirm('¿Desvincular esta dupla?')) return;
     try {
-      await fetch(`${API_URL}/api/programs/${programId}/vinculations/${vid}`, { method: 'DELETE' });
+      await apiFetch(`${API_URL}/api/programs/${programId}/vinculations/${vid}`, { method: 'DELETE' });
       setVincs(prev => prev.filter((v: any) => v.id !== vid));
       showToast('Dupla desvinculada');
     } catch { showToast('Error al desvincular', 'error'); }
@@ -2028,7 +2223,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
     setMatchResults([]);
     setActivations({});
     try {
-      const res = await fetch(`${API_URL}/api/matches/intelligent`, {
+      const res = await apiFetch(`${API_URL}/api/matches/intelligent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ program_id: programId, top_k: 20, min_score: 0, use_ai: useAI }),
@@ -2046,7 +2241,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
     const key = `${mentor_user_id}-${mentee_user_id}`;
     setActivations(p => ({ ...p, [key]: 'loading' }));
     try {
-      const res = await fetch(`${API_URL}/api/matches/intelligent/activate`, {
+      const res = await apiFetch(`${API_URL}/api/matches/intelligent/activate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ program_id: programId, mentor_user_id, mentee_user_id, score, ai_recommendation: ai_rec, vinculation_type: 'mentoria' }),
@@ -2286,7 +2481,7 @@ function PairProgressModal({ programId, vinc, onClose, showToast }: { programId:
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API_URL}/api/programs/${programId}/pair-progress?mentor_id=${mentor.id}&mentee_id=${mentee.id}`);
+      const r = await apiFetch(`${API_URL}/api/programs/${programId}/pair-progress?mentor_id=${mentor.id}&mentee_id=${mentee.id}`);
       if (r.ok) setData(await r.json());
     } catch {} finally { setLoading(false); }
   }, [programId, mentor.id, mentee.id]);
@@ -2297,7 +2492,7 @@ function PairProgressModal({ programId, vinc, onClose, showToast }: { programId:
     if (!form.date) { showToast('Indicá la fecha de la sesión', 'error'); return; }
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/api/programs/${programId}/sessions`, {
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/sessions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mentor_id: mentor.id, mentee_id: mentee.id, title: form.title || 'Sesión de mentoría',
@@ -2523,7 +2718,7 @@ function TabReportes({ program, participants, assignedPM, showToast }: { program
   React.useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`${API_URL}/api/stats/programs/${program.id}`);
+        const r = await apiFetch(`${API_URL}/api/stats/programs/${program.id}`);
         if (r.ok) setStats(await r.json());
       } catch {}
     })();
@@ -2751,7 +2946,7 @@ function AuditFeed({ programId }: { programId: string }) {
   React.useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`${API_URL}/api/programs/${programId}/audit-logs?limit=100`);
+        const r = await apiFetch(`${API_URL}/api/programs/${programId}/audit-logs?limit=100`);
         setLogs(r.ok ? await r.json() : []);
       } catch { setLogs([]); }
     })();

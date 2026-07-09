@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import Image from 'next/image';
+import { apiFetch } from "@/lib/api";
 
 // ============================================================================
 // TYPES
@@ -654,14 +655,14 @@ export default function CoreDashboardPage() {
 
   const fetchProgramDetail = async (id: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/programs/${id}`);
+      const res = await apiFetch(`${API_URL}/api/programs/${id}`);
       if (res.ok) { const d = await res.json(); setProgramDetail(d); }
     } catch (err) { console.error(err); }
   };
 
   const fetchProgramTemplate = async (programName: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/program-templates`);
+      const res = await apiFetch(`${API_URL}/api/program-templates`);
       if (res.ok) {
         const templates = await res.json();
         const match = templates.find((t: any) => t.name === programName);
@@ -673,7 +674,7 @@ export default function CoreDashboardPage() {
   const fetchParticipants = async (id: string) => {
     setLoadingParticipants(true);
     try {
-      const res = await fetch(`${API_URL}/api/programs/${id}/participants`);
+      const res = await apiFetch(`${API_URL}/api/programs/${id}/participants`);
       if (res.ok) { const d = await res.json(); setProgramParticipants(Array.isArray(d) ? d : (d.participants || [])); }
     } catch (err) { console.error(err); }
     finally { setLoadingParticipants(false); }
@@ -683,10 +684,10 @@ export default function CoreDashboardPage() {
     if (!selectedProgram || !newParticipant.email) return;
     setAddingParticipant(true); setParticipantMsg('');
     try {
-      const uRes = await fetch(`${API_URL}/api/programs/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: newParticipant.email, first_name: newParticipant.first_name, last_name: newParticipant.last_name, role: newParticipant.role }) });
+      const uRes = await apiFetch(`${API_URL}/api/programs/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: newParticipant.email, first_name: newParticipant.first_name, last_name: newParticipant.last_name, role: newParticipant.role }) });
       if (!uRes.ok) throw new Error((await uRes.json().catch(() => ({}))).detail || 'Error creando usuario');
       const ud = await uRes.json();
-      const pRes = await fetch(`${API_URL}/api/programs/${selectedProgram.id}/participants`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: ud.id, role: newParticipant.role, status: 'active' }) });
+      const pRes = await apiFetch(`${API_URL}/api/programs/${selectedProgram.id}/participants`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: ud.id, role: newParticipant.role, status: 'active' }) });
       if (!pRes.ok) throw new Error((await pRes.json().catch(() => ({}))).detail || 'Error agregando participante');
       setParticipantMsg('Participante agregado exitosamente');
       setNewParticipant({ email: '', first_name: '', last_name: '', role: 'participant_cell' });
@@ -700,7 +701,7 @@ export default function CoreDashboardPage() {
   const handleDownloadParticipantTemplate = async () => {
     if (!selectedProgram) return;
     try {
-      const res = await fetch(`${API_URL}/api/programs/${selectedProgram.id}/participants/template`);
+      const res = await apiFetch(`${API_URL}/api/programs/${selectedProgram.id}/participants/template`);
       if (!res.ok) throw new Error('No se pudo descargar la plantilla');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -725,7 +726,7 @@ export default function CoreDashboardPage() {
     try {
       const form = new FormData();
       form.append('file', batchFile);
-      const res = await fetch(`${API_URL}/api/programs/${selectedProgram.id}/participants/validate-batch`, {
+      const res = await apiFetch(`${API_URL}/api/programs/${selectedProgram.id}/participants/validate-batch`, {
         method: 'POST',
         body: form,
       });
@@ -764,7 +765,7 @@ export default function CoreDashboardPage() {
     setParticipantMsg('');
 
     try {
-      const res = await fetch(`${API_URL}/api/programs/${selectedProgram.id}/participants/batch`, {
+      const res = await apiFetch(`${API_URL}/api/programs/${selectedProgram.id}/participants/batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows, send_invitations: true }),
@@ -786,13 +787,13 @@ export default function CoreDashboardPage() {
 
   const handleRemoveParticipant = async (pid: string) => {
     if (!selectedProgram) return;
-    try { await fetch(`${API_URL}/api/programs/${selectedProgram.id}/participants/${pid}`, { method: 'DELETE' }); fetchParticipants(selectedProgram.id); refreshPrograms(); }
+    try { await apiFetch(`${API_URL}/api/programs/${selectedProgram.id}/participants/${pid}`, { method: 'DELETE' }); fetchParticipants(selectedProgram.id); refreshPrograms(); }
     catch (err) { console.error(err); }
   };
 
   const refreshPrograms = async () => {
     if (!company?.id) return;
-    try { const res = await fetch(`${API_URL}/api/programs?company_id=${company.id}`); if (res.ok) { const d = await res.json(); setPrograms((Array.isArray(d) ? d : []).map(mapApiProgram)); } }
+    try { const res = await apiFetch(`${API_URL}/api/programs?company_id=${company.id}`); if (res.ok) { const d = await res.json(); setPrograms((Array.isArray(d) ? d : []).map(mapApiProgram)); } }
     catch (err) { console.error(err); }
   };
 
@@ -817,7 +818,7 @@ export default function CoreDashboardPage() {
         // Fetch my programs
         if (parsedUser?.id) {
           setLoadingMyPrograms(true);
-          fetch(`${API_URL}/api/programs/my-programs/${parsedUser.id}`)
+          apiFetch(`${API_URL}/api/programs/my-programs/${parsedUser.id}`, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } })
             .then(r => r.ok ? r.json() : [])
             .then(d => { setMyPrograms(Array.isArray(d) ? d : []); if (Array.isArray(d) && d.length === 1) setSelectedMyProgram(d[0]); })
             .catch(() => {})
@@ -832,13 +833,13 @@ export default function CoreDashboardPage() {
         if (!PARTICIPANT_ROLES.includes(userRole) && slug && parsedCompany?.slug && slug !== parsedCompany.slug) {
           // Admin root can visit any company's Studio — fetch company by slug
           if (ADMIN_ROLES.includes(userRole)) {
-            fetch(`${API_URL}/api/companies/by-slug/${slug}`)
+            apiFetch(`${API_URL}/api/companies/by-slug/${slug}`)
               .then(r => r.ok ? r.json() : null)
               .then(d => {
                 if (d) {
                   setCompany(d);
                   if (d.id) {
-                    fetch(`${API_URL}/api/companies/company/${d.id}/pm`)
+                    apiFetch(`${API_URL}/api/companies/company/${d.id}/pm`)
                       .then(r => r.ok ? r.json() : null)
                       .then(pm => { if (pm) setPmData(pm.assigned_pm); })
                       .catch(() => {});
@@ -856,7 +857,7 @@ export default function CoreDashboardPage() {
         setCompany(parsedCompany);
         // Fetch PM data
         if (parsedCompany?.id) {
-          fetch(`${API_URL}/api/companies/company/${parsedCompany.id}/pm`)
+          apiFetch(`${API_URL}/api/companies/company/${parsedCompany.id}/pm`)
             .then(r => r.ok ? r.json() : null)
             .then(d => { if (d) setPmData(d.assigned_pm); })
             .catch(() => {});
@@ -865,7 +866,7 @@ export default function CoreDashboardPage() {
         // No company in localStorage but we have a slug — try to load it (admin navigating)
         const ADMIN_ROLES = ['admin_root', 'inspiratoria_admin', 'superadmin', 'coordinator'];
         if (ADMIN_ROLES.includes(userRole)) {
-          fetch(`${API_URL}/api/companies/by-slug/${slug}`)
+          apiFetch(`${API_URL}/api/companies/by-slug/${slug}`)
             .then(r => r.ok ? r.json() : null)
             .then(d => { if (d) setCompany(d); })
             .catch(() => {});
@@ -912,7 +913,7 @@ export default function CoreDashboardPage() {
     if (!company?.id) { setLoadingPrograms(false); return; }
     const f = async () => {
       setLoadingPrograms(true);
-      try { const res = await fetch(`${API_URL}/api/programs?company_id=${company.id}`); if (res.ok) { const d = await res.json(); setPrograms((Array.isArray(d) ? d : []).map(mapApiProgram)); } }
+      try { const res = await apiFetch(`${API_URL}/api/programs?company_id=${company.id}`); if (res.ok) { const d = await res.json(); setPrograms((Array.isArray(d) ? d : []).map(mapApiProgram)); } }
       catch (err) { console.error(err); }
       finally { setLoadingPrograms(false); }
     };

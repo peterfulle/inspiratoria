@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { apiFetch } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 
@@ -46,7 +47,7 @@ export default function EnrollPage() {
     if (!programId) return;
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/api/programs/${programId}/public-info`);
+        const res = await apiFetch(`${API_URL}/api/programs/${programId}/public-info`);
         if (!res.ok) throw new Error(res.status === 404 ? 'Programa no encontrado.' : 'No pudimos cargar el programa.');
         const data: ProgramInfo = await res.json();
         setProgram(data);
@@ -63,7 +64,7 @@ export default function EnrollPage() {
     setSubmitError(null);
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/api/programs/${programId}/self-enroll`, {
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/self-enroll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), first_name: firstName.trim(), last_name: lastName.trim(), role }),

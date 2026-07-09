@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 
 // ═══════════════════════════════════════════════════════════════════
 // STYLES — same visual language as accounts & dashboard
@@ -545,7 +546,7 @@ export default function BillingPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API}/api/companies/billing/overview`);
+      const res = await apiFetch(`${API}/api/companies/billing/overview`);
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
       setClients(data.clients || []);
@@ -563,7 +564,7 @@ export default function BillingPage() {
   async function handleCreateInvoice() {
     if (!invoiceTarget) return;
     try {
-      const res = await fetch(`${API}/api/companies/billing/invoice`, {
+      const res = await apiFetch(`${API}/api/companies/billing/invoice`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -587,7 +588,7 @@ export default function BillingPage() {
   async function handleCreatePayment() {
     if (!paymentTarget) return;
     try {
-      const res = await fetch(`${API}/api/companies/billing/payment-order`, {
+      const res = await apiFetch(`${API}/api/companies/billing/payment-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

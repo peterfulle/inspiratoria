@@ -170,18 +170,35 @@ export interface AIMatchHealth {
 const FALLBACK_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001") + "/api";
 const FALLBACK_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
+/**
+ * Reemplazo directo de `fetch()` para llamadas al backend propio — agrega el
+ * header `Authorization: Bearer <auth_token>` automáticamente (leyendo de
+ * localStorage) si no viene ya seteado. Mismo signature que `fetch`, así que
+ * migrar un call site es tan simple como cambiar el nombre de la función.
+ */
+export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+  const headers = new Headers(init.headers);
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  return fetch(input, { ...init, headers });
+}
+
 export const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? FALLBACK_BASE_URL;
 export const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? FALLBACK_BACKEND_URL;
 
 async function safeFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${apiBaseUrl}${path}`;
   console.log(`🌐 safeFetch: ${init?.method || 'GET'} ${url}`, init?.body ? JSON.parse(init.body as string) : '');
-  
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
   const response = await fetch(url, {
     cache: "no-store",
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
   });

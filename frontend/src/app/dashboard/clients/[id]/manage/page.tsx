@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
 
 interface Company {
   id: string;
@@ -70,7 +71,7 @@ export default function ClientManagePage() {
 
   const loadCompanyData = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${companyId}`);
+      const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${companyId}`);
       if (response.ok) {
         const data = await response.json();
         setCompany(data);
@@ -91,7 +92,7 @@ export default function ClientManagePage() {
     if (!company) return;
     setIsSaving(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${company.id}`, {
+      const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${company.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editFormData),
@@ -121,7 +122,7 @@ export default function ClientManagePage() {
     const cleanRUT = rut.replace(/\./g, '').replace(/-/g, '');
     setIsSaving(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/search-rut?rut=${cleanRUT}`);
+      const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/search-rut?rut=${cleanRUT}`);
       if (response.ok) {
         const data = await response.json();
         setEditFormData({

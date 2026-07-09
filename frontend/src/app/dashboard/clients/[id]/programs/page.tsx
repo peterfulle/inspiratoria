@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { apiFetch } from "@/lib/api";
 
 interface Program {
   id: string;
@@ -44,7 +45,7 @@ export default function ClientProgramsPage() {
   const loadData = async () => {
     try {
       // Cargar empresa
-      const companyRes = await fetch(
+      const companyRes = await apiFetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/companies/${companyId}`
       );
       if (companyRes.ok) {
@@ -53,7 +54,7 @@ export default function ClientProgramsPage() {
       }
 
       // Cargar programas
-      const programsRes = await fetch(
+      const programsRes = await apiFetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/programs?company_id=${companyId}`
       );
       if (programsRes.ok) {
@@ -77,7 +78,7 @@ export default function ClientProgramsPage() {
         activities: []
       };
       
-      const response = await fetch(`${apiUrl}/api/programs`, {
+      const response = await apiFetch(`${apiUrl}/api/programs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(programData),

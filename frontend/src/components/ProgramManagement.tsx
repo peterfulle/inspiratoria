@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { backendUrl } from "@/lib/api";
-
+import { backendUrl, apiFetch } from "@/lib/api";
 interface Program {
   id: number;
   name: string;
@@ -62,7 +61,7 @@ export default function ProgramManagement({ darkMode }: ProgramManagementProps) 
       const token = localStorage.getItem("token");
       const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
       
-      const response = await fetch(`${backendUrl}/api/programs`, { headers });
+      const response = await apiFetch(`${backendUrl}/api/programs`, { headers });
       if (!response.ok) throw new Error("Error al cargar programas");
       
       const data = await response.json();
@@ -102,7 +101,7 @@ export default function ProgramManagement({ darkMode }: ProgramManagementProps) 
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${backendUrl}/api/programs`, {
+      const response = await apiFetch(`${backendUrl}/api/programs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -128,7 +127,7 @@ export default function ProgramManagement({ darkMode }: ProgramManagementProps) 
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${backendUrl}/api/programs/${selectedProgram.id}`, {
+      const response = await apiFetch(`${backendUrl}/api/programs/${selectedProgram.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -155,7 +154,7 @@ export default function ProgramManagement({ darkMode }: ProgramManagementProps) 
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${backendUrl}/api/programs/${selectedProgram.id}`, {
+      const response = await apiFetch(`${backendUrl}/api/programs/${selectedProgram.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -176,7 +175,7 @@ export default function ProgramManagement({ darkMode }: ProgramManagementProps) 
   const handleStatusChange = async (program: Program, newStatus: string) => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${backendUrl}/api/programs/${program.id}/status?status=${newStatus}`, {
+      const response = await apiFetch(`${backendUrl}/api/programs/${program.id}/status?status=${newStatus}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,

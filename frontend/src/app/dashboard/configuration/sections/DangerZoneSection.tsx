@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icons } from '../components/Icons';
+import { apiFetch } from "@/lib/api";
 
 export default function DangerZoneSection() {
   const router = useRouter();
@@ -31,9 +32,10 @@ export default function DangerZoneSection() {
                         process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 
                         'http://localhost:8001';
       
-      const response = await fetch(`${backendUrl}/api/clear-all-data`, {
+      const token = localStorage.getItem('auth_token');
+      const response = await apiFetch(`${backendUrl}/api/clear-all-data`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       });
 
       const result = await response.json();

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Loader2, Mail, CheckCircle, AlertCircle, Copy, Check } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 type ParticipantModalProps = {
   isOpen: boolean;
@@ -36,7 +37,7 @@ export default function ParticipantModal({ isOpen, onClose, onSubmit, darkMode, 
   const loadPrograms = async () => {
     setLoadingPrograms(true);
     try {
-      const response = await fetch(`/api/programs/company/${companyId}`);
+      const response = await apiFetch(`/api/programs/company/${companyId}`);
       if (!response.ok) throw new Error('Error al cargar programas');
       const data = await response.json();
       setPrograms(data);
@@ -81,7 +82,7 @@ export default function ParticipantModal({ isOpen, onClose, onSubmit, darkMode, 
     setError(null);
 
     try {
-      const response = await fetch('/api/invitations/invite', {
+      const response = await apiFetch('/api/invitations/invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

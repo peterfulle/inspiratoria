@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { ProgramTemplate, Resource } from "../../types";
+import { apiFetch } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
@@ -105,7 +106,7 @@ export default function ProgramPreviewPage() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`${API_URL}/api/program-templates?include_files=true`);
+        const r = await apiFetch(`${API_URL}/api/program-templates?include_files=true`);
         if (r.ok) {
           const all: ProgramTemplate[] = await r.json();
           const found = all.find(t => t.slug === slug) || null;
@@ -113,7 +114,7 @@ export default function ProgramPreviewPage() {
           // Programas reales instanciados desde esta plantilla
           if (found?.id) {
             try {
-              const pr = await fetch(`${API_URL}/api/programs?template_id=${found.id}`);
+              const pr = await apiFetch(`${API_URL}/api/programs?template_id=${found.id}`);
               if (pr.ok) setAssignedPrograms(await pr.json());
             } catch {}
           }

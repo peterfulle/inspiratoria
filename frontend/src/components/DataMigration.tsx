@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { backendUrl } from "@/lib/api";
-
+import { backendUrl, apiFetch } from "@/lib/api";
 interface MigrationRecord {
   row: number;
   full_name: string;
@@ -37,7 +36,7 @@ export default function DataMigration({ darkMode = false }: DataMigrationProps) 
   const fetchPrograms = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${backendUrl}/api/programs`, {
+      const response = await apiFetch(`${backendUrl}/api/programs`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (response.ok) {
@@ -119,7 +118,7 @@ export default function DataMigration({ darkMode = false }: DataMigrationProps) 
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${backendUrl}/api/participants/bulk-import`, {
+      const response = await apiFetch(`${backendUrl}/api/participants/bulk-import`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

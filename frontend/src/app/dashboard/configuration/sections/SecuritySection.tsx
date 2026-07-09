@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Icons } from '../components/Icons';
 import Toggle from '../components/Toggle';
+import { apiFetch } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
@@ -43,7 +44,7 @@ export default function SecuritySection({ settings, onSettingsChange }: Security
       const user = JSON.parse(stored);
       setUserEmail(user.email || '');
 
-      const res = await fetch(`${API}/api/companies/auth/totp/check`, {
+      const res = await apiFetch(`${API}/api/companies/auth/totp/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: user.email }),
@@ -63,7 +64,7 @@ export default function SecuritySection({ settings, onSettingsChange }: Security
     setTotpSuccess('');
     setShowSetup(true);
     try {
-      const res = await fetch(`${API}/api/companies/auth/totp/setup`, {
+      const res = await apiFetch(`${API}/api/companies/auth/totp/setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
       });
@@ -89,7 +90,7 @@ export default function SecuritySection({ settings, onSettingsChange }: Security
     }
     setTotpError('');
     try {
-      const res = await fetch(`${API}/api/companies/auth/totp/enable`, {
+      const res = await apiFetch(`${API}/api/companies/auth/totp/enable`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
         body: JSON.stringify({ code: verifyCode }),
@@ -119,7 +120,7 @@ export default function SecuritySection({ settings, onSettingsChange }: Security
     }
     setTotpError('');
     try {
-      const res = await fetch(`${API}/api/companies/auth/totp/disable`, {
+      const res = await apiFetch(`${API}/api/companies/auth/totp/disable`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
         body: JSON.stringify({ code: disableCode }),

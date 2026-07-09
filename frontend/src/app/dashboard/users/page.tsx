@@ -176,7 +176,7 @@ export default function UsersPage() {
   const fetchCompanies = useCallback(async () => {
     try {
       const token = localStorage.getItem("auth_token");
-      const res = await fetch(`${API_URL}/api/companies/admin/companies-list`, {
+      const res = await apiFetch(`${API_URL}/api/companies/admin/companies-list`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {

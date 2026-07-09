@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
 
 const VIDEOS = [
   "/videos/d277079e-dc50-4501-ab94-8c2c6b9eeefe.mp4",
@@ -105,7 +106,7 @@ export default function LoginPage() {
 
     try {
       // First check if user has TOTP enabled
-      const checkRes = await fetch(`${API}/api/companies/auth/totp/check`, {
+      const checkRes = await apiFetch(`${API}/api/companies/auth/totp/check`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -133,7 +134,7 @@ export default function LoginPage() {
       }
 
       // No TOTP → send email OTP
-      const res = await fetch(`${API}/api/companies/auth/request-otp`, {
+      const res = await apiFetch(`${API}/api/companies/auth/request-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -169,7 +170,7 @@ export default function LoginPage() {
     setErrorCode("");
 
     try {
-      const res = await fetch(`${API}/api/companies/auth/login-otp`, {
+      const res = await apiFetch(`${API}/api/companies/auth/login-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp: otpCode, remember }),
@@ -290,7 +291,7 @@ export default function LoginPage() {
     setErrorCode("");
 
     try {
-      const res = await fetch(`${API}/api/companies/auth/login-totp`, {
+      const res = await apiFetch(`${API}/api/companies/auth/login-totp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, totp_code: totpVal, remember }),
@@ -328,7 +329,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API}/api/companies/auth/request-otp`, {
+      const res = await apiFetch(`${API}/api/companies/auth/request-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -354,7 +355,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API}/api/companies/auth/request-otp`, {
+      const res = await apiFetch(`${API}/api/companies/auth/request-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

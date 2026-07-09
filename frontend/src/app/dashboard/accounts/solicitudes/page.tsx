@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from "@/lib/api";
 
 // ─── SVG Icons ───
 const IconArrowLeft = ({ className = "w-5 h-5" }: { className?: string }) => (
@@ -113,7 +114,7 @@ export default function SolicitudesPage() {
 
   const fetchSolicitudes = async () => {
     try {
-      const response = await fetch(`${API}/api/companies/solicitudes`);
+      const response = await apiFetch(`${API}/api/companies/solicitudes`);
       if (response.ok) {
         const data = await response.json();
         setSolicitudes(data);
@@ -161,7 +162,7 @@ export default function SolicitudesPage() {
 
     try {
       // 1. Create account in backend
-      const res = await fetch(`${API}/api/companies/solicitudes/${modal.solicitud.id}/create-account`, {
+      const res = await apiFetch(`${API}/api/companies/solicitudes/${modal.solicitud.id}/create-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -180,7 +181,7 @@ export default function SolicitudesPage() {
 
       // 2. Send credentials email
       const baseUrl = window.location.origin;
-      await fetch('/api/studio-credentials', {
+      await apiFetch('/api/studio-credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -216,7 +217,7 @@ export default function SolicitudesPage() {
     if (!confirm('¿Eliminar esta solicitud? Esta acción no se puede deshacer.')) return;
     setActionLoading(id);
     try {
-      const res = await fetch(`${API}/api/companies/solicitudes/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`${API}/api/companies/solicitudes/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setSolicitudes(prev => prev.filter(s => s.id !== id));
         setExpandedId(null);

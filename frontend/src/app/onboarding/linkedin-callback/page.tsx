@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { apiFetch } from "@/lib/api";
 
 function LinkedInCallbackContent() {
   const router = useRouter();
@@ -42,7 +43,7 @@ function LinkedInCallbackContent() {
       try {
         // Call our backend to process LinkedIn callback
         setMessage('Conectando con LinkedIn...');
-        const response = await fetch('/api/invitations/linkedin/callback', {
+        const response = await apiFetch('/api/invitations/linkedin/callback', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

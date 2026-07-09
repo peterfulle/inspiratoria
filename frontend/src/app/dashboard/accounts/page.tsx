@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from "@/lib/api";
 
 // ============================================================================
 // ICONS (same style as dashboard)
@@ -1667,7 +1668,7 @@ export default function AccountsPage() {
       const submitData = { ...modalForm, whatsapp: fullWhatsapp };
 
       // 1) Crea empresa Studio
-      const registerRes = await fetch(`${API}/api/companies/auth/register-studio`, {
+      const registerRes = await apiFetch(`${API}/api/companies/auth/register-studio`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(submitData),
@@ -1679,7 +1680,7 @@ export default function AccountsPage() {
 
       // 2) Crea usuario admin + cuenta Studio (activa, sin revisión manual)
       const adminName = `${modalForm.nombre} ${modalForm.apellido}`.trim();
-      const createRes = await fetch(`${API}/api/companies/solicitudes/${registerData.company.id}/create-account`, {
+      const createRes = await apiFetch(`${API}/api/companies/solicitudes/${registerData.company.id}/create-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1695,7 +1696,7 @@ export default function AccountsPage() {
 
       // 3) Enviar credenciales por correo
       const baseUrl = window.location.origin;
-      await fetch('/api/studio-credentials', {
+      await apiFetch('/api/studio-credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1714,12 +1715,12 @@ export default function AccountsPage() {
       setModalStep(4);
       // Refresh companies list
       try {
-        const res = await fetch(`${API}/api/companies/`);
+        const res = await apiFetch(`${API}/api/companies/`);
         if (res.ok) {
           const all = await res.json();
           setCompanies(all.filter((c: CompanyItem) => c.status !== 'pending' && c.account_type === 'studio'));
         }
-        const sRes = await fetch(`${API}/api/companies/stats`);
+        const sRes = await apiFetch(`${API}/api/companies/stats`);
         if (sRes.ok) setStats(await sRes.json());
       } catch { /* ignore */ }
     } catch (err: any) {
@@ -1745,8 +1746,8 @@ export default function AccountsPage() {
     const fetchData = async () => {
       try {
         const [statsRes, companiesRes] = await Promise.all([
-          fetch(`${API}/api/companies/stats`),
-          fetch(`${API}/api/companies/`),
+          apiFetch(`${API}/api/companies/stats`),
+          apiFetch(`${API}/api/companies/`),
         ]);
         if (statsRes.ok) setStats(await statsRes.json());
         if (companiesRes.ok) {
@@ -1838,7 +1839,7 @@ export default function AccountsPage() {
     setPmModalLoading(true);
     setPmModalTab('resumen');
     try {
-      const res = await fetch(`${API}/api/companies/pm/${pmId}/activity`);
+      const res = await apiFetch(`${API}/api/companies/pm/${pmId}/activity`);
       if (res.ok) {
         setPmModalData(await res.json());
       }

@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { backendUrl } from "@/lib/api";
-
+import { backendUrl, apiFetch } from "@/lib/api";
 interface Match {
   id: string;
   mentor: {
@@ -84,8 +83,8 @@ export default function MatchingEngineAI({ darkMode = false }: MatchingEngineAIP
       const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [matchesRes, programsRes] = await Promise.all([
-        fetch(`${backendUrl}/api/matches`, { headers }),
-        fetch(`${backendUrl}/api/programs`, { headers }),
+        apiFetch(`${backendUrl}/api/matches`, { headers }),
+        apiFetch(`${backendUrl}/api/programs`, { headers }),
       ]);
 
       if (matchesRes.ok) {
@@ -153,7 +152,7 @@ export default function MatchingEngineAI({ darkMode = false }: MatchingEngineAIP
         "Content-Type": "application/json",
       } : { "Content-Type": "application/json" };
 
-      const response = await fetch(`${backendUrl}/api/ai/match-suggestions`, {
+      const response = await apiFetch(`${backendUrl}/api/ai/match-suggestions`, {
         method: "POST",
         headers,
         body: JSON.stringify({ program_id: selectedProgramId }),
@@ -235,7 +234,7 @@ export default function MatchingEngineAI({ darkMode = false }: MatchingEngineAIP
         "Content-Type": "application/json",
       } : { "Content-Type": "application/json" };
 
-      const response = await fetch(`${backendUrl}/api/matches/${matchId}/approve`, {
+      const response = await apiFetch(`${backendUrl}/api/matches/${matchId}/approve`, {
         method: "POST",
         headers,
       });

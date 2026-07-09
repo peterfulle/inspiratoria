@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch } from "@/lib/api";
 
 // ============================================================================
 // TYPES
@@ -107,8 +108,8 @@ export default function SubscriptionAccountsPage() {
       // Fetch core and studio companies (everything except internal)
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
       const [coreRes, studioRes] = await Promise.all([
-        fetch(`${API_URL}/api/companies?account_type=core`),
-        fetch(`${API_URL}/api/companies?account_type=studio`),
+        apiFetch(`${API_URL}/api/companies?account_type=core`),
+        apiFetch(`${API_URL}/api/companies?account_type=studio`),
       ]);
       
       let allCompanies: Company[] = [];
