@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import TopNavbar from "@/components/TopNavbar";
 import PushNotificationPrompt from "@/components/PushNotificationPrompt";
@@ -21,12 +21,16 @@ export default function DashboardLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // Inicialmente colapsado
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { sendNotification } = usePushNotifications();
 
   // Ocultar sidebar en rutas de programa que tienen su propio layout con sidebar
   const programManagePattern = /^\/dashboard\/programs\/[^/]+\/(manage|training|activities|participants|config|reports)$/;
   const isInProgramRoute = programManagePattern.test(pathname);
-  const isInClientRoute = isInProgramRoute;
+  // Ocultar todo el chrome del dashboard cuando la página se embebe (ej. iframe
+  // dentro de la consola de Studio) — ver app/dashboard/programs/preview/[slug].
+  const isEmbedded = searchParams.get("embed") === "1";
+  const isInClientRoute = isInProgramRoute || isEmbedded;
 
   useEffect(() => {
     const userStr = localStorage.getItem("user");
