@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { ProgramTemplate, Resource } from "../../types";
 import { apiFetch } from "@/lib/api";
@@ -91,9 +91,8 @@ function hasData(r: Resource) { return !!(r.dataUrl || r.url); }
 export default function ProgramPreviewPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const slug = params.slug as string;
-  const isEmbed = searchParams.get("embed") === "1";
+  const isEmbed = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("embed") === "1";
 
   const [template, setTemplate] = useState<ProgramTemplate | null>(null);
   const [assignedPrograms, setAssignedPrograms] = useState<Array<{ id: string; name: string; status: string; company?: { name: string; slug?: string } | null }>>([]);
