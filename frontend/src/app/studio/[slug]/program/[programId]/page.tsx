@@ -150,14 +150,14 @@ export default function ProgramManagerConsole() {
   const [pms, setPms] = useState<PM[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'resumen' | 'info' | 'contenido' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes'>('resumen');
+  const [activeTab, setActiveTab] = useState<'resumen' | 'info' | 'modulos' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes'>('resumen');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   // Deep-link ?tab=<id> — usado por las redirecciones legacy (ex /activities, /participants, etc.)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const tab = new URLSearchParams(window.location.search).get('tab');
-    const valid = ['resumen', 'info', 'contenido', 'cronograma', 'actividades', 'participantes', 'duplas', 'gobierno', 'reportes'];
+    const valid = ['resumen', 'info', 'modulos', 'cronograma', 'actividades', 'participantes', 'duplas', 'gobierno', 'reportes'];
     if (tab && valid.includes(tab)) setActiveTab(tab as typeof activeTab);
   }, []);
 
@@ -414,7 +414,7 @@ export default function ProgramManagerConsole() {
         <div className="px-8 py-7 w-full">
           {activeTab === 'resumen' && <TabResumen program={program} participants={participants} assignedPM={assignedPM} pms={pms} onAssignPM={assignPM} onTab={setActiveTab} />}
           {activeTab === 'info' && <TabInfo program={program} onSave={patchInfo} />}
-          {activeTab === 'contenido' && <TabContenido program={program} />}
+          {activeTab === 'modulos' && <TabModulos program={program} />}
           {activeTab === 'cronograma' && <TabCronograma programId={programId} activities={program.activities} onChange={fetchProgram} showToast={showToast} />}
           {activeTab === 'actividades' && <TabActividades programId={programId} activities={program.activities} onChange={fetchProgram} showToast={showToast} />}
           {activeTab === 'participantes' && <TabParticipantes participants={participants} programId={programId} onChange={fetchProgram} showToast={showToast} />}
@@ -455,12 +455,12 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab }: {
   program: ProgramDetail;
   slug: string;
   activeTab: string;
-  onTab: (t: 'resumen' | 'info' | 'contenido' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes') => void;
+  onTab: (t: 'resumen' | 'info' | 'modulos' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes') => void;
 }) {
-  const tabsNav: { id: 'resumen' | 'info' | 'contenido' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes'; label: string; icon: React.ReactNode }[] = [
+  const tabsNav: { id: 'resumen' | 'info' | 'modulos' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes'; label: string; icon: React.ReactNode }[] = [
     { id: 'resumen', label: 'Resumen', icon: <I.Sparkles /> },
     { id: 'info', label: 'Información', icon: <I.Edit /> },
-    { id: 'contenido', label: 'Contenido', icon: <I.Module /> },
+    { id: 'modulos', label: 'Módulos', icon: <I.Module /> },
     { id: 'cronograma', label: 'Cronograma', icon: <I.Calendar /> },
     { id: 'actividades', label: 'Actividades', icon: <I.Activity /> },
     { id: 'participantes', label: 'Participantes', icon: <I.Users /> },
@@ -1468,37 +1468,40 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
   );
 }
 
-function TabContenido({ program }: { program: ProgramDetail }) {
-  const slug = program.template?.slug;
+function TabModulos({ program }: { program: ProgramDetail }) {
+  const templateId = program.template?.id;
   const snap = program.design_snapshot || {};
   const hasSnapshot = Boolean(
     (snap.modules && snap.modules.length) ||
     (snap.milestones && snap.milestones.length)
   );
 
-  if (!slug) {
+  if (!templateId) {
     return (
-      <Card title="Contenido del programa" subtitle="Diseño de módulos, hitos, mentores/mentees, matching y sesiones">
+      <Card title="Módulos" subtitle="Contenido, recursos y actividades del programa">
         {hasSnapshot ? (
           <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
             <p className="text-[13px] text-amber-800">
-              La plantilla original de este programa ya no existe, así que no se puede mostrar la vista completa en vivo.
+              La plantilla original de este programa ya no existe, así que no se puede editar en vivo.
               El programa conserva una copia congelada del diseño ({(snap.modules || []).length} módulos, {(snap.milestones || []).length} hitos)
-              tomada al momento de asignarlo, pero no hay una vista de detalle disponible para esa copia.
+              tomada al momento de asignarlo, pero no hay un editor disponible para esa copia.
             </p>
           </div>
         ) : (
-          <Empty msg="Este programa no fue creado desde una plantilla de Programas Studio, así que no tiene un diseño de contenido asociado." icon={<I.Module />} />
+          <Empty msg="Este programa no fue creado desde una plantilla de Programas Studio, así que no tiene módulos asociados." icon={<I.Module />} />
         )}
       </Card>
     );
   }
 
+  // Embebe el editor real de la plantilla (Programas Studio), abierto directo
+  // en el paso "Módulos" — misma edición de módulos/sesiones/recursos/PDFs que
+  // el wizard, en vivo (los cambios se reflejan también en Programas Studio).
   return (
     <div className="rounded-2xl border border-zinc-200 overflow-hidden bg-white" style={{ height: 'calc(100vh - 220px)', minHeight: 640 }}>
       <iframe
-        src={`/dashboard/programs/preview/${slug}?embed=1`}
-        title="Contenido del programa"
+        src={`/dashboard/programs?edit=${templateId}&step=modules&embed=1`}
+        title="Módulos del programa"
         className="w-full h-full border-0"
       />
     </div>
