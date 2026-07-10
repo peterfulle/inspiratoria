@@ -92,7 +92,6 @@ export default function ProgramPreviewPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params.slug as string;
-  const isEmbed = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("embed") === "1";
 
   const [template, setTemplate] = useState<ProgramTemplate | null>(null);
   const [assignedPrograms, setAssignedPrograms] = useState<Array<{ id: string; name: string; status: string; company?: { name: string; slug?: string } | null }>>([]);
@@ -253,15 +252,13 @@ export default function ProgramPreviewPage() {
       })()}
 
       {/* TOP BAR */}
-      {!isEmbed && (
-        <header className="topbar no-print">
-          <button onClick={() => router.push("/dashboard/programs")} className="btn-ghost">{I.arrowLeft}<span>Programas</span></button>
-          <div className="row gap12 ai-c">
-            <button onClick={print} className="btn-ghost">{I.printer}<span>Imprimir</span></button>
-            <div className={`status-pill ${template.status}`}>{template.status === "published" ? "Publicado" : "Borrador"}</div>
-          </div>
-        </header>
-      )}
+      <header className="topbar no-print">
+        <button onClick={() => router.push("/dashboard/programs")} className="btn-ghost">{I.arrowLeft}<span>Programas</span></button>
+        <div className="row gap12 ai-c">
+          <button onClick={print} className="btn-ghost">{I.printer}<span>Imprimir</span></button>
+          <div className={`status-pill ${template.status}`}>{template.status === "published" ? "Publicado" : "Borrador"}</div>
+        </div>
+      </header>
 
       {/* HERO */}
       <section className="hero" style={{ background: cat.gradient }}>
@@ -291,7 +288,6 @@ export default function ProgramPreviewPage() {
       </section>
 
       {/* PROGRAMAS ASIGNADOS (instancias reales de esta plantilla) */}
-      {!isEmbed && (
       <section className="no-print" style={{ maxWidth: 1100, margin: "16px auto 0", padding: "0 24px" }}>
         <div style={{ background: "#fff", border: "1px solid #ececec", borderRadius: 14, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: assignedPrograms.length ? 12 : 0 }}>
@@ -328,7 +324,6 @@ export default function ProgramPreviewPage() {
           )}
         </div>
       </section>
-      )}
 
       {/* TABS */}
       <nav className="tabs-bar no-print">

@@ -26,12 +26,7 @@ export default function DashboardLayout({
   // Ocultar sidebar en rutas de programa que tienen su propio layout con sidebar
   const programManagePattern = /^\/dashboard\/programs\/[^/]+\/(manage|training|activities|participants|config|reports)$/;
   const isInProgramRoute = programManagePattern.test(pathname);
-  // Ocultar todo el chrome del dashboard cuando la página se embebe (ej. iframe
-  // dentro de la consola de Studio) — ver app/dashboard/programs/preview/[slug].
-  // Se lee directo de window (no useSearchParams) para no forzar renderizado
-  // dinámico de TODAS las páginas de /dashboard, que rompe el build estático.
-  const isEmbedded = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("embed") === "1";
-  const isInClientRoute = isInProgramRoute || isEmbedded;
+  const isInClientRoute = isInProgramRoute;
 
   useEffect(() => {
     const userStr = localStorage.getItem("user");

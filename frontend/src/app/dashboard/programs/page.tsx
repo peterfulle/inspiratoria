@@ -380,10 +380,7 @@ export default function ProgramsPage() {
   }, []);
 
   // Deep-link ?edit=<templateId> — usado desde Asignaciones para saltar
-  // directo a completar una plantilla incompleta (ver "Completar plantilla ahora"),
-  // y desde la consola de Studio (pestaña Módulos) para editar el diseño en vivo.
-  // ?step=<tab> fuerza el paso inicial del wizard; ?embed=1 se preserva en el
-  // replace para que el layout de /dashboard siga sin chrome tras la limpieza de URL.
+  // directo a completar una plantilla incompleta (ver "Completar plantilla ahora").
   useEffect(() => {
     if (loading || typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -392,13 +389,7 @@ export default function ProgramsPage() {
     const target = templates.find(t => t.id === editId);
     if (target) {
       openEditModal(target);
-      const step = params.get("step");
-      if (step && (STEP_ORDER as string[]).includes(step)) {
-        setEditTab(step as ConfigTab);
-        setMaxUnlockedIndex(STEP_ORDER.length - 1);
-      }
-      const embed = params.get("embed") === "1";
-      router.replace(embed ? "/dashboard/programs?embed=1" : "/dashboard/programs");
+      router.replace("/dashboard/programs");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, templates]);
