@@ -46,7 +46,7 @@ services:
       - key: NODE_VERSION
         value: 18.17.0
       - key: NEXT_PUBLIC_API_BASE_URL
-        value: https://inspiratoria-backend.onrender.com/api
+        value: https://api.inspiratoria.org/api
 
 databases:
   # PostgreSQL Database
