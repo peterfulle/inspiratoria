@@ -1323,6 +1323,12 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
 
+  // Menú "Agregar módulo / Agregar actividad" del botón principal
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [showModuloForm, setShowModuloForm] = useState(false);
+  const [moduloForm, setModuloForm] = useState<ModuleFormState>(EMPTY_MODULE);
+  const [savingModulo, setSavingModulo] = useState(false);
+
   const startEdit = (a: ProgramActivity) => {
     setEditingId(a.id);
     setForm({
@@ -1335,6 +1341,38 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
   };
   const startCreate = () => { setEditingId(null); setForm(EMPTY_ACTIVITY); setShowForm(true); };
   const cancel = () => { setShowForm(false); setEditingId(null); };
+
+  const startCreateModulo = () => { setShowCreateMenu(false); setModuloForm(EMPTY_MODULE); setShowModuloForm(true); };
+  const cancelModulo = () => setShowModuloForm(false);
+  const submitModulo = async () => {
+    if (!moduloForm.title.trim()) { showToast('El título del módulo es obligatorio', 'error'); return; }
+    setSavingModulo(true);
+    try {
+      // 1) Crea el contenedor (Activity) de forma transparente, usando el título del módulo
+      const actRes = await apiFetch(`${API_URL}/api/activities/create`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          program_id: programId, name: moduloForm.title, description: moduloForm.description,
+          type: 'training', category: 'mentoria', modality: 'online', is_certificate_issued: false,
+        }),
+      });
+      if (!actRes.ok) throw new Error(await actRes.text());
+      const activity = await actRes.json();
+      // 2) Crea el módulo (Content) dentro de esa actividad
+      const modRes = await apiFetch(`${API_URL}/api/activities/${activity.id}/modules`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: moduloForm.title, description: moduloForm.description, duration_minutes: moduloForm.duration_minutes,
+          requires_evaluation: moduloForm.requires_evaluation, minimum_score: moduloForm.minimum_score,
+          resources: moduloForm.resources,
+        }),
+      });
+      if (!modRes.ok) throw new Error(await modRes.text());
+      showToast('Módulo creado');
+      cancelModulo(); onChange();
+    } catch (e: unknown) { showToast(e instanceof Error ? e.message : 'Error', 'error'); }
+    finally { setSavingModulo(false); }
+  };
 
   const submit = async () => {
     if (!form.name.trim()) { showToast('El nombre es obligatorio', 'error'); return; }
@@ -1365,13 +1403,57 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
   };
 
   return (
-    <Card title="Gestión de actividades" subtitle={`${activities.length} actividades en el programa`} action={
-      !showForm ? (
-        <button onClick={startCreate} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold hover:bg-zinc-800 transition">
-          <I.Plus className="w-3.5 h-3.5" />Nueva actividad
-        </button>
+    <Card title="Módulos" subtitle={`${activities.length} actividad${activities.length === 1 ? '' : 'es'} en el programa`} action={
+      !showForm && !showModuloForm ? (
+        <div className="relative">
+          <button onClick={() => setShowCreateMenu(o => !o)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold hover:bg-zinc-800 transition">
+            <I.Plus className="w-3.5 h-3.5" />Agregar
+          </button>
+          {showCreateMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowCreateMenu(false)} />
+              <div className="absolute right-0 top-full mt-1.5 w-52 rounded-lg bg-white border border-zinc-200 shadow-lg z-20 overflow-hidden">
+                <button onClick={startCreateModulo} className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-semibold text-zinc-800 hover:bg-zinc-50 transition">
+                  Agregar módulo
+                </button>
+                <div className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-semibold text-zinc-400 flex items-center justify-between cursor-not-allowed">
+                  Agregar actividad
+                  <span className="text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-400">Próximamente</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       ) : null
     }>
+      {showModuloForm && (
+        <div className="mb-5 p-5 rounded-xl bg-zinc-100/40 border border-zinc-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[14px] font-bold text-zinc-900">Nuevo módulo</h3>
+            <button onClick={cancelModulo} className="p-1.5 rounded-md text-zinc-500 hover:bg-white"><I.Close className="w-4 h-4" /></button>
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            <div className="md:col-span-2"><Field label="Título"><input className={inputCls} value={moduloForm.title} onChange={e => setModuloForm({ ...moduloForm, title: e.target.value })} /></Field></div>
+            <div className="md:col-span-2"><Field label="Descripción"><textarea className={inputCls} rows={2} value={moduloForm.description} onChange={e => setModuloForm({ ...moduloForm, description: e.target.value })} /></Field></div>
+            <Field label="Duración (minutos)"><input type="number" min={1} className={inputCls} value={moduloForm.duration_minutes} onChange={e => setModuloForm({ ...moduloForm, duration_minutes: Number(e.target.value) })} /></Field>
+            <Field label="Puntaje mínimo de aprobación (%)"><input type="number" min={0} max={100} className={inputCls} value={moduloForm.minimum_score} onChange={e => setModuloForm({ ...moduloForm, minimum_score: Number(e.target.value) })} disabled={!moduloForm.requires_evaluation} /></Field>
+            <div className="md:col-span-2">
+              <label className="inline-flex items-center gap-2.5 text-[12.5px] text-zinc-700 cursor-pointer">
+                <input type="checkbox" checked={moduloForm.requires_evaluation} onChange={e => setModuloForm({ ...moduloForm, requires_evaluation: e.target.checked })} className="w-4 h-4 accent-blue-600" />
+                Requiere evaluación para aprobar
+              </label>
+            </div>
+          </div>
+          <div className="border-t border-zinc-100">
+            <ResourceManager resources={moduloForm.resources} onChange={(resources) => setModuloForm({ ...moduloForm, resources })} />
+          </div>
+          <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-zinc-200">
+            <button onClick={cancelModulo} className="px-3.5 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:bg-zinc-50">Cancelar</button>
+            <button onClick={submitModulo} disabled={savingModulo} className="px-3.5 py-2 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold disabled:opacity-50">{savingModulo ? 'Guardando…' : 'Crear módulo'}</button>
+          </div>
+        </div>
+      )}
+
       {showForm && (
         <div className="mb-5 p-5 rounded-xl bg-zinc-100/40 border border-zinc-200">
           <div className="flex items-center justify-between mb-4">
