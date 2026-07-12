@@ -417,7 +417,12 @@ class Content(models.Model):
     order = models.PositiveIntegerField(default=1)
     is_published = models.BooleanField(default=False)
     materials_url = models.URLField(blank=True, null=True)
-    
+    # Recursos del módulo (PDF/video/documento/link/template). Cada item:
+    # {id, name, type, url, dataUrl (archivo subido en base64), fileName, size, description}
+    # — mismo formato que ProgramTemplate.modules[].resources, sin FileField
+    # porque los archivos se guardan como base64 directo en este JSON.
+    resources = models.JSONField(default=list, blank=True)
+
     # Campos de configuración del módulo
     duration_minutes = models.PositiveIntegerField(default=60, help_text="Duración del módulo en minutos")
     requires_evaluation = models.BooleanField(default=False, help_text="Si el módulo requiere evaluación")

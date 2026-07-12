@@ -750,6 +750,7 @@ def get_program(program_id: str, authorization: Optional[str] = Header(None)) ->
                     "end_date": m.end_date.isoformat() if m.end_date else None,
                     "is_published": m.is_published,
                     "materials_url": m.materials_url or "",
+                    "resources": m.resources or [],
                 }
                 for m in modules
             ]
@@ -3488,6 +3489,7 @@ def create_module(activity_id: int, payload: dict, authorization: Optional[str] 
             description=payload.get("description", ""),
             order=order,
             materials_url=payload.get("materials_url", ""),
+            resources=payload.get("resources", []),
             duration_minutes=payload.get("duration_minutes", 60),
             requires_evaluation=payload.get("requires_evaluation", False),
             minimum_score=payload.get("minimum_score", 70),
@@ -3495,7 +3497,7 @@ def create_module(activity_id: int, payload: dict, authorization: Optional[str] 
             end_date=module_end_date,
             is_published=payload.get("is_published", False),
         )
-        
+
         return {
             "id": content.id,
             "title": content.title,
@@ -3508,6 +3510,7 @@ def create_module(activity_id: int, payload: dict, authorization: Optional[str] 
             "end_date": content.end_date.isoformat() if content.end_date else None,
             "is_published": content.is_published,
             "materials_url": content.materials_url,
+            "resources": content.resources or [],
             "message": "Module created successfully"
         }
     except Activity.DoesNotExist:
@@ -3554,13 +3557,14 @@ def update_module(module_id: int, payload: dict, authorization: Optional[str] = 
         content.requires_evaluation = payload.get("requires_evaluation", content.requires_evaluation)
         content.minimum_score = payload.get("minimum_score", content.minimum_score)
         content.materials_url = payload.get("materials_url", content.materials_url)
+        content.resources = payload.get("resources", content.resources)
         content.is_published = payload.get("is_published", content.is_published)
-        
+
         if "order" in payload:
             content.order = payload["order"]
-        
+
         content.save()
-        
+
         return {
             "id": content.id,
             "title": content.title,
@@ -3573,6 +3577,7 @@ def update_module(module_id: int, payload: dict, authorization: Optional[str] = 
             "end_date": content.end_date.isoformat() if content.end_date else None,
             "is_published": content.is_published,
             "materials_url": content.materials_url,
+            "resources": content.resources or [],
             "message": "Module updated successfully"
         }
     except Content.DoesNotExist:

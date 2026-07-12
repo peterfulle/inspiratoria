@@ -182,7 +182,7 @@ export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Prom
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  return fetch(input, { ...init, headers });
+  return fetch(input, { cache: "no-store", ...init, headers });
 }
 
 export const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? FALLBACK_BASE_URL;

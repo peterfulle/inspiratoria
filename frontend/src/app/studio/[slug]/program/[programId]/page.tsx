@@ -12,11 +12,16 @@ const ADMIN_ROLES = new Set(['superadmin', 'admin_root', 'inspiratoria_admin', '
 // ============================================================================
 // TYPES
 // ============================================================================
+interface ModuleResource {
+  id: string; name: string; type: 'pdf' | 'video' | 'template' | 'document' | 'link';
+  url: string; dataUrl?: string; fileName?: string; size?: string;
+}
 interface ProgramModule {
   id: number; title: string; description: string; order: number;
   duration_minutes: number; is_published: boolean; materials_url: string;
   requires_evaluation: boolean; minimum_score: number;
   start_date: string | null; end_date: string | null;
+  resources: ModuleResource[];
 }
 interface ProgramActivity {
   id: number | string; type: string; name: string; description: string; category: string;
@@ -1469,13 +1474,200 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
 interface ModuleFormState {
   title: string; description: string; duration_minutes: number;
   requires_evaluation: boolean; minimum_score: number;
-  start_date: string; end_date: string;
+  start_date: string; end_date: string; resources: ModuleResource[];
 }
 const EMPTY_MODULE: ModuleFormState = {
   title: '', description: '', duration_minutes: 60,
   requires_evaluation: false, minimum_score: 70,
-  start_date: '', end_date: '',
+  start_date: '', end_date: '', resources: [],
 };
+
+const RESOURCE_TYPE_META: Record<ModuleResource['type'], { label: string; icon: keyof typeof I; color: string; bg: string; accept: string }> = {
+  pdf: { label: 'PDF', icon: 'FileText', color: '#dc2626', bg: '#fef2f2', accept: '.pdf' },
+  video: { label: 'Video', icon: 'Activity', color: '#2563eb', bg: '#eff6ff', accept: '.mp4,.mov,.avi,.webm,.mkv' },
+  template: { label: 'Template', icon: 'Layout', color: '#d97706', bg: '#fffbeb', accept: '.doc,.docx,.xlsx,.xls,.pptx,.ppt,.csv' },
+  document: { label: 'Doc', icon: 'FileText', color: '#525252', bg: '#f5f5f5', accept: '.doc,.docx,.txt,.rtf,.xlsx,.xls,.pptx,.ppt,.csv,.pdf' },
+  link: { label: 'Link', icon: 'Link', color: '#4f46e5', bg: '#eef2ff', accept: '' },
+};
+
+function getVideoEmbedUrl(url: string): string | null {
+  if (!url) return null;
+  let m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/);
+  if (m) return `https://www.youtube.com/embed/${m[1]}`;
+  m = url.match(/vimeo\.com\/(\d+)/);
+  if (m) return `https://player.vimeo.com/video/${m[1]}`;
+  return null;
+}
+
+function dataUrlToBlobUrl(dataUrl: string): string {
+  const [head, b64] = dataUrl.split(',');
+  const mime = head.match(/:(.*?);/)?.[1] || 'application/octet-stream';
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([arr], { type: mime }));
+}
+
+function ResourceManager({ resources, onChange }: { resources: ModuleResource[]; onChange: (r: ModuleResource[]) => void }) {
+  const [curType, setCurType] = useState<ModuleResource['type']>('pdf');
+  const [linkInput, setLinkInput] = useState('');
+  const [linkNameInput, setLinkNameInput] = useState('');
+  const [videoMode, setVideoMode] = useState<'url' | 'file'>('url');
+  const [viewing, setViewing] = useState<ModuleResource | null>(null);
+  const [viewBlobUrl, setViewBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!viewing) { if (viewBlobUrl) URL.revokeObjectURL(viewBlobUrl); setViewBlobUrl(null); return; }
+    const src = viewing.dataUrl || viewing.url || '';
+    setViewBlobUrl(src.startsWith('data:') ? dataUrlToBlobUrl(src) : src);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewing]);
+
+  const handleFileUpload = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    Promise.all(Array.from(files).map((file) => new Promise<ModuleResource>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({
+        id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        type: curType,
+        url: '',
+        dataUrl: reader.result as string,
+        fileName: file.name,
+        size: file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+      });
+      reader.readAsDataURL(file);
+    }))).then((added) => onChange([...resources, ...added]));
+  };
+
+  const addLinkResource = () => {
+    const url = linkInput.trim();
+    if (!url) return;
+    const name = linkNameInput.trim() || url.replace(/^https?:\/\//, '').split('/')[0];
+    onChange([...resources, { id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name, type: curType, url }]);
+    setLinkInput(''); setLinkNameInput('');
+  };
+
+  const updateName = (id: string, name: string) => onChange(resources.map(r => r.id === id ? { ...r, name } : r));
+  const remove = (id: string) => onChange(resources.filter(r => r.id !== id));
+
+  const openFilePicker = () => {
+    const input = document.createElement('input');
+    input.type = 'file'; input.multiple = true;
+    input.accept = RESOURCE_TYPE_META[curType].accept;
+    input.onchange = (ev) => handleFileUpload((ev.target as HTMLInputElement).files);
+    input.click();
+  };
+
+  const canView = (r: ModuleResource) => (r.type === 'pdf' || r.type === 'video') && (r.dataUrl || (r.type === 'video' && getVideoEmbedUrl(r.url)));
+
+  return (
+    <div className="pt-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[12px] font-semibold text-zinc-700">Recursos ({resources.length})</span>
+      </div>
+
+      {/* Type tabs */}
+      <div className="flex gap-1.5 mb-2.5 flex-wrap">
+        {(Object.keys(RESOURCE_TYPE_META) as ModuleResource['type'][]).map((t) => {
+          const meta = RESOURCE_TYPE_META[t];
+          const TIcon = I[meta.icon];
+          const active = curType === t;
+          return (
+            <button key={t} type="button" onClick={() => setCurType(t)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-semibold border transition"
+              style={active ? { background: meta.bg, color: meta.color, borderColor: meta.color } : { background: '#fff', color: '#71717a', borderColor: '#e5e7eb' }}>
+              <TIcon className="w-3.5 h-3.5" />{meta.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Input area per type */}
+      {curType === 'link' ? (
+        <div className="flex gap-2 mb-2.5">
+          <input type="text" placeholder="Nombre (opcional)" value={linkNameInput} onChange={e => setLinkNameInput(e.target.value)} className={inputCls + ' flex-1'} />
+          <input type="url" placeholder="https://..." value={linkInput} onChange={e => setLinkInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addLinkResource(); } }} className={inputCls + ' flex-1'} />
+          <button onClick={addLinkResource} disabled={!linkInput.trim()} className="px-3 py-2 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold disabled:opacity-40">Agregar</button>
+        </div>
+      ) : curType === 'video' ? (
+        <div className="mb-2.5">
+          <div className="flex gap-2 mb-2">
+            <button type="button" onClick={() => setVideoMode('url')} className={`flex-1 text-[11.5px] font-semibold py-1.5 rounded-lg border ${videoMode === 'url' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-zinc-200 text-zinc-500'}`}>URL de video</button>
+            <button type="button" onClick={() => setVideoMode('file')} className={`flex-1 text-[11.5px] font-semibold py-1.5 rounded-lg border ${videoMode === 'file' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-zinc-200 text-zinc-500'}`}>Subir archivo</button>
+          </div>
+          {videoMode === 'url' ? (
+            <div className="flex gap-2">
+              <input type="text" placeholder="Nombre (opcional)" value={linkNameInput} onChange={e => setLinkNameInput(e.target.value)} className={inputCls + ' flex-1'} />
+              <input type="url" placeholder="https://youtube.com/watch?v=..." value={linkInput} onChange={e => setLinkInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addLinkResource(); } }} className={inputCls + ' flex-1'} />
+              <button onClick={addLinkResource} disabled={!linkInput.trim()} className="px-3 py-2 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold disabled:opacity-40">Agregar</button>
+            </div>
+          ) : (
+            <div onClick={openFilePicker} className="rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/50 p-4 text-center cursor-pointer hover:bg-blue-50 transition">
+              <I.Activity className="w-5 h-5 text-blue-400 mx-auto mb-1.5" />
+              <p className="text-[12px] text-blue-600 font-medium">Haz clic para subir video</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div onClick={openFilePicker} className="rounded-lg border-2 border-dashed p-4 text-center cursor-pointer transition mb-2.5"
+          style={{ borderColor: RESOURCE_TYPE_META[curType].color + '55', background: RESOURCE_TYPE_META[curType].bg, color: RESOURCE_TYPE_META[curType].color }}>
+          <I.FileText className="w-5 h-5 mx-auto mb-1.5" />
+          <p className="text-[12px] text-zinc-600">Haz clic para subir {RESOURCE_TYPE_META[curType].label}</p>
+        </div>
+      )}
+
+      {/* Resource list */}
+      {resources.length > 0 && (
+        <div className="space-y-1.5">
+          {resources.map((r) => {
+            const meta = RESOURCE_TYPE_META[r.type];
+            const RIcon = I[meta.icon];
+            return (
+              <div key={r.id} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-white border border-zinc-200 group">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: meta.bg, color: meta.color }}>
+                  <RIcon className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => canView(r) ? setViewing(r) : (r.url && window.open(r.url, '_blank'))}>
+                  <input type="text" value={r.name} onChange={e => updateName(r.id, e.target.value)} onClick={e => e.stopPropagation()}
+                    className="text-[12.5px] font-semibold text-zinc-900 bg-transparent border-none outline-none w-full p-0" />
+                  <p className="text-[11px] text-zinc-400 truncate">{r.fileName || r.url || 'Sin archivo'}{r.size && ` • ${r.size}`}</p>
+                </div>
+                <span className="text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: meta.bg, color: meta.color }}>{meta.label}</span>
+                <button onClick={() => remove(r.id)} className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition flex-shrink-0"><I.Trash className="w-3.5 h-3.5" /></button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Viewer modal */}
+      {viewing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-6" onClick={() => setViewing(null)}>
+          <div className="bg-white rounded-xl overflow-hidden flex flex-col w-full max-w-3xl h-[80vh]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200">
+              <span className="text-[13px] font-semibold text-zinc-900">{viewing.name}</span>
+              <button onClick={() => setViewing(null)} className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-100"><I.Close className="w-4 h-4" /></button>
+            </div>
+            <div className="flex-1">
+              {viewing.type === 'pdf' && viewBlobUrl && (
+                <iframe src={viewBlobUrl} title={viewing.name} className="w-full h-full border-0" />
+              )}
+              {viewing.type === 'video' && viewing.dataUrl && viewBlobUrl && (
+                <video src={viewBlobUrl} controls autoPlay className="w-full h-full bg-zinc-900" />
+              )}
+              {viewing.type === 'video' && !viewing.dataUrl && getVideoEmbedUrl(viewing.url) && (
+                <iframe src={getVideoEmbedUrl(viewing.url)!} title={viewing.name} className="w-full h-full border-0" allow="autoplay; fullscreen" allowFullScreen />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ModuleManager({ activityId, modules, onChange, showToast }: { activityId: number | string; modules: ProgramModule[]; onChange: () => void; showToast: (m: string, t?: 'success' | 'error') => void }) {
   const [showForm, setShowForm] = useState(false);
@@ -1490,6 +1682,7 @@ function ModuleManager({ activityId, modules, onChange, showToast }: { activityI
       title: m.title, description: m.description, duration_minutes: m.duration_minutes,
       requires_evaluation: m.requires_evaluation, minimum_score: m.minimum_score,
       start_date: m.start_date ? m.start_date.slice(0, 16) : '', end_date: m.end_date ? m.end_date.slice(0, 16) : '',
+      resources: m.resources || [],
     });
     setShowForm(true);
   };
@@ -1504,6 +1697,7 @@ function ModuleManager({ activityId, modules, onChange, showToast }: { activityI
         requires_evaluation: form.requires_evaluation, minimum_score: form.minimum_score,
         start_date: form.start_date ? new Date(form.start_date).toISOString() : null,
         end_date: form.end_date ? new Date(form.end_date).toISOString() : null,
+        resources: form.resources,
       };
       const url = editingId ? `${API_URL}/api/modules/${editingId}` : `${API_URL}/api/activities/${activityId}/modules`;
       const res = await apiFetch(url, { method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -1557,6 +1751,11 @@ function ModuleManager({ activityId, modules, onChange, showToast }: { activityI
               </label>
             </div>
           </div>
+
+          <div className="border-t border-zinc-100">
+            <ResourceManager resources={form.resources} onChange={(resources) => setForm({ ...form, resources })} />
+          </div>
+
           <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-zinc-200">
             <button onClick={cancel} className="px-3.5 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:bg-zinc-50">Cancelar</button>
             <button onClick={submit} disabled={saving} className="px-3.5 py-2 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold disabled:opacity-50">{saving ? 'Guardando…' : editingId ? 'Guardar cambios' : 'Crear módulo'}</button>
@@ -1586,6 +1785,7 @@ function ModuleManager({ activityId, modules, onChange, showToast }: { activityI
                   </div>
                   <div className="flex items-center gap-3 text-[11px] text-zinc-500 mt-0.5">
                     <span className="inline-flex items-center gap-1"><I.Clock className="w-3 h-3" />{m.duration_minutes} min</span>
+                    <span className="inline-flex items-center gap-1"><I.FileText className="w-3 h-3" />{(m.resources || []).length} recursos</span>
                     {m.requires_evaluation && <span className="inline-flex items-center gap-1"><I.Award className="w-3 h-3" />Aprobar con {m.minimum_score}%</span>}
                   </div>
                 </div>
