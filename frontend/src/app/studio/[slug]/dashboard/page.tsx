@@ -28,10 +28,15 @@ const PARTICIPANT_ROLES = new Set(['facilitator', 'mentor', 'mentee', 'participa
 // ============================================================================
 // TYPES
 // ============================================================================
+interface ModuleResource {
+  id: string; name: string; type: 'pdf' | 'video' | 'template' | 'document' | 'link';
+  url: string; dataUrl?: string; fileName?: string; size?: string;
+}
 interface ProgramModule {
   id: number; title: string; description: string; order: number;
   duration_minutes: number; is_published: boolean; materials_url: string;
   requires_evaluation: boolean; minimum_score: number;
+  resources: ModuleResource[];
 }
 interface ProgramActivity {
   id: number | string; type: string; name: string; description: string; category: string;
@@ -84,7 +89,92 @@ const I = {
   Target:      SvgBase(<><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></>),
   Swap:        SvgBase(<><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>),
   Lock:        SvgBase(<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>),
+  FileText:    SvgBase(<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" /></>),
+  Link:        SvgBase(<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></>),
+  Close:       SvgBase(<><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>),
 };
+
+const RESOURCE_TYPE_LABEL: Record<ModuleResource['type'], string> = {
+  pdf: 'PDF', video: 'Video', template: 'Template', document: 'Doc', link: 'Link',
+};
+
+function getVideoEmbedUrl(url: string): string | null {
+  if (!url) return null;
+  let m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/);
+  if (m) return `https://www.youtube.com/embed/${m[1]}`;
+  m = url.match(/vimeo\.com\/(\d+)/);
+  if (m) return `https://player.vimeo.com/video/${m[1]}`;
+  return null;
+}
+
+function dataUrlToBlobUrl(dataUrl: string): string {
+  const [head, b64] = dataUrl.split(',');
+  const mime = head.match(/:(.*?);/)?.[1] || 'application/octet-stream';
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([arr], { type: mime }));
+}
+
+function ResourceViewerModal({ resource, onClose }: { resource: ModuleResource; onClose: () => void }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const src = resource.dataUrl || resource.url || '';
+    const url = src.startsWith('data:') ? dataUrlToBlobUrl(src) : src;
+    setBlobUrl(url);
+    return () => { if (src.startsWith('data:')) URL.revokeObjectURL(url); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resource]);
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
+      <div className="bg-white rounded-xl overflow-hidden flex flex-col w-full max-w-3xl h-[80vh]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200">
+          <span className="text-[13px] font-semibold text-zinc-900">{resource.name}</span>
+          <button onClick={onClose} className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-100"><I.Close className="w-4 h-4" /></button>
+        </div>
+        <div className="flex-1">
+          {resource.type === 'pdf' && blobUrl && <iframe src={blobUrl} title={resource.name} className="w-full h-full border-0" />}
+          {resource.type === 'video' && resource.dataUrl && blobUrl && <video src={blobUrl} controls autoPlay className="w-full h-full bg-zinc-900" />}
+          {resource.type === 'video' && !resource.dataUrl && getVideoEmbedUrl(resource.url) && (
+            <iframe src={getVideoEmbedUrl(resource.url)!} title={resource.name} className="w-full h-full border-0" allow="autoplay; fullscreen" allowFullScreen />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResourceList({ resources }: { resources: ModuleResource[] }) {
+  const [viewing, setViewing] = useState<ModuleResource | null>(null);
+  if (resources.length === 0) return null;
+  return (
+    <div className="mt-2.5 pt-2.5 border-t border-zinc-100 space-y-1.5">
+      {resources.map(r => {
+        const canView = (r.type === 'pdf' || r.type === 'video') && (r.dataUrl || (r.type === 'video' && getVideoEmbedUrl(r.url)));
+        const openExternal = () => { if (r.url) window.open(r.url, '_blank'); };
+        return (
+          <button
+            key={r.id}
+            onClick={() => canView ? setViewing(r) : openExternal()}
+            disabled={!canView && !r.url}
+            className="w-full flex items-center gap-2.5 p-2 rounded-lg bg-white border border-zinc-200 hover:bg-zinc-50 transition text-left disabled:opacity-50 disabled:cursor-default"
+          >
+            <div className="w-7 h-7 rounded-md bg-zinc-100 text-zinc-500 flex items-center justify-center flex-shrink-0">
+              {r.type === 'link' ? <I.Link className="w-3.5 h-3.5" /> : <I.FileText className="w-3.5 h-3.5" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] font-medium text-zinc-800 truncate">{r.name}</div>
+              {r.size && <div className="text-[10.5px] text-zinc-400">{r.size}</div>}
+            </div>
+            <span className="text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 flex-shrink-0">{RESOURCE_TYPE_LABEL[r.type]}</span>
+          </button>
+        );
+      })}
+      {viewing && <ResourceViewerModal resource={viewing} onClose={() => setViewing(null)} />}
+    </div>
+  );
+}
 
 // ============================================================================
 // STATUS META — rampa monocromática ordinal (más oscuro = etapa más avanzada
@@ -580,8 +670,8 @@ function TabActividades({ activities }: { activities: ProgramActivity[] }) {
                     ) : (
                       <div className="space-y-2">
                         {[...modules].sort((x, y) => x.order - y.order).map((m, i) => (
-                          <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg bg-white border border-zinc-200">
-                            <div className="w-6 h-6 rounded-full bg-zinc-100 text-zinc-600 text-[11px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</div>
+                          <div key={m.id} className="flex items-start gap-3 p-3 rounded-lg bg-white border border-zinc-200">
+                            <div className="w-6 h-6 rounded-full bg-zinc-100 text-zinc-600 text-[11px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="text-[12.5px] font-semibold text-zinc-900 truncate">{m.title}</span>
@@ -591,8 +681,10 @@ function TabActividades({ activities }: { activities: ProgramActivity[] }) {
                               </div>
                               <div className="flex items-center gap-3 text-[11px] text-zinc-500 mt-0.5">
                                 <span className="inline-flex items-center gap-1"><I.Clock className="w-3 h-3" />{m.duration_minutes} min</span>
+                                <span className="inline-flex items-center gap-1"><I.FileText className="w-3 h-3" />{(m.resources || []).length} recursos</span>
                                 {m.requires_evaluation && <span className="inline-flex items-center gap-1"><I.Award className="w-3 h-3" />Aprobar con {m.minimum_score}%</span>}
                               </div>
+                              <ResourceList resources={m.resources || []} />
                             </div>
                           </div>
                         ))}
