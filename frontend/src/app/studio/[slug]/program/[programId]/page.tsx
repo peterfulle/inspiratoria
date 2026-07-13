@@ -157,6 +157,17 @@ export default function ProgramManagerConsole() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes'>('resumen');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('studioSidebarCollapsed') : null;
+    if (saved === 'true') setSidebarCollapsed(true);
+  }, []);
+  const toggleSidebar = () => {
+    setSidebarCollapsed(c => {
+      localStorage.setItem('studioSidebarCollapsed', String(!c));
+      return !c;
+    });
+  };
 
   // Deep-link ?tab=<id> — usado por las redirecciones legacy (ex /activities, /participants, etc.)
   useEffect(() => {
@@ -342,9 +353,11 @@ export default function ProgramManagerConsole() {
         slug={slug}
         activeTab={activeTab}
         onTab={(t) => setActiveTab(t)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={toggleSidebar}
       />
 
-      <main className="ml-64 flex-1 min-h-screen">
+      <main className={`flex-1 min-h-screen transition-[margin] duration-200 ${sidebarCollapsed ? 'ml-[76px]' : 'ml-64'}`}>
         {/* Topbar */}
         <header className="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-zinc-100">
           <div className="px-8 py-3.5 flex items-center justify-between gap-6">
@@ -453,101 +466,151 @@ export default function ProgramManagerConsole() {
 // ============================================================================
 // SIDEBAR
 // ============================================================================
-function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab }: {
+function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab, collapsed, onToggleCollapsed }: {
   currentUser: CurrentUser | null;
   onLogout: () => void;
   program: ProgramDetail;
   slug: string;
   activeTab: string;
   onTab: (t: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes') => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }) {
-  const tabsNav: { id: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes'; label: string; icon: React.ReactNode }[] = [
-    { id: 'resumen', label: 'Resumen', icon: <I.Sparkles /> },
-    { id: 'info', label: 'Información', icon: <I.Edit /> },
-    { id: 'cronograma', label: 'Cronograma', icon: <I.Calendar /> },
-    { id: 'actividades', label: 'Módulos', icon: <I.Module /> },
-    { id: 'participantes', label: 'Participantes', icon: <I.Users /> },
-    { id: 'duplas', label: 'Duplas', icon: <I.Bot /> },
-    { id: 'reportes', label: 'Reportes', icon: <I.Chart /> },
-    { id: 'gobierno', label: 'Gobierno', icon: <I.Settings /> },
+  type TabId = 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes';
+  const NAV_GROUPS: { label: string | null; items: { id: TabId; label: string; icon: React.ReactNode }[] }[] = [
+    { label: null, items: [{ id: 'resumen', label: 'Resumen', icon: <I.Sparkles /> }] },
+    {
+      label: 'Programa',
+      items: [
+        { id: 'info', label: 'Información', icon: <I.Edit /> },
+        { id: 'cronograma', label: 'Cronograma', icon: <I.Calendar /> },
+        { id: 'actividades', label: 'Módulos', icon: <I.Module /> },
+        { id: 'participantes', label: 'Participantes', icon: <I.Users /> },
+        { id: 'duplas', label: 'Duplas', icon: <I.Bot /> },
+      ],
+    },
+    {
+      label: 'Gestión',
+      items: [
+        { id: 'reportes', label: 'Reportes', icon: <I.Chart /> },
+        { id: 'gobierno', label: 'Gobierno', icon: <I.Settings /> },
+      ],
+    },
   ];
 
   const initials = (currentUser?.full_name || currentUser?.email || 'A').charAt(0).toUpperCase();
   const roleLabel = ROLE_LABELS[currentUser?.role || ''] || currentUser?.role || '';
 
+  const NavItem = ({ id, label, icon }: { id: TabId; label: string; icon: React.ReactNode }) => {
+    const active = activeTab === id;
+    return (
+      <button
+        onClick={() => onTab(id)}
+        title={collapsed ? label : undefined}
+        className={`group/nav w-full flex items-center gap-2.5 rounded-lg text-[12.5px] font-medium transition-all relative ${
+          collapsed ? 'justify-center px-0 py-2' : 'pl-3 pr-2 py-[7px]'
+        } ${active ? 'bg-primary-50 text-zinc-900' : 'text-zinc-500 hover:bg-zinc-100/80 hover:text-zinc-900'}`}
+      >
+        <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full bg-primary-500 transition-all ${active ? 'h-5 opacity-100' : 'h-5 opacity-0'}`} />
+        <span className={`w-[15px] h-[15px] flex-shrink-0 transition-colors ${active ? 'text-primary-700' : 'text-zinc-400 group-hover/nav:text-zinc-600'}`}>{icon}</span>
+        {!collapsed && <span className="truncate">{label}</span>}
+      </button>
+    );
+  };
+
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-zinc-50/60 border-r border-zinc-200/70 z-40 flex flex-col backdrop-blur-sm">
+    <aside className={`fixed left-0 top-0 bottom-0 bg-white border-r border-zinc-100 z-40 flex flex-col transition-[width] duration-200 ${collapsed ? 'w-[76px]' : 'w-64'}`}>
       {/* Marca */}
-      <div className="px-4 py-4">
-        <Link href="/dashboard" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center overflow-hidden flex-shrink-0">
+      <div className={`flex items-center h-16 flex-shrink-0 ${collapsed ? 'justify-center px-0' : 'justify-between px-4'}`}>
+        <Link href="/dashboard" className="flex items-center gap-2.5 group min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-zinc-950 flex items-center justify-center overflow-hidden flex-shrink-0">
             <Image src="/images/logo.png" alt="Inspiratoria" width={32} height={32} className="object-cover" />
           </div>
-          <div className="min-w-0">
-            <p className="text-[13.5px] font-semibold text-zinc-900 leading-tight tracking-tight">Inspiratoria</p>
-            <p className="text-[10px] text-zinc-400 font-medium tracking-tight">Studio</p>
-          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="text-[13.5px] font-semibold text-zinc-900 leading-tight tracking-tight">Inspiratoria</p>
+              <p className="text-[10px] text-zinc-400 font-medium tracking-tight">Studio</p>
+            </div>
+          )}
         </Link>
+        {!collapsed && (
+          <button onClick={onToggleCollapsed} title="Colapsar" className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600 transition flex-shrink-0">
+            <I.Back className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Contexto del programa */}
-      <div className="px-3 pb-3">
-        <div className="px-3 py-2.5 rounded-lg bg-white border border-zinc-200/80">
-          <p className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-zinc-400 truncate">{program.company?.name || slug}</p>
-          <p className="text-[12.5px] font-semibold text-zinc-900 truncate mt-0.5 leading-snug">{program.name}</p>
+      {!collapsed && (
+        <div className="px-3 pb-3">
+          <div className="px-3 py-2.5 rounded-lg bg-zinc-50">
+            <p className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-zinc-400 truncate">{program.company?.name || slug}</p>
+            <p className="text-[12.5px] font-semibold text-zinc-900 truncate mt-0.5 leading-snug">{program.name}</p>
+          </div>
         </div>
-      </div>
+      )}
+      {collapsed && (
+        <div className="flex justify-center pb-3">
+          <div title={program.name} className="w-9 h-9 rounded-lg bg-zinc-50 flex items-center justify-center text-[11px] font-bold text-zinc-500">
+            {(program.company?.name || slug).charAt(0).toUpperCase()}
+          </div>
+        </div>
+      )}
 
       {/* Navegación */}
-      <nav className="flex-1 overflow-y-auto px-3">
-        <div className="space-y-0.5">
-          {tabsNav.map(t => {
-            const active = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => onTab(t.id)}
-                className={`group/nav w-full flex items-center gap-2.5 pl-3 pr-2 py-[7px] rounded-lg text-[12.5px] font-medium transition-colors relative ${
-                  active ? 'bg-white text-zinc-900 shadow-[0_1px_2px_rgba(0,0,0,0.04)] border border-zinc-200/70' : 'text-zinc-500 hover:bg-white/70 hover:text-zinc-900'
-                }`}
-              >
-                {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-blue-600 rounded-r-full" />}
-                <span className={`w-[15px] h-[15px] transition-colors ${active ? 'text-blue-600' : 'text-zinc-400 group-hover/nav:text-zinc-600'}`}>{t.icon}</span>
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
+      <nav className="flex-1 overflow-y-auto px-3 pt-1">
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={gi} className={gi > 0 ? 'mt-4' : ''}>
+            {group.label && !collapsed && (
+              <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">{group.label}</p>
+            )}
+            {group.label && collapsed && <div className="mx-2 mb-2 border-t border-zinc-100" />}
+            <div className="space-y-0.5">
+              {group.items.map(t => <NavItem key={t.id} {...t} />)}
+            </div>
+          </div>
+        ))}
 
-        <div className="mt-5 pt-4 border-t border-zinc-200/70 space-y-0.5">
-          <Link href={`/studio/${slug}/dashboard`} className="w-full flex items-center gap-2.5 pl-3 pr-2 py-[7px] rounded-lg text-[12px] text-zinc-500 hover:bg-white/70 hover:text-zinc-900 transition-colors">
-            <I.Layout className="w-[15px] h-[15px] text-zinc-400" />
-            Vista Corporativa
+        <div className="mt-4 pt-3 border-t border-zinc-100 space-y-0.5">
+          <Link href={`/studio/${slug}/dashboard`} title={collapsed ? 'Vista Corporativa' : undefined}
+            className={`w-full flex items-center gap-2.5 rounded-lg text-[12px] text-zinc-500 hover:bg-zinc-100/80 hover:text-zinc-900 transition-colors ${collapsed ? 'justify-center px-0 py-2' : 'pl-3 pr-2 py-[7px]'}`}>
+            <I.Layout className="w-[15px] h-[15px] text-zinc-400 flex-shrink-0" />
+            {!collapsed && 'Vista Corporativa'}
           </Link>
-          <Link href="/dashboard" className="w-full flex items-center gap-2.5 pl-3 pr-2 py-[7px] rounded-lg text-[12px] text-zinc-500 hover:bg-white/70 hover:text-zinc-900 transition-colors">
-            <I.Home className="w-[15px] h-[15px] text-zinc-400" />
-            Inicio admin
+          <Link href="/dashboard" title={collapsed ? 'Inicio admin' : undefined}
+            className={`w-full flex items-center gap-2.5 rounded-lg text-[12px] text-zinc-500 hover:bg-zinc-100/80 hover:text-zinc-900 transition-colors ${collapsed ? 'justify-center px-0 py-2' : 'pl-3 pr-2 py-[7px]'}`}>
+            <I.Home className="w-[15px] h-[15px] text-zinc-400 flex-shrink-0" />
+            {!collapsed && 'Inicio admin'}
           </Link>
+          {collapsed && (
+            <button onClick={onToggleCollapsed} title="Expandir" className="w-full flex items-center justify-center py-2 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition">
+              <I.Back className="w-3.5 h-3.5 rotate-180" />
+            </button>
+          )}
         </div>
       </nav>
 
       {/* Usuario */}
-      <div className="px-3 py-3 border-t border-zinc-200/70">
-        <div className="flex items-center gap-2.5 px-1.5 py-1">
+      <div className={`py-3 border-t border-zinc-100 ${collapsed ? 'px-0 flex justify-center' : 'px-3'}`}>
+        <div className={`flex items-center gap-2.5 ${collapsed ? '' : 'px-1.5 py-1'}`}>
           {currentUser?.avatar_url ? (
             <img src={currentUser.avatar_url} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center text-[12px] font-semibold text-white flex-shrink-0">
+            <div title={collapsed ? (currentUser?.full_name || 'Admin') : undefined} className="w-8 h-8 rounded-lg bg-zinc-950 flex items-center justify-center text-[12px] font-semibold text-white flex-shrink-0">
               {initials}
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="text-[12.5px] font-semibold text-zinc-900 truncate leading-tight">{currentUser?.full_name || 'Admin'}</p>
-            <p className="text-[10.5px] text-zinc-400 truncate">{roleLabel}</p>
-          </div>
-          <button onClick={onLogout} title="Cerrar sesión" className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0">
-            <I.Logout className="w-4 h-4" />
-          </button>
+          {!collapsed && (
+            <>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12.5px] font-semibold text-zinc-900 truncate leading-tight">{currentUser?.full_name || 'Admin'}</p>
+                <p className="text-[10.5px] text-zinc-400 truncate">{roleLabel}</p>
+              </div>
+              <button onClick={onLogout} title="Cerrar sesión" className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0">
+                <I.Logout className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </aside>
