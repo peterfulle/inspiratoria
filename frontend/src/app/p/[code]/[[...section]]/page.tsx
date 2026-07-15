@@ -389,21 +389,6 @@ const styles = `
   .p-loading-spinner { width: 40px; height: 40px; border: 3px solid #e0f2fe; border-top: 3px solid #0891b2; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Skeleton */
-  .skel { background: linear-gradient(90deg, #eef2f7 0%, #f7fafc 50%, #eef2f7 100%); background-size: 200% 100%; animation: skel-shimmer 1.4s ease-in-out infinite; border-radius: 8px; }
-  @keyframes skel-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-  .skel-line { height: 12px; border-radius: 6px; }
-  .skel-circle { border-radius: 50%; }
-  .skel-card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; background: #fff; }
-
-  /* Portal skeleton (full-page shell) */
-  .p-skel { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; background: #fafafa; }
-  .p-skel-side { background: #fff; border-right: 1px solid #e5e7eb; padding: 18px 14px; }
-  .p-skel-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; border-bottom: 1px solid #e5e7eb; background: #fff; }
-  .p-skel-main { padding: 28px; }
-  .p-skel-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
-  .p-skel-grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
-  @media (max-width: 1024px) { .p-skel { grid-template-columns: 1fr; } .p-skel-side { display: none; } .p-skel-stats { grid-template-columns: repeat(2, 1fr); } .p-skel-grid2 { grid-template-columns: 1fr; } }
   .p-error { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #fafafa; gap: 16px; }
   .p-error-code { font-size: 4rem; font-weight: 800; color: #0891b2; letter-spacing: -0.04em; }
   .p-error-msg { font-size: 1rem; color: #6b7280; }
@@ -655,52 +640,12 @@ const navIcons: Record<string, JSX.Element> = {
 // COMPONENT
 // ============================================================================
 
-// Reusable skeleton primitives
-const SkelBlock = ({ h = 12, w = '100%', mb = 0, r = 6, style = {} }: any) => (
-  <div className="skel" style={{ height: h, width: w, marginBottom: mb, borderRadius: r, ...style }} />
-);
-const SkelCardGrid = ({ count = 4, height = 96 }: { count?: number; height?: number }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${count >= 4 ? 200 : 260}px, 1fr))`, gap: 14, marginBottom: 22 }}>
-    {[...Array(count)].map((_, i) => (
-      <div key={i} className="skel-card" style={{ minHeight: height }}>
-        <SkelBlock w="60%" h={10} mb={12} />
-        <SkelBlock w="40%" h={22} mb={10} />
-        <SkelBlock w="80%" h={9} />
-      </div>
-    ))}
+// Único indicador de carga reutilizado en toda la app — evita mostrar un
+// spinner y luego un skeleton distinto para la misma navegación.
+const InlineSpinner = ({ minH = 300 }: { minH?: number }) => (
+  <div style={{ minHeight: minH, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div className="p-loading-spinner" />
   </div>
-);
-const SkelList = ({ rows = 5 }: { rows?: number }) => (
-  <div className="skel-card">
-    {[...Array(rows)].map((_, i) => (
-      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < rows - 1 ? '1px solid #f3f4f6' : 'none' }}>
-        <div className="skel skel-circle" style={{ width: 38, height: 38 }} />
-        <div style={{ flex: 1 }}>
-          <SkelBlock w="55%" h={11} mb={6} />
-          <SkelBlock w="35%" h={9} />
-        </div>
-        <SkelBlock w={60} h={22} r={10} />
-      </div>
-    ))}
-  </div>
-);
-const SkelDetailPage = () => (
-  <>
-    <div style={{ marginBottom: 18 }}>
-      <SkelBlock w={300} h={24} mb={8} />
-      <SkelBlock w={420} h={11} />
-    </div>
-    <SkelCardGrid count={4} />
-    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
-      <SkelList rows={6} />
-      <div className="skel-card">
-        <SkelBlock w="50%" h={14} mb={16} />
-        <SkelBlock h={130} mb={12} r={10} />
-        <SkelBlock w="80%" mb={6} />
-        <SkelBlock w="60%" />
-      </div>
-    </div>
-  </>
 );
 
 export default function ParticipantPortalPage() {
@@ -1310,7 +1255,7 @@ export default function ParticipantPortalPage() {
   );
 
   const renderMyProgram = () => {
-    if (loadingDetail) return <SkelDetailPage />;
+    if (loadingDetail) return <InlineSpinner minH={400} />;
     const mp = activeProgram;
     if (!mp) return <div className="empty-state">Selecciona un programa</div>;
 
@@ -2152,7 +2097,7 @@ export default function ParticipantPortalPage() {
   // RENDER: PROGRESS
   // ══════════════════════════════════════════════════════════════════════════
   const renderProgress = () => {
-    if (loadingDetail) return <SkelDetailPage />;
+    if (loadingDetail) return <InlineSpinner minH={400} />;
     const mp = activeProgram;
     if (!mp) return <div className="empty-state">Selecciona un programa para ver el progreso</div>;
 
@@ -3339,7 +3284,7 @@ export default function ParticipantPortalPage() {
   // RENDER: MIS MENTEES
   // ═══════════════════════════════════════════════════════════════
   const renderMentees = () => {
-    if (menteesLoading) return <SkelList rows={4} />;
+    if (menteesLoading) return <InlineSpinner />;
     if (myMentees.length === 0) return (
       <div>
         <div className="dash-header"><h1 className="dash-title">Mis Mentees</h1><p className="dash-subtitle">Mentees asignados a ti en tus programas de mentoría</p></div>
@@ -3476,7 +3421,7 @@ export default function ParticipantPortalPage() {
   };
 
   const renderSessions = () => {
-    if (sessionsLoading) return <SkelList rows={5} />;
+    if (sessionsLoading) return <InlineSpinner />;
 
     const upcoming = mySessions.filter(s => s.status === 'scheduled');
     const completed = mySessions.filter(s => s.status === 'completed');
@@ -3620,7 +3565,7 @@ export default function ParticipantPortalPage() {
   // RENDER: MI RED DE INFLUENCIA
   // ═══════════════════════════════════════════════════════════════
   const renderNetwork = () => {
-    if (networkLoading) return <SkelList rows={5} />;
+    if (networkLoading) return <InlineSpinner />;
     return (
       <div>
         <div className="dash-header"><h1 className="dash-title">Mi Red de Influencia</h1><p className="dash-subtitle">Perfiles express de las personas en tus programas</p></div>
@@ -3656,7 +3601,7 @@ export default function ParticipantPortalPage() {
   // RENDER: ACTIVIDADES CON COMPLETAR
   // ═══════════════════════════════════════════════════════════════
   const renderPortalActivities = () => {
-    if (activitiesLoading) return <SkelList rows={5} />;
+    if (activitiesLoading) return <InlineSpinner />;
     const total = portalActivities.length;
     const done = portalActivities.filter((a: any) => a.completed_by_me).length;
     const scheduled = portalActivities.filter((a: any) => a.start_date).length;
@@ -3762,7 +3707,7 @@ export default function ParticipantPortalPage() {
   const tierPillText: Record<number, string> = { 0: '#94a3b8', 1: '#b45309', 2: '#475569', 3: '#a16207' };
 
   const renderBadges = () => {
-    if (badgesLoading) return <SkelCardGrid count={6} height={120} />;
+    if (badgesLoading) return <InlineSpinner />;
     if (!badgesData) return <div className="empty-state">No se pudieron cargar las insignias</div>;
 
     const { badges, summary } = badgesData;
@@ -4349,7 +4294,7 @@ export default function ParticipantPortalPage() {
   // RENDER: SESIONES MENTEE (vista mentee — sin crear, solo ver)
   // ═══════════════════════════════════════════════════════════════
   const renderMenteeSessions = () => {
-    if (sessionsLoading) return <SkelList rows={5} />;
+    if (sessionsLoading) return <InlineSpinner />;
 
     const upcoming = mySessions.filter(s => s.status === 'scheduled');
     const completed = mySessions.filter(s => s.status === 'completed');
@@ -4439,7 +4384,7 @@ export default function ParticipantPortalPage() {
   // RENDER: MI MENTOR (vista mentee)
   // ═══════════════════════════════════════════════════════════════
   const renderMyMentor = () => {
-    if (mentorLoading) return <div className="skel-card"><div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16 }}><div className="skel skel-circle" style={{ width: 64, height: 64 }} /><div style={{ flex: 1 }}><SkelBlock w="55%" h={14} mb={8} /><SkelBlock w="35%" h={10} /></div></div><SkelBlock w="90%" mb={6} /><SkelBlock w="75%" mb={6} /><SkelBlock w="60%" /></div>;
+    if (mentorLoading) return <InlineSpinner />;
     if (!myMentor) return (
       <div>
         <div className="dash-header"><h1 className="dash-title">Mi Mentor</h1><p className="dash-subtitle">Tu mentor asignado para el programa</p></div>
