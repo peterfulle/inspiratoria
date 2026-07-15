@@ -10,7 +10,7 @@ django.setup()
 
 from django.db import IntegrityError, transaction
 from django.db import models as django_models
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Response
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
@@ -720,6 +720,8 @@ def get_program_company_slug(program_id: str) -> dict:
 
 @router.get("/programs/{program_id}", response_model=ProgramOut)
 def get_program(program_id: str, authorization: Optional[str] = Header(None)) -> dict:
+    from django.db import close_old_connections
+    close_old_connections()
     from companies.auth_deps import get_current_user, require_company_access
     from programs.models import Activity, Content, ProgramParticipant
     import uuid
@@ -731,12 +733,17 @@ def get_program(program_id: str, authorization: Optional[str] = Header(None)) ->
         require_company_access(actor, program.company_id)
 
         # Obtener actividades del programa
-        activities = Activity.objects.filter(program=program)
+        activities = list(Activity.objects.filter(program=program))
         activities_data = []
-        
+
+        # Una sola consulta para los módulos de TODAS las actividades — evita N+1
+        # (antes: una consulta a Content por cada actividad).
+        modules_by_activity: dict = {}
+        for m in Content.objects.filter(activity__in=activities).order_by('order'):
+            modules_by_activity.setdefault(m.activity_id, []).append(m)
+
         for a in activities:
-            # Obtener módulos (Content) asociados a esta actividad
-            modules = Content.objects.filter(activity=a).order_by('order')
+            modules = modules_by_activity.get(a.id, [])
             modules_data = [
                 {
                     "id": m.id,
@@ -754,7 +761,7 @@ def get_program(program_id: str, authorization: Optional[str] = Header(None)) ->
                 }
                 for m in modules
             ]
-            
+
             # Determinar categoría unificada
             category = "mentoria"
             if a.activity_type == "training" and a.training_category:
@@ -1085,6 +1092,408 @@ def get_program_participants(program_id: str, authorization: Optional[str] = Hea
         return result
     except Program.DoesNotExist:
         raise HTTPException(status_code=404, detail="Program not found")
+
+
+@router.post("/programs/{program_id}/ai-chat")
+def program_ai_chat(program_id: str, payload: dict, authorization: Optional[str] = Header(None)):
+    """
+    Chat con InspiraSQM (Claude) — asistente de IA con contexto en tiempo real
+    del programa (participantes, mentores/mentees, cronograma).
+    """
+    from companies.auth_deps import get_current_user, require_company_access
+    from programs.models import ProgramParticipant
+    from programs.inspirasqm_service import InspiraSQMChatService
+    import uuid
+
+    actor = get_current_user(authorization)
+
+    try:
+        program = Program.objects.select_related("company").get(id=uuid.UUID(program_id))
+    except Program.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+
+    require_company_access(actor, program.company_id)
+
+    message = (payload.get("message") or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="message requerido")
+    history = payload.get("history") or []
+
+    participants = list(ProgramParticipant.objects.filter(program=program).select_related("user"))
+    activities = list(program.activities.all().order_by("start_date"))
+
+    context = InspiraSQMChatService.build_context(program, participants, activities)
+    reply = InspiraSQMChatService.chat(message, history, context)
+    if reply is None:
+        raise HTTPException(status_code=502, detail="No se pudo obtener respuesta del asistente")
+    return {"reply": reply}
+
+
+def _compute_engagement_report(program) -> dict:
+    from programs.models import ProgramParticipant, ActivityCompletion, ContentView, ParticipantAccessLog, Content
+
+    completed_activities = list(program.activities.filter(status="completed"))
+    sessions_total = len(completed_activities)
+
+    trackable_contents = list(
+        Content.objects.filter(activity__in=completed_activities).filter(
+            ~django_models.Q(resources=[])
+        )
+    )
+    resources_total = len(trackable_contents)
+
+    pps = list(ProgramParticipant.objects.filter(program=program).select_related("user"))
+    total_pps = len(pps)
+
+    participants_out = []
+    mentor_rows, mentee_rows = [], []
+    for pp in pps:
+        sessions_attended = ActivityCompletion.objects.filter(
+            activity__in=completed_activities, user=pp.user
+        ).count()
+        resources_viewed = (
+            ContentView.objects.filter(content__in=trackable_contents, user=pp.user)
+            .values("content_id").distinct().count()
+        )
+        access_count = ParticipantAccessLog.objects.filter(participant=pp).count()
+
+        attendance_pct = round(100 * sessions_attended / sessions_total) if sessions_total else 0
+        resources_pct = round(100 * resources_viewed / resources_total) if resources_total else 0
+        risk = "high" if attendance_pct < 60 else "medium" if attendance_pct < 80 else "low"
+
+        row = {
+            "participant_id": str(pp.id),
+            "name": pp.user.full_name or pp.user.email,
+            "email": pp.user.email,
+            "role": pp.role,
+            "status": pp.status,
+            "joined_at": pp.invitation_sent_at.isoformat() if pp.invitation_sent_at else None,
+            "activated_at": pp.activated_at.isoformat() if pp.activated_at else None,
+            "last_access_at": pp.last_access_at.isoformat() if pp.last_access_at else None,
+            "access_count": access_count,
+            "sessions_attended": sessions_attended,
+            "sessions_total": sessions_total,
+            "attendance_pct": attendance_pct,
+            "resources_viewed": resources_viewed,
+            "resources_total": resources_total,
+            "resources_pct": resources_pct,
+            "risk": risk,
+        }
+        participants_out.append(row)
+        if pp.role == "mentor":
+            mentor_rows.append(row)
+        elif pp.role == "mentee":
+            mentee_rows.append(row)
+
+    sessions_out = []
+    for act in completed_activities:
+        attended_count = ActivityCompletion.objects.filter(activity=act).values("user_id").distinct().count()
+        sessions_out.append({
+            "id": act.id,
+            "name": act.name,
+            "date": act.start_date.isoformat() if act.start_date else None,
+            "attended": attended_count,
+            "total": total_pps,
+            "attendance_pct": round(100 * attended_count / total_pps) if total_pps else 0,
+        })
+    sessions_out.sort(key=lambda s: s["date"] or "")
+
+    def _avg(rows, key):
+        return round(sum(r[key] for r in rows) / len(rows), 1) if rows else 0
+
+    aggregates = {
+        "sessions_total": sessions_total,
+        "resources_total": resources_total,
+        "avg_attendance_pct": _avg(participants_out, "attendance_pct"),
+        "avg_access_count": _avg(participants_out, "access_count"),
+        "avg_resources_pct": _avg(participants_out, "resources_pct"),
+        "by_role": {
+            "mentor": {
+                "avg_attendance_pct": _avg(mentor_rows, "attendance_pct"),
+                "avg_access_count": _avg(mentor_rows, "access_count"),
+                "avg_resources_pct": _avg(mentor_rows, "resources_pct"),
+            },
+            "mentee": {
+                "avg_attendance_pct": _avg(mentee_rows, "attendance_pct"),
+                "avg_access_count": _avg(mentee_rows, "access_count"),
+                "avg_resources_pct": _avg(mentee_rows, "resources_pct"),
+            },
+        },
+    }
+
+    return {"participants": participants_out, "aggregates": aggregates, "sessions": sessions_out}
+
+
+@router.get("/programs/{program_id}/engagement-report")
+def get_program_engagement_report(program_id: str, authorization: Optional[str] = Header(None)):
+    """
+    Reporte de engagement por participante: asistencia a sesiones, recursos
+    (PDFs/videos) revisados y accesos a la plataforma. Base para los reportes
+    múltiples de la consola admin y la Vista Corporativa.
+    """
+    from companies.auth_deps import get_current_user, require_company_access
+    import uuid
+
+    actor = get_current_user(authorization)
+
+    try:
+        program = Program.objects.get(id=uuid.UUID(program_id))
+    except Program.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+
+    require_company_access(actor, program.company_id)
+    return _compute_engagement_report(program)
+
+
+@router.get("/programs/{program_id}/ai-insights")
+def get_program_ai_insights(program_id: str, authorization: Optional[str] = Header(None)):
+    """
+    Resumen ejecutivo generado por IA (Claude) a partir de los datos agregados
+    reales de engagement — sin PII, solo para la vista de reportes.
+    """
+    from companies.auth_deps import get_current_user, require_company_access
+    from programs.models import ProgramParticipant
+    from programs.inspirasqm_service import InspiraSQMChatService
+    from django.core.cache import cache
+    import uuid
+
+    actor = get_current_user(authorization)
+
+    try:
+        program = Program.objects.select_related("company").get(id=uuid.UUID(program_id))
+    except Program.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+
+    require_company_access(actor, program.company_id)
+
+    cache_key = f"ai_insights:{program_id}"
+    insights = cache.get(cache_key)
+    if insights:
+        return {"insights": insights, "cached": True}
+
+    participants = list(ProgramParticipant.objects.filter(program=program).select_related("user"))
+    activities = list(program.activities.all().order_by("start_date"))
+    engagement = _compute_engagement_report(program)
+
+    program_context = InspiraSQMChatService.build_context(program, participants, activities)
+    engagement_context = InspiraSQMChatService.build_engagement_context(engagement)
+    insights = InspiraSQMChatService.generate_insights(program_context, engagement_context)
+    if insights:
+        cache.set(cache_key, insights, timeout=300)
+    if insights is None:
+        raise HTTPException(status_code=502, detail="No se pudo generar el resumen ejecutivo")
+    return {"insights": insights}
+
+
+@router.get("/programs/{program_id}/participants/{participant_id}/preview-portal")
+def get_participant_preview_portal(program_id: str, participant_id: str, authorization: Optional[str] = Header(None)):
+    """
+    Resuelve el portal_code de un participante para que un admin de Inspiratoria
+    pueda ver exactamente lo que ese mentor/mentee ve — solo lectura, y no cuenta
+    como un acceso real de esa persona (ver `preview` en las rutas del portal).
+    Deliberadamente restringido a staff de Inspiratoria, no a PMs de la empresa.
+    """
+    from companies.auth_deps import get_current_user, is_admin
+    from programs.models import ProgramParticipant
+    import uuid
+
+    actor = get_current_user(authorization)
+    if not is_admin(actor):
+        raise HTTPException(status_code=403, detail="Solo staff de Inspiratoria puede usar la vista previa")
+
+    try:
+        program = Program.objects.get(id=uuid.UUID(program_id))
+    except Program.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+
+    try:
+        pp = ProgramParticipant.objects.select_related("user").get(id=participant_id, program=program)
+    except ProgramParticipant.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Participant not found") from exc
+
+    return {
+        "portal_code": pp.user.portal_code,
+        "name": pp.user.full_name or pp.user.email,
+        "role": pp.role,
+    }
+
+
+@router.get("/programs/{program_id}/participants/{participant_id}/detail-report")
+def get_participant_detail_report(program_id: str, participant_id: str, authorization: Optional[str] = Header(None)):
+    """
+    Datos detallados de un participante (sesión por sesión, recurso por recurso,
+    accesos recientes) — base para el reporte PDF individual en tiempo real.
+    """
+    from companies.auth_deps import get_current_user, require_company_access
+    from programs.models import ProgramParticipant, ActivityCompletion, ContentView, ParticipantAccessLog, Content
+    import uuid
+
+    actor = get_current_user(authorization)
+
+    try:
+        program = Program.objects.select_related("company").get(id=uuid.UUID(program_id))
+    except Program.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+
+    require_company_access(actor, program.company_id)
+
+    try:
+        pp = ProgramParticipant.objects.select_related("user").get(id=participant_id, program=program)
+    except ProgramParticipant.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Participant not found") from exc
+
+    completed_activities = list(program.activities.filter(status="completed").order_by("start_date"))
+    attended_ids = set(
+        ActivityCompletion.objects.filter(activity__in=completed_activities, user=pp.user)
+        .values_list("activity_id", flat=True)
+    )
+    sessions = [
+        {
+            "name": act.name,
+            "date": act.start_date.isoformat() if act.start_date else None,
+            "modality": act.get_modality_display(),
+            "attended": act.id in attended_ids,
+        }
+        for act in completed_activities
+    ]
+
+    trackable_contents = list(
+        Content.objects.filter(activity__in=completed_activities).filter(~django_models.Q(resources=[]))
+    )
+    resources = []
+    for content in trackable_contents:
+        last_view = (
+            ContentView.objects.filter(content=content, user=pp.user).order_by("-viewed_at").first()
+        )
+        resources.append({
+            "title": content.title,
+            "viewed": last_view is not None,
+            "last_viewed_at": last_view.viewed_at.isoformat() if last_view else None,
+        })
+
+    access_logs = list(ParticipantAccessLog.objects.filter(participant=pp).order_by("-occurred_at"))
+
+    return {
+        "participant": {
+            "id": str(pp.id),
+            "name": pp.user.full_name or pp.user.email,
+            "email": pp.user.email,
+            "role": pp.role,
+            "status": pp.status,
+            "joined_at": pp.invitation_sent_at.isoformat() if pp.invitation_sent_at else None,
+            "last_access_at": pp.last_access_at.isoformat() if pp.last_access_at else None,
+        },
+        "program": {"name": program.name, "company": program.company.name if program.company else None},
+        "sessions": sessions,
+        "resources": resources,
+        "access": {
+            "total": len(access_logs),
+            "first_access": access_logs[-1].occurred_at.isoformat() if access_logs else None,
+            "last_access": access_logs[0].occurred_at.isoformat() if access_logs else None,
+            "recent": [a.occurred_at.isoformat() for a in access_logs[:10]],
+        },
+    }
+
+
+class GeneratedReportIn(BaseModel):
+    participant_id: str
+    file_name: str
+    pdf_base64: str
+
+
+@router.post("/programs/{program_id}/reports", status_code=201)
+def create_generated_report(program_id: str, payload: GeneratedReportIn, authorization: Optional[str] = Header(None)):
+    """Registra en el historial un reporte PDF individual generado desde la Vista Corporativa."""
+    from companies.auth_deps import get_current_user, require_company_access
+    from programs.models import ProgramParticipant, GeneratedReport
+    import uuid
+
+    actor = get_current_user(authorization)
+
+    try:
+        program = Program.objects.get(id=uuid.UUID(program_id))
+    except Program.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+
+    require_company_access(actor, program.company_id)
+
+    try:
+        pp = ProgramParticipant.objects.get(id=payload.participant_id, program=program)
+    except ProgramParticipant.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Participant not found") from exc
+
+    report = GeneratedReport.objects.create(
+        program=program, participant=pp, generated_by=actor,
+        file_name=payload.file_name, pdf_base64=payload.pdf_base64,
+    )
+    return {
+        "id": str(report.id),
+        "participant_id": str(pp.id),
+        "participant_name": pp.user.full_name or pp.user.email,
+        "file_name": report.file_name,
+        "generated_by": actor.full_name or actor.email,
+        "generated_at": report.generated_at.isoformat(),
+    }
+
+
+@router.get("/programs/{program_id}/reports")
+def list_generated_reports(program_id: str, authorization: Optional[str] = Header(None)):
+    """Historial de reportes PDF individuales generados para este programa (sin el PDF en sí, liviano)."""
+    from companies.auth_deps import get_current_user, require_company_access
+    from programs.models import GeneratedReport
+    import uuid
+
+    actor = get_current_user(authorization)
+
+    try:
+        program = Program.objects.get(id=uuid.UUID(program_id))
+    except Program.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+
+    require_company_access(actor, program.company_id)
+
+    reports = (
+        GeneratedReport.objects.filter(program=program)
+        .select_related("participant__user", "generated_by")
+        .order_by("-generated_at")
+    )
+    return [
+        {
+            "id": str(r.id),
+            "participant_id": str(r.participant_id),
+            "participant_name": r.participant.user.full_name or r.participant.user.email,
+            "participant_role": r.participant.role,
+            "file_name": r.file_name,
+            "generated_by": (r.generated_by.full_name or r.generated_by.email) if r.generated_by else "—",
+            "generated_at": r.generated_at.isoformat(),
+        }
+        for r in reports
+    ]
+
+
+@router.get("/reports/{report_id}/download")
+def download_generated_report(report_id: str, authorization: Optional[str] = Header(None)):
+    """Descarga el PDF exacto (base64 decodificado) de un reporte previamente generado."""
+    from companies.auth_deps import get_current_user, require_company_access
+    from programs.models import GeneratedReport
+    import base64
+    import uuid
+
+    actor = get_current_user(authorization)
+
+    try:
+        report = GeneratedReport.objects.select_related("program").get(id=uuid.UUID(report_id))
+    except GeneratedReport.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Report not found") from exc
+
+    require_company_access(actor, report.program.company_id)
+
+    pdf_bytes = base64.b64decode(report.pdf_base64)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{report.file_name}"'},
+    )
 
 
 @router.get("/programs/users/search")
@@ -2418,7 +2827,7 @@ def get_program_stats(program_id: str, authorization: Optional[str] = Header(Non
     Estadísticas detalladas de un programa específico
     """
     from companies.auth_deps import get_current_user, require_company_access
-    from django.db.models import Avg, Count
+    from programs.models import ProgramParticipant, Vinculation
     import uuid
 
     actor = get_current_user(authorization)
@@ -2428,10 +2837,14 @@ def get_program_stats(program_id: str, authorization: Optional[str] = Header(Non
         require_company_access(actor, program.company_id)
     except Program.DoesNotExist as exc:
         raise HTTPException(status_code=404, detail="Program not found") from exc
-    
-    participants = Participant.objects.filter(program=program)
-    matches = Match.objects.filter(program=program)
-    
+
+    participants = ProgramParticipant.objects.filter(program=program, deleted_at__isnull=True)
+    vinculations = Vinculation.objects.filter(program=program)
+    scores = [
+        v.metadata.get("score") for v in vinculations
+        if isinstance(v.metadata, dict) and v.metadata.get("score") is not None
+    ]
+
     return {
         "program_id": program.id,
         "program_name": program.name,
@@ -2441,10 +2854,10 @@ def get_program_stats(program_id: str, authorization: Optional[str] = Header(Non
             "mentees": participants.filter(role="mentee").count(),
         },
         "matches": {
-            "total": matches.count(),
-            "active": matches.filter(status="active").count(),
-            "completed": matches.filter(status="completed").count(),
-            "avg_score": round(float(matches.aggregate(avg=Avg("score"))["avg"] or 0), 2),
+            "total": vinculations.count(),
+            "active": vinculations.filter(status="active").count(),
+            "completed": vinculations.filter(status="inactive").count(),
+            "avg_score": round(sum(scores) / len(scores), 2) if scores else 0,
         }
     }
 

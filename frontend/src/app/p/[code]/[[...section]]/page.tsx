@@ -46,86 +46,82 @@ const styles = `
   /* ═══ Sidebar ═══ */
   .p-sidebar {
     width: ${SIDEBAR_W_COLLAPSED}px;
-    background: linear-gradient(180deg, #0c1929 0%, #0f2744 40%, #0a1628 100%);
+    background: #ffffff;
+    border-right: 1px solid #edeef0;
     display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 40;
     transition: width 0.28s cubic-bezier(0.4,0,0.2,1); overflow: hidden;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.15);
-  }
-  .p-sidebar::before {
-    content: ''; position: absolute; inset: 0; opacity: 0.03; pointer-events: none;
-    background-image: radial-gradient(circle at 20% 50%, rgba(6,182,212,0.4) 0%, transparent 50%),
-                      radial-gradient(circle at 80% 20%, rgba(34,211,153,0.3) 0%, transparent 50%);
+    box-shadow: 1px 0 0 rgba(15,23,42,0.02);
   }
   .p-sidebar.expanded { width: ${SIDEBAR_W_EXPANDED}px; }
 
-  .p-sidebar-header { padding: 14px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; gap: 0; min-height: 64px; position: relative; z-index: 1; }
+  .p-sidebar-header { padding: 14px; border-bottom: 1px solid #f0f1f2; display: flex; align-items: center; justify-content: center; gap: 0; min-height: 64px; position: relative; z-index: 1; }
   .p-sidebar.expanded .p-sidebar-header { justify-content: flex-start; gap: 12px; }
-  .p-sidebar-logo-img { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; filter: brightness(1.1); }
-  .p-sidebar-logo-text { font-size: 1.05rem; font-weight: 800; color: #fff; letter-spacing: -0.02em; white-space: nowrap; display: none; }
+  .p-sidebar-logo-img { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; }
+  .p-sidebar-logo-text { font-size: 1.05rem; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; white-space: nowrap; display: none; }
   .p-sidebar.expanded .p-sidebar-logo-text { display: inline; }
 
   /* Program card in sidebar */
   .p-program-card {
     margin: 4px 10px 8px; padding: 10px 12px; border-radius: 10px;
-    background: linear-gradient(135deg, rgba(6,182,212,0.12), rgba(34,211,153,0.08));
-    border: 1px solid rgba(6,182,212,0.18);
+    background: linear-gradient(135deg, rgba(6,182,212,0.07), rgba(34,211,153,0.05));
+    border: 1px solid rgba(6,182,212,0.15);
     opacity: 0; max-height: 0; overflow: hidden; transition: all 0.25s;
   }
   .p-sidebar.expanded .p-program-card { opacity: 1; max-height: 100px; }
-  .p-program-card-name { font-size: 0.72rem; font-weight: 700; color: #e0f2fe; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
-  .p-program-card-meta { font-size: 0.62rem; color: rgba(255,255,255,0.45); display: flex; gap: 8px; }
+  .p-program-card-name { font-size: 0.72rem; font-weight: 700; color: #0e7490; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+  .p-program-card-meta { font-size: 0.62rem; color: #6b7280; display: flex; gap: 8px; }
 
   /* Nav */
   .p-nav { flex: 1; padding: 8px; overflow-y: auto; overflow-x: hidden; position: relative; z-index: 1; }
   .p-nav::-webkit-scrollbar { width: 3px; }
-  .p-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  .p-nav::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.1); border-radius: 3px; }
   .p-nav-section { margin-bottom: 12px; }
-  .p-nav-section-title { font-size: 0.6rem; font-weight: 700; color: rgba(255,255,255,0.25); text-transform: uppercase; letter-spacing: 0.1em; padding: 0 8px; margin-bottom: 6px; white-space: nowrap; overflow: hidden; opacity: 0; height: 0; transition: opacity 0.2s, height 0.2s; }
+  .p-nav-section-title { font-size: 0.6rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; padding: 0 8px; margin-bottom: 6px; white-space: nowrap; overflow: hidden; opacity: 0; height: 0; transition: opacity 0.2s, height 0.2s; }
   .p-sidebar.expanded .p-nav-section-title { opacity: 1; height: auto; margin-bottom: 6px; }
 
-  .p-nav-item { display: flex; align-items: center; justify-content: center; gap: 0; padding: 10px 0; border-radius: 10px; cursor: pointer; font-size: 0.82rem; font-weight: 500; color: rgba(255,255,255,0.55); transition: all 0.18s; border: none; background: none; width: 100%; text-align: left; position: relative; white-space: nowrap; }
+  .p-nav-item { display: flex; align-items: center; justify-content: center; gap: 0; padding: 10px 0; border-radius: 10px; cursor: pointer; font-size: 0.82rem; font-weight: 500; color: #52525b; transition: all 0.18s; border: none; background: none; width: 100%; text-align: left; position: relative; white-space: nowrap; }
   .p-sidebar.expanded .p-nav-item { justify-content: flex-start; padding: 10px 14px; gap: 12px; }
-  .p-nav-item:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.95); }
-  .p-nav-item.active { background: rgba(6,182,212,0.15); color: #fff; font-weight: 600; }
-  .p-nav-item.active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 24px; background: #22d3ee; border-radius: 0 4px 4px 0; }
+  .p-nav-item:hover { background: #f4f5f6; color: #111827; }
+  .p-nav-item.active { background: rgba(6,182,212,0.1); color: #0e7490; font-weight: 600; }
+  .p-nav-item.active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 24px; background: #06b6d4; border-radius: 0 4px 4px 0; }
   .p-nav-item .nav-icon { width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: filter 0.18s; color: inherit; }
-  .p-nav-item.active .nav-icon { filter: drop-shadow(0 0 6px rgba(34,211,153,0.4)); color: #67e8f9; }
+  .p-nav-item.active .nav-icon { color: #0891b2; }
   .p-nav-item .nav-icon svg { width: 20px; height: 20px; stroke: currentColor; }
   .p-nav-label { display: none; }
   .p-sidebar.expanded .p-nav-label { display: inline; }
   .p-nav-count { display: none; }
-  .p-sidebar.expanded .p-nav-count { display: inline-block; margin-left: auto; font-size: 0.65rem; font-weight: 700; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); padding: 2px 8px; border-radius: 10px; }
-  .p-nav-item.active .p-nav-count { background: rgba(6,182,212,0.2); color: #67e8f9; }
+  .p-sidebar.expanded .p-nav-count { display: inline-block; margin-left: auto; font-size: 0.65rem; font-weight: 700; background: rgba(15,23,42,0.06); color: #6b7280; padding: 2px 8px; border-radius: 10px; }
+  .p-nav-item.active .p-nav-count { background: rgba(6,182,212,0.15); color: #0e7490; }
 
   /* Tooltip on collapsed */
-  .p-nav-item .nav-tooltip { position: absolute; left: 68px; top: 50%; transform: translateY(-50%); background: #0c4a6e; color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 100; }
-  .p-nav-item .nav-tooltip::before { content: ''; position: absolute; left: -4px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 8px; height: 8px; background: #0c4a6e; }
+  .p-nav-item .nav-tooltip { position: absolute; left: 68px; top: 50%; transform: translateY(-50%); background: #111827; color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 100; }
+  .p-nav-item .nav-tooltip::before { content: ''; position: absolute; left: -4px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 8px; height: 8px; background: #111827; }
   .p-sidebar:not(.expanded) .p-nav-item:hover .nav-tooltip { opacity: 1; }
 
-  .p-sidebar-footer { padding: 12px; border-top: 1px solid rgba(255,255,255,0.06); position: relative; z-index: 1; }
+  .p-sidebar-footer { padding: 12px; border-top: 1px solid #f0f1f2; position: relative; z-index: 1; }
   .p-user-card { display: flex; align-items: center; justify-content: center; gap: 0; padding: 8px; border-radius: 10px; transition: background 0.15s; }
   .p-sidebar.expanded .p-user-card { justify-content: flex-start; gap: 10px; }
-  .p-user-card:hover { background: rgba(255,255,255,0.04); }
+  .p-user-card:hover { background: #f4f5f6; }
   .p-user-avatar { width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(135deg, #0891b2, #06b6d4); display: flex; align-items: center; justify-content: center; font-size: 0.82rem; font-weight: 800; color: #fff; flex-shrink: 0; box-shadow: 0 2px 8px rgba(6,182,212,0.3); }
   .p-user-info { display: none; }
   .p-sidebar.expanded .p-user-info { display: block; }
-  .p-user-name { font-size: 0.8rem; font-weight: 600; color: #fff; white-space: nowrap; }
-  .p-user-role { font-size: 0.65rem; color: rgba(255,255,255,0.4); white-space: nowrap; }
-  .p-user-online { position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background: #22c55e; border: 2px solid #0a1628; }
+  .p-user-name { font-size: 0.8rem; font-weight: 600; color: #111827; white-space: nowrap; }
+  .p-user-role { font-size: 0.65rem; color: #6b7280; white-space: nowrap; }
+  .p-user-online { position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background: #22c55e; border: 2px solid #ffffff; }
 
   /* Support button */
-  .p-support-btn { display: flex; align-items: center; justify-content: center; gap: 0; padding: 10px 0; border-radius: 10px; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: rgba(255,255,255,0.55); transition: all 0.18s; border: none; background: none; width: 100%; text-align: left; white-space: nowrap; }
+  .p-support-btn { display: flex; align-items: center; justify-content: center; gap: 0; padding: 10px 0; border-radius: 10px; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: #52525b; transition: all 0.18s; border: none; background: none; width: 100%; text-align: left; white-space: nowrap; }
   .p-sidebar.expanded .p-support-btn { justify-content: flex-start; padding: 10px 14px; gap: 10px; }
-  .p-support-btn:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.95); }
+  .p-support-btn:hover { background: #f4f5f6; color: #111827; }
   .p-support-btn .nav-icon { width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: inherit; }
   .p-support-btn .nav-icon svg { width: 20px; height: 20px; stroke: currentColor; }
   .p-support-label { display: none; }
   .p-sidebar.expanded .p-support-label { display: inline; }
 
   /* Logout button */
-  .p-logout-btn { display: flex; align-items: center; justify-content: center; gap: 0; padding: 8px 0; border-radius: 8px; cursor: pointer; font-size: 0.75rem; font-weight: 500; color: rgba(255,255,255,0.35); transition: all 0.18s; border: none; background: none; width: 100%; white-space: nowrap; margin-top: 6px; }
+  .p-logout-btn { display: flex; align-items: center; justify-content: center; gap: 0; padding: 8px 0; border-radius: 8px; cursor: pointer; font-size: 0.75rem; font-weight: 500; color: #9ca3af; transition: all 0.18s; border: none; background: none; width: 100%; white-space: nowrap; margin-top: 6px; }
   .p-sidebar.expanded .p-logout-btn { justify-content: flex-start; padding: 8px 14px; gap: 10px; }
-  .p-logout-btn:hover { background: rgba(239,68,68,0.1); color: #fca5a5; }
+  .p-logout-btn:hover { background: rgba(239,68,68,0.08); color: #dc2626; }
   .p-logout-label { display: none; }
   .p-sidebar.expanded .p-logout-label { display: inline; }
 
@@ -159,6 +155,11 @@ const styles = `
   .dash-header { margin-bottom: 20px; }
   .dash-title { font-size: 1.25rem; font-weight: 700; color: #111827; margin: 0 0 4px; letter-spacing: -0.02em; }
   .dash-subtitle { font-size: 0.82rem; color: #6b7280; margin: 0; }
+
+  /* Page header — mismo look que el dashboard en todas las sub-páginas, sin banner de color */
+  .pd-page-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  .pd-page-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pd-pill-lite { padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; background: #f4f5f6; color: #52525b; border: 1px solid #ececec; white-space: nowrap; }
 
   /* Stats */
   .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
@@ -201,33 +202,6 @@ const styles = `
 
   /* ═══ Program Detail ═══ */
   .pd-wrapper { background: #fafafa; min-height: calc(100vh - 64px); width: 100%; }
-  .pd-hero { position: relative; overflow: hidden; padding: 0; width: 100%; }
-  .pd-hero-bg { position: absolute; inset: 0; z-index: 0; }
-  .pd-hero-inner { position: relative; z-index: 2; max-width: 1200px; margin: 0 auto; padding: 40px 36px 32px; }
-  .pd-back { display: inline-flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.7); font-size: 0.78rem; font-weight: 500; cursor: pointer; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 14px; backdrop-filter: blur(8px); transition: all 0.2s; }
-  .pd-back:hover { background: rgba(255,255,255,0.2); color: #fff; }
-  .pd-hero-title { font-size: 2rem; font-weight: 800; color: #fff; letter-spacing: -0.03em; margin: 16px 0 8px; line-height: 1.15; }
-  .pd-hero-desc { font-size: 0.95rem; color: rgba(255,255,255,0.8); max-width: 600px; line-height: 1.6; }
-  .pd-hero-meta { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px; }
-  .pd-hero-meta-item { display: flex; flex-direction: column; gap: 2px; }
-  .pd-hero-meta-label { font-size: 0.68rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
-  .pd-hero-meta-value { font-size: 1rem; font-weight: 700; color: #fff; }
-  .pd-hero-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
-  .pd-pill { padding: 5px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; backdrop-filter: blur(10px); }
-  .pd-pill-theme { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
-  .pd-pill-status { border: 1px solid rgba(255,255,255,0.2); }
-  .pd-bubble { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.06); z-index: 1; }
-  .pd-bubble-1 { width: 300px; height: 300px; top: -80px; right: -40px; animation: pd-float 8s ease-in-out infinite; }
-  .pd-bubble-2 { width: 200px; height: 200px; bottom: -60px; left: 10%; animation: pd-float 12s ease-in-out infinite reverse; }
-  .pd-bubble-3 { width: 150px; height: 150px; top: 30%; right: 20%; animation: pd-float 10s ease-in-out infinite 2s; background: rgba(255,255,255,0.04); }
-  .pd-bubble-4 { width: 80px; height: 80px; bottom: 20px; right: 35%; animation: pd-float 7s ease-in-out infinite 1s; background: rgba(255,255,255,0.08); }
-  .pd-bubble-5 { width: 120px; height: 120px; top: 10px; left: 30%; animation: pd-float 9s ease-in-out infinite 3s; background: rgba(255,255,255,0.03); }
-  @keyframes pd-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
-  .pd-tabs { max-width: 1200px; margin: 0 auto; padding: 0 36px; }
-  .pd-tabs-bar { display: flex; gap: 4px; background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); border-radius: 14px; padding: 5px; border: 1px solid rgba(6,182,212,0.08); margin-top: -24px; position: relative; z-index: 10; box-shadow: 0 4px 24px rgba(6,182,212,0.08); }
-  .pd-tab { flex: 1; padding: 11px 8px; font-size: 0.8rem; font-weight: 500; color: #6b7280; cursor: pointer; border: none; background: transparent; border-radius: 10px; transition: all 0.2s; text-align: center; }
-  .pd-tab:hover { color: #374151; background: rgba(6,182,212,0.04); }
-  .pd-tab.active { background: #fff; color: #0891b2; font-weight: 700; box-shadow: 0 2px 8px rgba(6,182,212,0.1); }
   .pd-content { max-width: 1200px; margin: 0 auto; padding: 28px 36px 60px; }
   .pd-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
   .pd-stat { background: #fff; border-radius: 16px; padding: 20px; border: 1px solid #f0f0f0; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
@@ -440,8 +414,7 @@ const styles = `
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
     .pd-stats { grid-template-columns: repeat(2, 1fr); }
     .pd-info-grid { grid-template-columns: repeat(2, 1fr); }
-    .pd-hero-inner { padding: 28px 20px 24px; }
-    .pd-content, .pd-tabs { padding-left: 20px; padding-right: 20px; }
+    .pd-content { padding-left: 20px; padding-right: 20px; }
     .p-sidebar { display: none; }
     .p-topbar { left: 0 !important; }
     .p-main { margin-left: 0 !important; }
@@ -451,8 +424,6 @@ const styles = `
     .pd-stats { grid-template-columns: 1fr; }
     .pd-info-grid { grid-template-columns: 1fr; }
     .pd-info-item { border-right: none; }
-    .pd-hero-title { font-size: 1.4rem; }
-    .pd-tabs-bar { flex-wrap: wrap; }
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -737,6 +708,24 @@ export default function ParticipantPortalPage() {
   const params = useParams();
   const portalCode = params.code as string;
   const sectionParam = (params.section as string[] | undefined)?.[0] || '';
+  // Un admin de Inspiratoria puede "ver como" cualquier mentor/mentee desde la
+  // consola admin (?preview=admin). Es una vista de solo lectura: no dispara el
+  // marcado de mensajes como leídos ni ninguna acción que mute datos reales de
+  // esa persona — no cuenta como un acceso real suyo. Leemos el query param
+  // directo de window.location (no useSearchParams) para no forzar un límite
+  // de Suspense en esta página.
+  const [isAdminPreview, setIsAdminPreview] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const key = `admin_preview_${portalCode}`;
+    const fromUrl = new URLSearchParams(window.location.search).get('preview') === 'admin';
+    if (fromUrl) {
+      sessionStorage.setItem(key, '1');
+    }
+    // sessionStorage.setItem is synchronous, so this read always sees the write above.
+    setIsAdminPreview(fromUrl || sessionStorage.getItem(key) === '1');
+  }, [portalCode]);
+  const blockInPreview = () => { alert('Estás en modo vista previa (solo lectura) — esta acción no está disponible.'); };
 
   // Map URL slug → internal section key
   const SECTION_SLUGS: Record<string, string> = {
@@ -1023,6 +1012,7 @@ export default function ParticipantPortalPage() {
   // Fetch badges when entering the badges tab
   useEffect(() => {
     if (activeNav !== 'my-badges' || !portalCode) return;
+    if (badgesData) return; // already loaded
     setBadgesLoading(true);
     apiFetch(`${API_URL}/api/companies/portal/${portalCode}/badges`)
       .then(r => { if (!r.ok) throw new Error('badges_error'); return r.json(); })
@@ -1073,6 +1063,7 @@ export default function ParticipantPortalPage() {
   // Fetch activities when entering the activities tab (with completion status)
   useEffect(() => {
     if (activeNav !== 'my-portal-activities' || !portalCode) return;
+    if (portalActivities.length > 0) return; // already loaded — usa el botón "Actualizar" para refrescar
     setActivitiesLoading(true);
     apiFetch(`${API_URL}/api/companies/portal/${portalCode}/activities`)
       .then(r => r.ok ? r.json() : { activities: [] })
@@ -1084,6 +1075,7 @@ export default function ParticipantPortalPage() {
   // Fetch network when entering the network tab
   useEffect(() => {
     if (activeNav !== 'my-network' || !portalCode) return;
+    if (networkPeople.length > 0) return; // already loaded
     setNetworkLoading(true);
     apiFetch(`${API_URL}/api/companies/portal/${portalCode}/network`)
       .then(r => r.ok ? r.json() : { network: [] })
@@ -1119,8 +1111,8 @@ export default function ParticipantPortalPage() {
     if (!chatActiveProgram || activeNav !== 'my-chat') return;
     setChatLoading(true);
     setChatMessages([]);
-    // Fetch messages
-    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/messages`)
+    // Fetch messages — en vista previa de admin, no marca como leído (no cuenta como acceso real)
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/messages${isAdminPreview ? '?preview=1' : ''}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) setChatMessages(data.messages || []);
@@ -1130,7 +1122,7 @@ export default function ParticipantPortalPage() {
         setChatLoading(false);
         setTimeout(() => { chatMessagesRef.current?.scrollTo({ top: chatMessagesRef.current.scrollHeight }); }, 100);
       });
-  }, [chatActiveProgram?.id, activeNav, portalCode]);
+  }, [chatActiveProgram?.id, activeNav, portalCode, isAdminPreview]);
 
   // ── Chat: fetch participants when program changes ──
   useEffect(() => {
@@ -1173,6 +1165,7 @@ export default function ParticipantPortalPage() {
   // ── Chat functions ──
   const sendChatMessage = useCallback(async () => {
     if ((!chatInput.trim() && chatAttachments.length === 0) || chatSending || !chatActiveProgram) return;
+    if (isAdminPreview) { blockInPreview(); return; }
     setChatSending(true);
     try {
       const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/chat/${chatActiveProgram.id}/messages`, {
@@ -1189,7 +1182,7 @@ export default function ParticipantPortalPage() {
       }
     } catch {}
     setChatSending(false);
-  }, [chatInput, chatAttachments, chatSending, chatActiveProgram, portalCode]);
+  }, [chatInput, chatAttachments, chatSending, chatActiveProgram, portalCode, isAdminPreview]);
 
   const handleChatTyping = useCallback(() => {
     if (!chatActiveProgram) return;
@@ -1226,60 +1219,11 @@ export default function ParticipantPortalPage() {
   }, []);
 
   // ── Loading / Error states ──
-  if (loading) return (
+  if (loading || loadingPrograms) return (
     <>
       <style suppressHydrationWarning dangerouslySetInnerHTML={{ __html: styles }} />
-      <div className="p-skel">
-        <aside className="p-skel-side">
-          <div className="skel" style={{ height: 32, width: '70%', marginBottom: 22 }} />
-          {[...Array(8)].map((_, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <div className="skel skel-circle" style={{ width: 18, height: 18 }} />
-              <div className="skel skel-line" style={{ width: `${50 + (i % 3) * 15}%` }} />
-            </div>
-          ))}
-        </aside>
-        <div>
-          <div className="p-skel-top">
-            <div className="skel skel-line" style={{ width: 220, height: 16 }} />
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <div className="skel skel-line" style={{ width: 90, height: 12 }} />
-              <div className="skel skel-circle" style={{ width: 36, height: 36 }} />
-            </div>
-          </div>
-          <div className="p-skel-main">
-            <div className="skel skel-line" style={{ width: 280, height: 22, marginBottom: 8 }} />
-            <div className="skel skel-line" style={{ width: 380, height: 12, marginBottom: 24 }} />
-            <div className="p-skel-stats">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="skel-card">
-                  <div className="skel skel-line" style={{ width: '60%', height: 10, marginBottom: 12 }} />
-                  <div className="skel skel-line" style={{ width: '40%', height: 22 }} />
-                </div>
-              ))}
-            </div>
-            <div className="p-skel-grid2">
-              <div className="skel-card" style={{ minHeight: 240 }}>
-                <div className="skel skel-line" style={{ width: '40%', height: 14, marginBottom: 18 }} />
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                    <div className="skel skel-circle" style={{ width: 36, height: 36 }} />
-                    <div style={{ flex: 1 }}>
-                      <div className="skel skel-line" style={{ width: '70%', marginBottom: 6 }} />
-                      <div className="skel skel-line" style={{ width: '40%', height: 9 }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="skel-card" style={{ minHeight: 240 }}>
-                <div className="skel skel-line" style={{ width: '50%', height: 14, marginBottom: 18 }} />
-                <div className="skel" style={{ height: 140, borderRadius: 10, marginBottom: 14 }} />
-                <div className="skel skel-line" style={{ width: '80%', marginBottom: 8 }} />
-                <div className="skel skel-line" style={{ width: '60%' }} />
-              </div>
-            </div>
-          </div>
-        </div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
+        <div className="p-loading-spinner" />
       </div>
     </>
   );
@@ -1306,23 +1250,7 @@ export default function ParticipantPortalPage() {
         <p className="dash-subtitle">Bienvenido a tu espacio de aprendizaje</p>
       </div>
 
-      {loadingPrograms ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16, marginBottom: 24 }}>
-          {[...Array(2)].map((_, i) => (
-            <div key={i} className="skel-card" style={{ padding: 24, minHeight: 180 }}>
-              <SkelBlock w={80} h={9} mb={12} />
-              <SkelBlock w="75%" h={20} mb={10} />
-              <SkelBlock w="95%" h={10} mb={6} />
-              <SkelBlock w="60%" h={10} mb={20} />
-              <div style={{ display: 'flex', gap: 16 }}>
-                <SkelBlock w={70} h={10} />
-                <SkelBlock w={70} h={10} />
-                <SkelBlock w={70} h={10} />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : myPrograms.length === 0 ? (
+      {loadingPrograms ? null : myPrograms.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px' }}>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', marginBottom: 8 }}>Aún no estás inscrito en un programa</h3>
           <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>Cuando te asignen a un programa, aparecerá aquí.</p>
@@ -1382,11 +1310,10 @@ export default function ParticipantPortalPage() {
   );
 
   const renderMyProgram = () => {
+    if (loadingDetail) return <SkelDetailPage />;
     const mp = activeProgram;
     if (!mp) return <div className="empty-state">Selecciona un programa</div>;
-    if (loadingDetail) return <SkelDetailPage />;
 
-    const heroGradient = THEME_GRADIENTS[mp.theme] || THEME_GRADIENTS.leadership;
     const activities = programDetail?.activities || mp.activities || [];
     const modulesCount = programTemplate?.modules?.length || 0;
 
@@ -1424,60 +1351,34 @@ export default function ParticipantPortalPage() {
       </span>
     );
 
+    const pageTitle = detailTab === 'overview'
+      ? mp.name
+      : ({ modules: 'Módulos', participants: 'Participantes', activities: 'Actividades', milestones: 'Hitos', ecosystem: 'Ecosistema' } as Record<string, string>)[detailTab];
+    const pageSubtitle = detailTab === 'overview'
+      ? (mp.description || `${roleLabel} · Mi rol en este programa`)
+      : `${roleLabel} · ${programTemplate?.duration || mp.name}`;
+
     return (
       <div className="pd-wrapper">
-        {/* ── HERO — only on programa overview ── */}
-        {detailTab === 'overview' && (
-        <section className="pd-hero">
-          <div className="pd-hero-bg" style={{ background: heroGradient }}>
-            <div className="pd-bubble pd-bubble-1" />
-            <div className="pd-bubble pd-bubble-2" />
-            <div className="pd-bubble pd-bubble-3" />
-            <div className="pd-bubble pd-bubble-4" />
-            <div className="pd-bubble pd-bubble-5" />
-          </div>
-          <div className="pd-hero-inner">
-            <button className="pd-back" onClick={() => navigate('dashboard')}>
-              &larr; Volver al inicio
-            </button>
-            <h1 className="pd-hero-title">{mp.name}</h1>
-            {mp.description && <p className="pd-hero-desc">{mp.description}</p>}
-
-            <div className="pd-hero-meta">
-              <div className="pd-hero-meta-item"><div className="pd-hero-meta-label">Participantes</div><div className="pd-hero-meta-value">{programParticipants.length}</div></div>
-              <div className="pd-hero-meta-item"><div className="pd-hero-meta-label">Actividades</div><div className="pd-hero-meta-value">{activities.length}</div></div>
-              <div className="pd-hero-meta-item"><div className="pd-hero-meta-label">Módulos</div><div className="pd-hero-meta-value">{modulesCount}</div></div>
-              <div className="pd-hero-meta-item"><div className="pd-hero-meta-label">Duración</div><div className="pd-hero-meta-value">{programTemplate?.duration || '—'}</div></div>
-              <div className="pd-hero-meta-item"><div className="pd-hero-meta-label">Mi rol</div><div className="pd-hero-meta-value">{roleLabel}</div></div>
-            </div>
-
-            <div className="pd-hero-pills">
-              <span className="pd-pill pd-pill-theme">{LABELS.theme[mp.theme] || mp.theme}</span>
-              <span className="pd-pill pd-pill-status" style={{ background: mp.status === 'active' || mp.status === 'running' ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.12)', color: '#fff' }}>{LABELS.status[mp.status] || mp.status}</span>
-              {programTemplate?.tags?.map((tag: string, i: number) => (
-                <span key={i} className="pd-pill" style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.15)' }}>#{tag}</span>
-              ))}
-            </div>
-          </div>
-        </section>
-        )}
-
-        {/* ── Mini context bar for sub-section pages ── */}
-        {detailTab !== 'overview' && (
-          <div style={{ background: heroGradient, padding: '16px 36px', display: 'flex', alignItems: 'center', gap: 16 }}>
-            <button className="pd-back" onClick={() => navigate('my-program')} style={{ margin: 0, fontSize: '0.72rem', padding: '5px 12px' }}>
-              &larr; {mp.name}
-            </button>
-            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem' }}>|</span>
-            <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.88rem' }}>
-              {{ modules: 'Módulos', participants: 'Participantes', activities: 'Actividades', milestones: 'Hitos', ecosystem: 'Ecosistema' }[detailTab]}
-            </span>
-            <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem', marginLeft: 'auto' }}>{roleLabel} &middot; {programTemplate?.duration || ''}</span>
-          </div>
-        )}
-
         {/* ── CONTENT ── */}
         <div className="pd-content">
+
+          {/* ── Encabezado de página — mismo estilo que Inicio, sin banner de color ── */}
+          <div className="pd-page-header">
+            <div>
+              <h1 className="dash-title">{pageTitle}</h1>
+              <p className="dash-subtitle">{pageSubtitle}</p>
+            </div>
+            {detailTab === 'overview' && (
+              <div className="pd-page-pills">
+                <span className="pd-pill-lite">{LABELS.theme[mp.theme] || mp.theme}</span>
+                <span className="pd-pill-lite">{LABELS.status[mp.status] || mp.status}</span>
+                {programTemplate?.tags?.map((tag: string, i: number) => (
+                  <span key={i} className="pd-pill-lite">#{tag}</span>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* ─── TAB: OVERVIEW ─── */}
           {detailTab === 'overview' && (
@@ -2251,15 +2152,14 @@ export default function ParticipantPortalPage() {
   // RENDER: PROGRESS
   // ══════════════════════════════════════════════════════════════════════════
   const renderProgress = () => {
+    if (loadingDetail) return <SkelDetailPage />;
     const mp = activeProgram;
     if (!mp) return <div className="empty-state">Selecciona un programa para ver el progreso</div>;
-    if (loadingDetail) return <SkelDetailPage />;
 
     const modules = programTemplate?.modules || [];
     const milestones = programTemplate?.milestones || [];
     const activities = programDetail?.activities || mp.activities || [];
     const durationStr = programTemplate?.duration || '2 meses';
-    const heroGradient = THEME_GRADIENTS[mp.theme] || THEME_GRADIENTS.leadership;
 
     // ── Calculate program timeline ──
     const durationMatch = durationStr.match(/(\d+)/);
@@ -2333,16 +2233,12 @@ export default function ParticipantPortalPage() {
 
     return (
       <>
-        {/* Mini context bar */}
-        <div style={{ background: heroGradient, padding: '16px 36px', margin: '-32px -32px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
-          <button className="pd-back" onClick={() => navigate('my-program')} style={{ margin: 0, fontSize: '0.72rem', padding: '5px 12px' }}>
-            &larr; {mp.name}
-          </button>
-          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem' }}>|</span>
-          <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.88rem' }}>Progreso del Programa</span>
-          <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem', marginLeft: 'auto' }}>
-            Semana {currentWeek} de {totalWeeks} &middot; {roleLabel}
-          </span>
+        {/* Encabezado de página — mismo estilo que Inicio, sin banner de color */}
+        <div className="pd-page-header">
+          <div>
+            <h1 className="dash-title">Progreso</h1>
+            <p className="dash-subtitle">{mp.name} · Semana {currentWeek} de {totalWeeks} · {roleLabel}</p>
+          </div>
         </div>
 
         {/* Overall progress bar */}
@@ -2617,6 +2513,7 @@ export default function ParticipantPortalPage() {
   };
 
   const saveProfile = async (stepOverride?: number) => {
+    if (isAdminPreview) { blockInPreview(); return; }
     const token = localStorage.getItem('auth_token');
     if (!token) return;
     setProfileSaving(true);
@@ -2660,6 +2557,7 @@ export default function ParticipantPortalPage() {
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isAdminPreview) { blockInPreview(); return; }
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) { setProfileMsg('err:La imagen no puede superar 2 MB'); return; }
@@ -2687,6 +2585,7 @@ export default function ParticipantPortalPage() {
   };
 
   const deleteAvatar = async () => {
+    if (isAdminPreview) { blockInPreview(); return; }
     const token = localStorage.getItem('auth_token');
     if (!token) return;
     setAvatarUploading(true);
@@ -3536,6 +3435,7 @@ export default function ParticipantPortalPage() {
   };
 
   const handleSaveNotes = async (sessionId: string) => {
+    if (isAdminPreview) { blockInPreview(); return; }
     try {
       await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/notes`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3559,6 +3459,7 @@ export default function ParticipantPortalPage() {
   };
 
   const handleCompleteSession = async (sessionId: string) => {
+    if (isAdminPreview) { blockInPreview(); return; }
     try {
       await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/status?status_val=completed`, { method: 'PATCH' });
       const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
@@ -3567,6 +3468,7 @@ export default function ParticipantPortalPage() {
   };
 
   const handleCompleteActivity = async (actId: number) => {
+    if (isAdminPreview) { blockInPreview(); return; }
     try {
       await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/activities/${actId}/complete`, { method: 'POST' });
       setPortalActivities(prev => prev.map(a => a.id === actId ? { ...a, completed_by_me: true } : a));
@@ -4334,9 +4236,7 @@ export default function ParticipantPortalPage() {
           <p className="dash-subtitle">Tu espacio de mentoría y aprendizaje</p>
         </div>
 
-        {loadingPrograms ? (
-          <div className="empty-state">Cargando tus programas...</div>
-        ) : myPrograms.length === 0 ? (
+        {loadingPrograms ? null : myPrograms.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', marginBottom: 8 }}>Aún no estás inscrito en un programa</h3>
             <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>Cuando te asignen a un programa, aparecerá aquí.</p>
@@ -4682,7 +4582,19 @@ export default function ParticipantPortalPage() {
   return (
     <>
       <style suppressHydrationWarning dangerouslySetInnerHTML={{ __html: styles }} />
-      <div className="p-layout">
+      {isAdminPreview && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+          background: '#0a0a0a', color: '#fff', padding: '9px 20px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          fontSize: 12.5, fontWeight: 600, letterSpacing: 0.2,
+          boxShadow: '0 1px 0 rgba(255,255,255,0.08)',
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FFD902', flexShrink: 0 }} />
+          Vista previa desde administración — estás viendo el portal de <strong>{displayName}</strong> ({roleLabel}), solo lectura. No se registra como un acceso real de esta persona.
+        </div>
+      )}
+      <div className="p-layout" style={isAdminPreview ? { paddingTop: 38 } : undefined}>
 
         {/* SIDEBAR */}
         <aside
@@ -4828,11 +4740,7 @@ export default function ParticipantPortalPage() {
 
         {/* MAIN */}
         <main className="p-main" style={{ marginLeft: sidebarExpanded ? SIDEBAR_W_EXPANDED : SIDEBAR_W_COLLAPSED }}>
-          {loadingPrograms ? (
-            <div className="empty-state">Cargando datos...</div>
-          ) : (
-            renderContent()
-          )}
+          {renderContent()}
         </main>
       </div>
     </>

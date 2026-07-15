@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request, status, Header, UploadFile, File as FastAPIFile
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 import uuid
 import random
 import string
@@ -2087,6 +2087,71 @@ def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bo
     )
 
 
+def _send_corp_admin_invite_email(user_email: str, user_name: str, company_name: str, otp_code: str, activation_token: str):
+    """Invita a un administrador corporativo (rol 'client'/'admin') a la Vista Corporativa de solo lectura."""
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+    login_link = f"{frontend_url}/activate/{activation_token}"
+    first_name = user_name.split()[0] if user_name.strip() else "usuario"
+
+    subject = f"Invitación a la plataforma de {company_name} · Inspiratoria"
+    plain_message = (
+        f"Hola, {first_name}.\n\n"
+        f"Fuiste invitado/a a la Vista Corporativa de {company_name} en Inspiratoria, "
+        f"con acceso de solo lectura para seguir en tiempo real el progreso del programa "
+        f"de mentorías: participantes, cronograma, reportes y engagement.\n\n"
+        f"Tu código de activación es: {otp_code}\n\n"
+        f"Activa tu acceso: {login_link}\n\n"
+        f"Este código expira en 15 minutos.\n\n"
+        f"Equipo Inspiratoria"
+    )
+
+    d1, d2, d3, d4 = otp_code[0], otp_code[1], otp_code[2], otp_code[3]
+    html_message = f"""
+    <div style="background-color:#f9fafb;padding:40px 16px;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+      <div style="max-width:520px;margin:0 auto;">
+        <div style="text-align:center;padding-bottom:32px;">
+          <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#0a0a0a;">Inspiratoria</span>
+        </div>
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:40px 36px;">
+          <p style="margin:0 0 24px 0;color:#111827;font-size:17px;font-weight:500;">Hola, {first_name}.</p>
+          <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:1.7;">
+            Fuiste invitado/a a la <strong>Vista Corporativa de {company_name}</strong> en Inspiratoria,
+            con acceso de solo lectura para seguir en tiempo real el progreso del programa de mentorías.
+          </p>
+          <p style="margin:0 0 28px 0;color:#6b7280;font-size:14px;line-height:1.7;">
+            Vas a poder ver participantes, cronograma, duplas, reportes de engagement y el asistente de IA del programa &mdash; todo actualizado en vivo.
+          </p>
+          <div style="text-align:center;margin:0 0 12px 0;">
+            <p style="margin:0 0 12px 0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:3px;">Código de acceso</p>
+            <div style="display:inline-block;">
+              <span style="display:inline-block;width:48px;height:56px;line-height:56px;text-align:center;font-size:26px;font-weight:700;font-family:'Courier New',monospace;color:#0a0a0a;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;margin:0 3px;">{d1}</span>
+              <span style="display:inline-block;width:48px;height:56px;line-height:56px;text-align:center;font-size:26px;font-weight:700;font-family:'Courier New',monospace;color:#0a0a0a;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;margin:0 3px;">{d2}</span>
+              <span style="display:inline-block;width:48px;height:56px;line-height:56px;text-align:center;font-size:26px;font-weight:700;font-family:'Courier New',monospace;color:#0a0a0a;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;margin:0 3px;">{d3}</span>
+              <span style="display:inline-block;width:48px;height:56px;line-height:56px;text-align:center;font-size:26px;font-weight:700;font-family:'Courier New',monospace;color:#0a0a0a;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;margin:0 3px;">{d4}</span>
+            </div>
+            <p style="margin:10px 0 0 0;color:#9ca3af;font-size:12px;">Expira en 15 minutos</p>
+          </div>
+          <div style="text-align:center;margin:32px 0 0 0;">
+            <a href="{login_link}" style="display:inline-block;background:#0a0a0a;color:#FFD902;padding:14px 40px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.3px;">Activar mi acceso</a>
+          </div>
+        </div>
+        <div style="text-align:center;padding-top:28px;">
+          <p style="margin:0 0 12px 0;color:#d1d5db;font-size:11px;">Si no esperabas esta invitación, puedes ignorar este mensaje.</p>
+          <p style="margin:0;color:#d1d5db;font-size:11px;">Equipo Inspiratoria</p>
+        </div>
+      </div>
+    </div>
+    """
+    send_mail(
+        subject=subject,
+        message=plain_message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user_email],
+        html_message=html_message,
+        fail_silently=False,
+    )
+
+
 async def _require_admin(token: str) -> User:
     """Valida que el token pertenezca a una sesión real y que sea de un admin."""
     from .services import AuthService
@@ -2192,6 +2257,105 @@ async def admin_create_user(
         "view_permissions": user.view_permissions or [],
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "message": f"Usuario creado. OTP enviado a {payload.email}",
+    }
+
+
+class InviteCorpAdminRequest(BaseModel):
+    """
+    Invita a una persona a la Vista Corporativa (solo lectura) de una empresa.
+    'corp_admin' es deliberadamente distinto del rol 'admin' — ese valor ya se
+    usa en otra parte de la plataforma para acceso a la consola de Inspiratoria,
+    y no queremos que una invitación acá otorgue, sin querer, ese acceso.
+    """
+    email: EmailStr
+    full_name: str = Field(..., min_length=2, max_length=200)
+    role: str = Field(..., pattern="^(client|corp_admin)$")
+    position: Optional[str] = None
+
+
+@router.post("/{company_id}/corporate-admins/invite", status_code=status.HTTP_201_CREATED)
+async def invite_corporate_admin(
+    company_id: uuid.UUID,
+    payload: InviteCorpAdminRequest,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Invita por email a una persona de la empresa cliente a la Vista Corporativa
+    de solo lectura (roles 'client'/'corp_admin'). Reusa el mismo flujo de
+    activación por OTP + 2FA que el resto de la plataforma — nunca acceden a
+    nada fuera de su propia empresa.
+
+    Solo puede invitar quien ya tiene rol 'corp_admin' en esa empresa (o es
+    staff de Inspiratoria) — un 'client' (Visualizador) puede ver esta vista
+    pero no gestionar quién más tiene acceso.
+    """
+    from .auth_deps import get_current_user, require_company_access, is_admin
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_company_access)(actor, company_id)
+    if not is_admin(actor) and not (actor.role == "corp_admin" and str(actor.company_id) == str(company_id)):
+        raise HTTPException(status_code=403, detail="Solo un Administrador de esta cuenta puede enviar invitaciones")
+
+    try:
+        company = await sync_to_async(Company.objects.get)(id=company_id)
+    except Company.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    exists = await sync_to_async(User.objects.filter(email=payload.email).exists)()
+    if exists:
+        raise HTTPException(status_code=400, detail="Ya existe un usuario con ese email")
+
+    otp_code = _generate_otp()
+    otp_expires = timezone.now() + timedelta(minutes=15)
+
+    base_username = payload.email.split("@")[0]
+    username = base_username
+    counter = 1
+    while await sync_to_async(User.objects.filter(username=username).exists)():
+        username = f"{base_username}{counter}"
+        counter += 1
+
+    import secrets as _secrets
+    activation_token = _secrets.token_urlsafe(48)
+
+    def _create():
+        user = User(
+            username=username,
+            email=payload.email,
+            full_name=payload.full_name,
+            role=payload.role,
+            company=company,
+            position=payload.position or "",
+            is_active=True,
+            is_account_activated=False,
+            otp_code=otp_code,
+            otp_expires_at=otp_expires,
+            activation_token=activation_token,
+        )
+        user.set_unusable_password()
+        user.save()
+        return user
+
+    user = await sync_to_async(_create)()
+
+    try:
+        await sync_to_async(_send_corp_admin_invite_email)(
+            payload.email, payload.full_name, company.name, otp_code, activation_token,
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Error enviando invitación corp admin: {e}")
+        raise HTTPException(status_code=502, detail="Usuario creado pero no se pudo enviar el email de invitación")
+
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": user.role,
+        "position": user.position,
+        "is_active": user.is_active,
+        "is_account_activated": user.is_account_activated,
+        "last_login_at": None,
+        "message": f"Invitación enviada a {payload.email}",
     }
 
 
@@ -3318,8 +3482,12 @@ async def get_chat_programs(portal_code: str):
 
 
 @router.get("/portal/{portal_code}/chat/{program_id}/messages")
-async def get_chat_messages(portal_code: str, program_id: str, before: Optional[str] = None, limit: int = 50):
-    """Get messages for a program chat. Supports cursor pagination with 'before' timestamp."""
+async def get_chat_messages(portal_code: str, program_id: str, before: Optional[str] = None, limit: int = 50, preview: Optional[str] = None):
+    """
+    Get messages for a program chat. Supports cursor pagination with 'before' timestamp.
+    `preview` (any truthy value) marks this as an admin peeking at someone else's portal —
+    it must not register as a real access, so we skip the last_access_at write below.
+    """
     from programs.models import ProgramParticipant, ProgramChatMessage
 
     def _fetch():
@@ -3340,8 +3508,9 @@ async def get_chat_messages(portal_code: str, program_id: str, before: Optional[
         msgs = list(qs[:limit])
         msgs.reverse()
 
-        # Mark as read (update last_access)
-        ProgramParticipant.objects.filter(user=user, program_id=program_id).update(last_access_at=timezone.now())
+        # Mark as read (update last_access) — but not if this is just an admin preview
+        if not preview:
+            ProgramParticipant.objects.filter(user=user, program_id=program_id).update(last_access_at=timezone.now())
 
         return {
             "messages": [
@@ -4072,9 +4241,12 @@ async def list_company_users(company_id: uuid.UUID, authorization: Optional[str]
             "full_name": user.full_name,
             "role": user.role,
             "position": user.position or "",
-            "is_active": user.is_active
+            "is_active": user.is_active,
+            "avatar_url": user.avatar_url or "",
+            "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+            "is_account_activated": user.is_account_activated,
         })
-    
+
     return {"users": users_response}
 
 

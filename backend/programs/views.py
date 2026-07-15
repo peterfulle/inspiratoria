@@ -303,6 +303,7 @@ class UserSearchResult(BaseModel):
     email: str
     nombre: str  # Cambiado de first_name
     apellidos: str  # Cambiado de last_name
+    full_name: Optional[str] = None
     telefono: str = ""  # Agregado
     role: str
     company: Optional[str] = None
@@ -472,32 +473,73 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
     Obtener los programas en los que participa un usuario (vista participante).
     Retorna programas con módulos, actividades, progreso, etc.
     """
+    from django.db import close_old_connections
     from companies.auth_deps import get_current_user, require_self_or_admin
+    close_old_connections()
     actor = await sync_to_async(get_current_user)(authorization)
     await sync_to_async(require_self_or_admin)(actor, user_id)
 
     def fetch():
+        close_old_connections()
+        from django.db.models import Count
+        from programs.models import Activity, Content
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-        memberships = ProgramParticipant.objects.filter(
+        memberships = list(ProgramParticipant.objects.filter(
             user=user, deleted_at__isnull=True
-        ).select_related('program', 'program__company')
+        ).select_related('program', 'program__company'))
+        program_ids = [m.program_id for m in memberships]
+
+        # Todo lo que sigue eran consultas por-programa (y por-actividad, en el
+        # caso de módulos) dentro del for — un N+1 clásico. Se traen todas de
+        # una sola vez y se agrupan en Python para evitar decenas de round-trips
+        # a la DB remota.
+        all_activities = list(Activity.objects.filter(program_id__in=program_ids))
+        activities_by_program: dict = {}
+        for act in all_activities:
+            activities_by_program.setdefault(act.program_id, []).append(act)
+
+        training_ids = [a.id for a in all_activities if a.activity_type == 'training']
+        modules_by_activity: dict = {}
+        for mod in Content.objects.filter(activity_id__in=training_ids).order_by('order'):
+            modules_by_activity.setdefault(mod.activity_id, []).append(mod)
+
+        from programs.models import Vinculation
+        all_vincs = list(
+            Vinculation.objects.filter(program_id__in=program_ids, status='active')
+            .filter(db_models.Q(participant1__user=user) | db_models.Q(participant2__user=user))
+            .select_related('participant1__user', 'participant2__user')
+        )
+        vinc_by_program: dict = {}
+        for v in all_vincs:
+            vinc_by_program.setdefault(v.program_id, v)
+
+        counts_by_program = {
+            row['program_id']: row['total']
+            for row in ProgramParticipant.objects.filter(
+                program_id__in=program_ids, deleted_at__isnull=True
+            ).values('program_id').annotate(total=Count('id'))
+        }
 
         results = []
         for m in memberships:
             p = m.program
-            # Activities for this program
-            activities = list(p.activities.all().values(
-                'id', 'name', 'description', 'activity_type', 'status',
-                'start_date', 'end_date', 'modality', 'meeting_url',
-            ))
-            # Modules (Content) from training activities
+            acts = activities_by_program.get(p.id, [])
+            activities = [{
+                'id': a.id, 'name': a.name, 'description': a.description,
+                'activity_type': a.activity_type, 'status': a.status,
+                'start_date': a.start_date, 'end_date': a.end_date,
+                'modality': a.modality, 'meeting_url': a.meeting_url,
+            } for a in acts]
+
             modules = []
-            for act in p.activities.filter(activity_type='training'):
-                for mod in act.modules.all().order_by('order'):
+            for act in acts:
+                if act.activity_type != 'training':
+                    continue
+                for mod in modules_by_activity.get(act.id, []):
                     modules.append({
                         "id": mod.id,
                         "title": mod.title,
@@ -507,13 +549,8 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
                         "is_published": mod.is_published,
                         "activity_name": act.name,
                     })
-            # Vinculations (mentor/mentee pairs)
-            from programs.models import Vinculation
-            vinc = Vinculation.objects.filter(
-                program=p, status='active'
-            ).filter(
-                db_models.Q(participant1__user=user) | db_models.Q(participant2__user=user)
-            ).select_related('participant1__user', 'participant2__user').first()
+
+            vinc = vinc_by_program.get(p.id)
             vinculation_info = None
             if vinc:
                 other = vinc.participant2 if vinc.participant1.user == user else vinc.participant1
@@ -523,10 +560,6 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
                     "partner_email": other.user.email,
                     "partner_role": other.role,
                 }
-            # Total participants
-            total_participants = ProgramParticipant.objects.filter(
-                program=p, deleted_at__isnull=True
-            ).count()
 
             results.append({
                 "id": str(p.id),
@@ -540,7 +573,7 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
                 "my_status": m.status,
                 "joined_at": m.created_at.isoformat() if m.created_at else None,
                 "activated_at": m.activated_at.isoformat() if m.activated_at else None,
-                "total_participants": total_participants,
+                "total_participants": counts_by_program.get(p.id, 0),
                 "activities": activities,
                 "modules": modules,
                 "vinculation": vinculation_info,
@@ -566,20 +599,18 @@ async def list_participants(
     """
     Listar participantes de un programa con filtros
     """
+    from django.db import close_old_connections
     from companies.auth_deps import get_current_user, require_program_access
-    actor = await sync_to_async(get_current_user)(authorization)
-    await sync_to_async(require_program_access)(actor, program_id)
 
     def get_participants():
-        # Verificar que el programa existe
-        try:
-            program = Program.objects.get(id=program_id)
-        except Program.DoesNotExist:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Programa no encontrado"
-            )
-        
+        # Todo esto vivía en 3 dispatches de sync_to_async separados
+        # (auth, program access, y la query en sí) — cada uno podía terminar
+        # en un thread distinto y abrir su propia conexión nueva a la DB
+        # remota. Se colapsa en un solo dispatch para pagar ese costo una vez.
+        close_old_connections()
+        actor = get_current_user(authorization)
+        program = require_program_access(actor, program_id)
+
         # Query base
         queryset = ProgramParticipant.objects.filter(
             program=program,
@@ -612,6 +643,7 @@ async def list_participants(
                     "id": str(p.user.id),
                     "nombre": p.user.first_name,  # Cambiado de first_name a nombre
                     "apellidos": p.user.last_name,  # Cambiado de last_name a apellidos
+                    "full_name": getattr(p.user, 'full_name', '') or f"{p.user.first_name} {p.user.last_name}".strip() or p.user.email,
                     "email": p.user.email,
                     "telefono": getattr(p.user, 'phone', ''),  # Agregado telefono
                     "role": p.user.role,

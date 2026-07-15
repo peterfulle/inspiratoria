@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { apiFetch } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
-const ADMIN_ROLES = new Set(['superadmin', 'admin_root', 'inspiratoria_admin', 'admin']);
+const ADMIN_ROLES = new Set(['superadmin', 'admin_root', 'inspiratoria_admin']);
 
 // ============================================================================
 // TYPES
@@ -99,6 +99,7 @@ const I = {
   Check:       SvgBase(<polyline points="20 6 9 17 4 12" />),
   CheckCircle: SvgBase(<><circle cx="12" cy="12" r="10" /><polyline points="9 12 12 15 17 10" /></>),
   Close:       SvgBase(<><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>),
+  Eye:         SvgBase(<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>),
   Link:        SvgBase(<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></>),
   Alert:       SvgBase(<><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>),
   Lock:        SvgBase(<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>),
@@ -1980,6 +1981,22 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
   const [showAdd, setShowAdd] = useState(false);
   const [enrollLink, setEnrollLink] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+
+  const viewAsParticipant = async (p: Participant) => {
+    setPreviewingId(p.id);
+    try {
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/participants/${p.id}/preview-portal`);
+      if (!res.ok) throw new Error('No se pudo abrir la vista previa');
+      const data = await res.json();
+      if (!data.portal_code) throw new Error('Esta persona todavía no tiene portal asignado');
+      window.open(`/p/${data.portal_code}?preview=admin`, '_blank', 'noopener');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'No se pudo abrir la vista previa', 'error');
+    } finally {
+      setPreviewingId(null);
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -2146,6 +2163,16 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    {(p.role === 'mentor' || p.role === 'mentee') && (
+                      <button
+                        onClick={() => viewAsParticipant(p)}
+                        disabled={previewingId === p.id}
+                        title="Ver como este participante — vista previa de solo lectura, no cuenta como acceso real"
+                        className="p-2 rounded-lg text-zinc-400 hover:bg-blue-50 hover:text-blue-600 transition disabled:opacity-40"
+                      >
+                        {previewingId === p.id ? <span className="w-4 h-4 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin inline-block" /> : <I.Eye className="w-4 h-4" />}
+                      </button>
+                    )}
                     <button
                       onClick={() => resend(p.id, p.user.email)}
                       disabled={busyId === p.id}
@@ -3246,7 +3273,116 @@ function TabReportes({ program, participants, assignedPM, showToast }: { program
           )}
         </Card>
       </div>
+
+      <EngagementReport programId={program.id} />
     </div>
+  );
+}
+
+// ============================================================================
+// REPORTE DE ENGAGEMENT — asistencia, recursos vistos y accesos por participante
+// ============================================================================
+interface EngagementRow {
+  participant_id: string; name: string; email: string; role: string; status: string;
+  joined_at: string | null; activated_at: string | null; last_access_at: string | null;
+  access_count: number; sessions_attended: number; sessions_total: number; attendance_pct: number;
+  resources_viewed: number; resources_total: number; resources_pct: number;
+}
+interface EngagementReportData {
+  participants: EngagementRow[];
+  aggregates: {
+    sessions_total: number; resources_total: number;
+    avg_attendance_pct: number; avg_access_count: number; avg_resources_pct: number;
+    by_role: Record<string, { avg_attendance_pct: number; avg_access_count: number; avg_resources_pct: number }>;
+  };
+}
+
+function EngagementReport({ programId }: { programId: string }) {
+  const [data, setData] = React.useState<EngagementReportData | null>(null);
+  const [sortBy, setSortBy] = React.useState<'name' | 'attendance_pct' | 'access_count' | 'resources_pct'>('attendance_pct');
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const r = await apiFetch(`${API_URL}/api/programs/${programId}/engagement-report`);
+        if (r.ok) setData(await r.json());
+      } catch {}
+    })();
+  }, [programId]);
+
+  if (!data) {
+    return (
+      <Card title="Engagement por participante" subtitle="Asistencia, recursos revisados y accesos a la plataforma">
+        <div className="flex items-center justify-center py-8 gap-2"><Spinner /><span className="text-[12px] text-zinc-400">Cargando engagement…</span></div>
+      </Card>
+    );
+  }
+
+  const rows = [...data.participants].sort((a, b) => {
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    return b[sortBy] - a[sortBy];
+  });
+
+  const SortHeader = ({ id, label }: { id: typeof sortBy; label: string }) => (
+    <th
+      onClick={() => setSortBy(id)}
+      className={`px-3 py-2 text-left font-semibold cursor-pointer select-none ${sortBy === id ? 'text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}
+    >
+      {label}{sortBy === id && ' ▾'}
+    </th>
+  );
+
+  return (
+    <Card title="Engagement por participante" subtitle={`Asistencia a ${data.aggregates.sessions_total} sesiones realizadas · ${data.aggregates.resources_total} recursos publicados`}>
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        <ReportTile label="Asistencia promedio" value={`${data.aggregates.avg_attendance_pct}%`} sub={`mentores ${data.aggregates.by_role.mentor?.avg_attendance_pct ?? 0}% · mentees ${data.aggregates.by_role.mentee?.avg_attendance_pct ?? 0}%`} strong />
+        <ReportTile label="Recursos revisados" value={`${data.aggregates.avg_resources_pct}%`} sub={`mentores ${data.aggregates.by_role.mentor?.avg_resources_pct ?? 0}% · mentees ${data.aggregates.by_role.mentee?.avg_resources_pct ?? 0}%`} />
+        <ReportTile label="Accesos promedio" value={data.aggregates.avg_access_count} sub={`mentores ${data.aggregates.by_role.mentor?.avg_access_count ?? 0} · mentees ${data.aggregates.by_role.mentee?.avg_access_count ?? 0}`} />
+      </div>
+
+      {rows.length === 0 ? <Empty msg="Sin participantes" icon={<I.Users />} /> : (
+        <div className="overflow-x-auto -mx-1">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="border-b border-zinc-200">
+                <SortHeader id="name" label="Participante" />
+                <th className="px-3 py-2 text-left font-semibold text-zinc-400">Rol</th>
+                <th className="px-3 py-2 text-left font-semibold text-zinc-400">Ingresó</th>
+                <th className="px-3 py-2 text-left font-semibold text-zinc-400">Últ. acceso</th>
+                <SortHeader id="access_count" label="Accesos" />
+                <SortHeader id="attendance_pct" label="Asistencia" />
+                <SortHeader id="resources_pct" label="Recursos vistos" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.participant_id} className="border-b border-zinc-100 hover:bg-zinc-50">
+                  <td className="px-3 py-2.5 font-semibold text-zinc-900">{r.name}</td>
+                  <td className="px-3 py-2.5">
+                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${r.role === 'mentor' ? 'bg-blue-50 text-blue-700' : 'bg-zinc-100 text-zinc-600'}`}>{r.role}</span>
+                  </td>
+                  <td className="px-3 py-2.5 text-zinc-500">{r.joined_at ? formatDate(r.joined_at) : '—'}</td>
+                  <td className="px-3 py-2.5 text-zinc-500">{r.last_access_at ? formatDate(r.last_access_at) : 'Nunca'}</td>
+                  <td className="px-3 py-2.5 text-zinc-700">{r.access_count}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 rounded-full bg-zinc-100 overflow-hidden"><div className="h-full bg-zinc-900" style={{ width: `${r.attendance_pct}%` }} /></div>
+                      <span className="text-zinc-600 tabular-nums">{r.sessions_attended}/{r.sessions_total}</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 rounded-full bg-zinc-100 overflow-hidden"><div className="h-full bg-blue-500" style={{ width: `${r.resources_pct}%` }} /></div>
+                      <span className="text-zinc-600 tabular-nums">{r.resources_viewed}/{r.resources_total}</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }
 

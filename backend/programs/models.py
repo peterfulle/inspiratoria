@@ -815,3 +815,57 @@ class ActivityCompletion(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.full_name} — {self.activity.name}"
+
+
+class ContentView(models.Model):
+    """Registro de que un participante abrió/revisó un recurso (PDF, video, etc.) de un módulo."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    content = models.ForeignKey(Content, on_delete=models.CASCADE, related_name="views")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="content_views")
+    resource_id = models.CharField(max_length=64, blank=True)  # id dentro de Content.resources, si aplica
+    viewed_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-viewed_at"]
+        indexes = [models.Index(fields=["content", "user"])]
+
+    def __str__(self) -> str:
+        return f"{self.user.full_name} vio {self.content.title}"
+
+
+class ParticipantAccessLog(models.Model):
+    """Registro de un acceso (login/visita) de un participante a la plataforma."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    participant = models.ForeignKey(ProgramParticipant, on_delete=models.CASCADE, related_name="access_logs")
+    occurred_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-occurred_at"]
+        indexes = [models.Index(fields=["participant", "occurred_at"])]
+
+    def __str__(self) -> str:
+        return f"{self.participant} — {self.occurred_at}"
+
+
+class GeneratedReport(models.Model):
+    """
+    Historial de reportes PDF individuales generados desde la Vista Corporativa
+    (uno por mentor/mentee). El PDF se genera en el browser (jsPDF) y se sube
+    acá como base64 para poder re-descargar exactamente lo que se generó.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    program = models.ForeignKey(Program, on_delete=models.CASCADE, related_name="generated_reports")
+    participant = models.ForeignKey(ProgramParticipant, on_delete=models.CASCADE, related_name="generated_reports")
+    generated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="reports_generated",
+    )
+    file_name = models.CharField(max_length=255)
+    pdf_base64 = models.TextField()
+    generated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-generated_at"]
+
+    def __str__(self) -> str:
+        return f"Reporte de {self.participant} — {self.generated_at}"
