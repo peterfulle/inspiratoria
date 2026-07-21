@@ -140,7 +140,7 @@ const getRoleDisplayName = (role: string): string => {
 
 // Get initials from username
 const getInitials = (name: string): string => {
-  return name
+  return (name || "")
     .split(" ")
     .map(n => n[0])
     .join("")

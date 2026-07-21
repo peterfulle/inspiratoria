@@ -50,7 +50,7 @@ const VIEW_PERMISSIONS_OPTIONS = [
   { key: "dashboard", label: "Vista General" },
   { key: "accounts", label: "Cuentas Studio" },
   { key: "programs", label: "Programas Studio" },
-  { key: "manage-programs", label: "Gestionar Programas" },
+  { key: "programs-assignments", label: "Asignaciones" },
   { key: "intelligent-match", label: "Match Inteligente" },
   { key: "billing", label: "Facturación" },
   { key: "users", label: "Usuarios" },

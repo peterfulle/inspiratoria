@@ -530,7 +530,7 @@ def create_program(payload: ProgramIn, authorization: Optional[str] = Header(Non
     from companies.auth_deps import require_admin
     require_admin(authorization)
     from companies.models import Company
-    from programs.models import Activity, ProgramTemplate, AuditLog
+    from programs.models import Activity, Content, ProgramTemplate, AuditLog
     from django.db import close_old_connections
     import uuid
     close_old_connections()
@@ -604,18 +604,14 @@ def create_program(payload: ProgramIn, authorization: Optional[str] = Header(Non
 
     actor = _actor_from_auth(authorization)
 
-    # ─── Actividades a crear: las enviadas, o derivadas del diseño de la plantilla ───
+    # ─── Actividades a crear: las enviadas explícitamente (planas), o derivadas
+    # del diseño de la plantilla — en ese caso, 1 Activity (training) por MÓDULO,
+    # con las activities anidadas del módulo convertidas en sus Content (submódulos),
+    # para preservar la jerarquía módulo → submódulos que muestra Studio. ───
     activities_in = payload.activities
+    modules_in = None
     if not activities_in and design_snapshot.get("modules"):
-        activities_in = []
-        for m in design_snapshot["modules"]:
-            for a in (m.get("activities") or []):
-                activities_in.append({
-                    "type": a.get("type") or "training",
-                    "name": a.get("title") or a.get("name") or "Actividad",
-                    "description": a.get("description") or "",
-                    "modality": a.get("modality") or "online",
-                })
+        modules_in = design_snapshot["modules"]
 
     # ─── Creación atómica: curso + actividades + auditoría (todo o nada) ───
     with transaction.atomic():
@@ -630,17 +626,41 @@ def create_program(payload: ProgramIn, authorization: Optional[str] = Header(Non
             cohort_year=payload.cohort_year,
         )
 
-        for act_data in (activities_in or []):
-            Activity.objects.create(
-                program=program,
-                name=act_data.get('name', ''),
-                description=act_data.get('description', ''),
-                activity_type=act_data.get('type', 'event'),
-                training_category=act_data.get('category') if act_data.get('type') == 'training' else None,
-                event_category=act_data.get('category') if act_data.get('type') == 'event' else None,
-                modality=act_data.get('modality'),
-                status='created',
-            )
+        modules_created = 0
+        submodules_created = 0
+        if modules_in:
+            for m in modules_in:
+                training = Activity.objects.create(
+                    program=program,
+                    name=str(m.get("name") or m.get("title") or "Módulo"),
+                    description=str(m.get("description", ""))[:1000],
+                    activity_type="training",
+                    training_category=template.category if template else None,
+                    modality="online",
+                    status="created",
+                    has_modules=True,
+                )
+                modules_created += 1
+                for idx, a in enumerate(m.get("activities") or [], start=1):
+                    Content.objects.create(
+                        activity=training,
+                        title=a.get("title") or a.get("name") or "Actividad",
+                        description=a.get("description") or "",
+                        order=idx,
+                    )
+                    submodules_created += 1
+        else:
+            for act_data in (activities_in or []):
+                Activity.objects.create(
+                    program=program,
+                    name=act_data.get('name', ''),
+                    description=act_data.get('description', ''),
+                    activity_type=act_data.get('type', 'event'),
+                    training_category=act_data.get('category') if act_data.get('type') == 'training' else None,
+                    event_category=act_data.get('category') if act_data.get('type') == 'event' else None,
+                    modality=act_data.get('modality'),
+                    status='created',
+                )
 
         # Bitácora de auditoría: registra QUIÉN creó QUÉ, con contexto completo
         AuditLog.objects.create(
@@ -657,7 +677,8 @@ def create_program(payload: ProgramIn, authorization: Optional[str] = Header(Non
                 "template": template.name if template else None,
                 "template_id": str(template.id) if template else None,
                 "cohort_year": payload.cohort_year,
-                "activities_created": len(activities_in or []),
+                "activities_created": modules_created if modules_in else len(activities_in or []),
+                "submodules_created": submodules_created,
                 "from_snapshot": bool(design_snapshot),
                 "forced_duplicate": bool(payload.force),
                 "actor": (actor.full_name or actor.email) if actor else "sistema/anónimo",

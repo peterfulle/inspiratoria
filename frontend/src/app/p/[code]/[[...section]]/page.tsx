@@ -3456,7 +3456,10 @@ export default function ParticipantPortalPage() {
                 <div className="prof-field"><label>Título *</label><input value={sessionForm.title} onChange={e => setSessionForm(f => ({ ...f, title: e.target.value }))} placeholder="Ej: Sesión de alineación de objetivos" /></div>
                 <div className="prof-field"><label>Fecha y hora *</label><input type="datetime-local" value={sessionForm.scheduled_at} onChange={e => setSessionForm(f => ({ ...f, scheduled_at: e.target.value }))} /></div>
                 <div className="prof-field"><label>Duración (min)</label><input type="number" value={sessionForm.duration_minutes} onChange={e => setSessionForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 60 }))} /></div>
-                <div className="prof-field"><label>Enlace de reunión</label><input value={sessionForm.meeting_url} onChange={e => setSessionForm(f => ({ ...f, meeting_url: e.target.value }))} placeholder="https://meet.google.com/..." /></div>
+                <div className="prof-field">
+                  <label>Enlace de reunión (opcional)</label>
+                  <input value={sessionForm.meeting_url} onChange={e => setSessionForm(f => ({ ...f, meeting_url: e.target.value }))} placeholder="Se genera automáticamente un Google Meet si lo dejas vacío" />
+                </div>
                 <div className="prof-field"><label>Descripción</label><textarea value={sessionForm.description} onChange={e => setSessionForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Temas a tratar..." /></div>
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>

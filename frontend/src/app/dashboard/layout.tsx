@@ -90,7 +90,7 @@ export default function DashboardLayout({
             />
           </>
         )}
-        <main className={`${isInClientRoute ? '' : 'ml-72 mt-16 p-8 pb-64'} flex-1 bg-white`}>
+        <main className={`${isInClientRoute ? '' : 'ml-72 mt-16 p-8 pb-64'} flex-1 min-w-0 bg-white`}>
           <DashboardSkeleton darkMode={darkMode} />
         </main>
       </div>
@@ -121,7 +121,7 @@ export default function DashboardLayout({
         </>
       )}
 
-      <main className={`${isInClientRoute ? '' : sidebarCollapsed ? 'ml-[72px] mt-16 p-8 pb-64' : 'ml-72 mt-16 p-8 pb-64'} flex-1 bg-white transition-all duration-300`}>
+      <main className={`${isInClientRoute ? '' : sidebarCollapsed ? 'ml-[72px] mt-16 p-8 pb-64' : 'ml-72 mt-16 p-8 pb-64'} flex-1 min-w-0 bg-white transition-all duration-300`}>
         {children}
       </main>
 

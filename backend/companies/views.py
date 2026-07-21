@@ -741,7 +741,7 @@ async def assign_template_to_company(company_id: uuid.UUID, payload: AssignTempl
     """
     from .auth_deps import require_admin
     await sync_to_async(require_admin)(authorization)
-    from programs.models import Program, ProgramTemplate, Activity
+    from programs.models import Program, ProgramTemplate, Activity, Content
     from .models import AccountChangeLog
 
     def _assign():
@@ -766,7 +766,8 @@ async def assign_template_to_company(company_id: uuid.UUID, payload: AssignTempl
             company=company,
         )
 
-        # Derivar activities desde los módulos del template (1 activity por módulo)
+        # Derivar activities desde los módulos del template (1 activity por módulo,
+        # con las activities anidadas del módulo como sus Content/submódulos)
         activities_created: List[dict] = []
         for module in (template.modules or []):
             try:
@@ -778,7 +779,15 @@ async def assign_template_to_company(company_id: uuid.UUID, payload: AssignTempl
                     training_category=template.category or None,
                     modality="online",
                     status="created",
+                    has_modules=True,
                 )
+                for idx, sub in enumerate(module.get("activities") or [], start=1):
+                    Content.objects.create(
+                        activity=act,
+                        title=sub.get("title") or sub.get("name") or "Actividad",
+                        description=sub.get("description") or "",
+                        order=idx,
+                    )
                 activities_created.append({
                     "id": str(act.id),
                     "name": act.name,
@@ -5076,11 +5085,25 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
             raise HTTPException(status_code=404, detail="Programa no encontrado")
 
         scheduled = dt.fromisoformat(payload.scheduled_at.replace("Z", "+00:00"))
+
+        # Videollamada automática por Google Meet — si Google no está
+        # configurado o falla, seguimos sin bloquear la creación de la sesión.
+        meeting_url = payload.meeting_url
+        if not meeting_url:
+            from .google_meet_service import create_meet_event
+            meeting_url = create_meet_event(
+                title=payload.title,
+                description=payload.description,
+                start=scheduled,
+                duration_minutes=payload.duration_minutes,
+                attendee_emails=[user.email, mentee.email],
+            ) or ""
+
         session = MentoringSession.objects.create(
             program=program, mentor=user, mentee=mentee,
             title=payload.title, description=payload.description,
             scheduled_at=scheduled, duration_minutes=payload.duration_minutes,
-            meeting_url=payload.meeting_url,
+            meeting_url=meeting_url,
         )
 
         # ── Audit log (bitácora) ────────────────────────────────
@@ -5276,7 +5299,17 @@ async def update_session(portal_code: str, session_id: str, payload: SessionCrea
         session.description = payload.description
         session.scheduled_at = dt.fromisoformat(payload.scheduled_at.replace("Z", "+00:00"))
         session.duration_minutes = payload.duration_minutes
-        session.meeting_url = payload.meeting_url
+        if payload.meeting_url:
+            session.meeting_url = payload.meeting_url
+        elif not session.meeting_url:
+            from .google_meet_service import create_meet_event
+            session.meeting_url = create_meet_event(
+                title=session.title,
+                description=session.description,
+                start=session.scheduled_at,
+                duration_minutes=session.duration_minutes,
+                attendee_emails=[session.mentor.email, session.mentee.email],
+            ) or ""
         session.save()
         return {"success": True, "id": str(session.id)}
 
