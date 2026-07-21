@@ -1393,39 +1393,13 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
   const [moduloForm, setModuloForm] = useState<ModuleFormState>(EMPTY_MODULE);
   const [savingModulo, setSavingModulo] = useState(false);
 
-  // "Agregar recurso": crea un recurso (Content) directo dentro de un módulo existente,
-  // elegido desde un desplegable, sin tener que desplegar ese módulo primero.
-  const trainingActivities = activities.filter(a => a.type === 'training');
-  const [showRecursoForm, setShowRecursoForm] = useState(false);
-  const [recursoActivityId, setRecursoActivityId] = useState<number | string>('');
-  const [recursoForm, setRecursoForm] = useState<ModuleFormState>(EMPTY_MODULE);
-  const [savingRecurso, setSavingRecurso] = useState(false);
-
-  const startCreateRecurso = () => {
-    setShowCreateMenu(false);
-    setRecursoActivityId(trainingActivities[0]?.id ?? '');
-    setRecursoForm(EMPTY_MODULE);
-    setShowRecursoForm(true);
-  };
-  const cancelRecurso = () => setShowRecursoForm(false);
-  const submitRecurso = async () => {
-    if (!recursoActivityId) { showToast('Elegí a qué módulo pertenece este recurso', 'error'); return; }
-    if (!recursoForm.title.trim()) { showToast('El título del recurso es obligatorio', 'error'); return; }
-    setSavingRecurso(true);
-    try {
-      const res = await apiFetch(`${API_URL}/api/activities/${recursoActivityId}/modules`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: recursoForm.title, description: recursoForm.description, duration_minutes: recursoForm.duration_minutes,
-          requires_evaluation: recursoForm.requires_evaluation, minimum_score: recursoForm.minimum_score,
-          resources: recursoForm.resources,
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      showToast('Recurso creado');
-      cancelRecurso(); onChange();
-    } catch (e: unknown) { showToast(e instanceof Error ? e.message : 'Error', 'error'); }
-    finally { setSavingRecurso(false); }
+  // "Agregar recurso" por fila: despliega EL módulo sobre el que se hizo clic
+  // (no uno por defecto) y le pide a su ModuleManager que abra el formulario
+  // de "Nuevo recurso" automáticamente.
+  const [pendingAutoCreate, setPendingAutoCreate] = useState<number | string | null>(null);
+  const addResourceTo = (id: number | string) => {
+    setExpandedId(id);
+    setPendingAutoCreate(id);
   };
 
   const startEdit = (a: ProgramActivity) => {
@@ -1507,7 +1481,7 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
 
   return (
     <Card title="Módulos" subtitle={`${activities.length} actividad${activities.length === 1 ? '' : 'es'} en el programa`} action={
-      !showForm && !showModuloForm && !showRecursoForm ? (
+      !showForm && !showModuloForm ? (
         <div className="relative">
           <button onClick={() => setShowCreateMenu(o => !o)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold hover:bg-zinc-800 transition">
             <I.Plus className="w-3.5 h-3.5" />Agregar
@@ -1519,13 +1493,6 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
                 <button onClick={startCreateModulo} className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-semibold text-zinc-800 hover:bg-zinc-50 transition">
                   Agregar módulo nuevo
                 </button>
-                <button
-                  onClick={startCreateRecurso}
-                  disabled={trainingActivities.length === 0}
-                  className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-semibold text-zinc-800 hover:bg-zinc-50 transition disabled:text-zinc-400 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                >
-                  Agregar recurso
-                </button>
                 <div className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-semibold text-zinc-400 flex items-center justify-between cursor-not-allowed">
                   Agregar actividad
                   <span className="text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-400">Próximamente</span>
@@ -1536,40 +1503,6 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
         </div>
       ) : null
     }>
-      {showRecursoForm && (
-        <div className="mb-5 p-5 rounded-xl bg-zinc-100/40 border border-zinc-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[14px] font-bold text-zinc-900">Nuevo recurso</h3>
-            <button onClick={cancelRecurso} className="p-1.5 rounded-md text-zinc-500 hover:bg-white"><I.Close className="w-4 h-4" /></button>
-          </div>
-          <div className="grid md:grid-cols-2 gap-3">
-            <div className="md:col-span-2">
-              <Field label="Módulo">
-                <select className={inputCls} value={recursoActivityId} onChange={e => setRecursoActivityId(e.target.value)}>
-                  {trainingActivities.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
-              </Field>
-            </div>
-            <div className="md:col-span-2"><Field label="Título"><input className={inputCls} value={recursoForm.title} onChange={e => setRecursoForm({ ...recursoForm, title: e.target.value })} /></Field></div>
-            <div className="md:col-span-2"><Field label="Descripción"><textarea className={inputCls} rows={2} value={recursoForm.description} onChange={e => setRecursoForm({ ...recursoForm, description: e.target.value })} /></Field></div>
-            <Field label="Duración (minutos)"><input type="number" min={1} className={inputCls} value={recursoForm.duration_minutes} onChange={e => setRecursoForm({ ...recursoForm, duration_minutes: Number(e.target.value) })} /></Field>
-            <Field label="Puntaje mínimo de aprobación (%)"><input type="number" min={0} max={100} className={inputCls} value={recursoForm.minimum_score} onChange={e => setRecursoForm({ ...recursoForm, minimum_score: Number(e.target.value) })} disabled={!recursoForm.requires_evaluation} /></Field>
-            <div className="md:col-span-2">
-              <label className="inline-flex items-center gap-2.5 text-[12.5px] text-zinc-700 cursor-pointer">
-                <input type="checkbox" checked={recursoForm.requires_evaluation} onChange={e => setRecursoForm({ ...recursoForm, requires_evaluation: e.target.checked })} className="w-4 h-4 accent-blue-600" />
-                Requiere evaluación para aprobar
-              </label>
-            </div>
-          </div>
-          <div className="border-t border-zinc-100">
-            <ResourceManager resources={recursoForm.resources} onChange={(resources) => setRecursoForm({ ...recursoForm, resources })} />
-          </div>
-          <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-zinc-200">
-            <button onClick={cancelRecurso} className="px-3.5 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:bg-zinc-50">Cancelar</button>
-            <button onClick={submitRecurso} disabled={savingRecurso} className="px-3.5 py-2 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold disabled:opacity-50">{savingRecurso ? 'Guardando…' : 'Crear recurso'}</button>
-          </div>
-        </div>
-      )}
       {showModuloForm && (
         <div className="mb-5 p-5 rounded-xl bg-zinc-100/40 border border-zinc-200">
           <div className="flex items-center justify-between mb-4">
@@ -1672,21 +1605,38 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
                   </div>
                   <div className="flex gap-1 flex-shrink-0">
                     {a.type !== 'event' && (
-                      <button
-                        onClick={() => setExpandedId(isExpanded ? null : a.id)}
-                        className="px-3 py-2 rounded-lg text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition inline-flex items-center gap-1.5 text-[12px] font-semibold"
-                      >
-                        <I.Layers className="w-3.5 h-3.5" />
-                        Recursos
-                        <I.Chevron className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                      </button>
+                      <>
+                        <button
+                          onClick={() => addResourceTo(a.id)}
+                          title="Agregar recurso a este módulo"
+                          className="px-3 py-2 rounded-lg text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition inline-flex items-center gap-1.5 text-[12px] font-semibold"
+                        >
+                          <I.Plus className="w-3.5 h-3.5" />
+                          Recurso
+                        </button>
+                        <button
+                          onClick={() => setExpandedId(isExpanded ? null : a.id)}
+                          className="px-3 py-2 rounded-lg text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition inline-flex items-center gap-1.5 text-[12px] font-semibold"
+                        >
+                          <I.Layers className="w-3.5 h-3.5" />
+                          Recursos
+                          <I.Chevron className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                      </>
                     )}
                     <button onClick={() => startEdit(a)} className="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition"><I.Edit className="w-4 h-4" /></button>
                     <button onClick={() => remove(a.id)} className="p-2 rounded-lg text-zinc-500 hover:bg-red-50 hover:text-red-600 transition"><I.Trash className="w-4 h-4" /></button>
                   </div>
                 </div>
                 {isExpanded && a.type !== 'event' && (
-                  <ModuleManager activityId={a.id} modules={a.modules || []} onChange={onChange} showToast={showToast} />
+                  <ModuleManager
+                    activityId={a.id}
+                    modules={a.modules || []}
+                    onChange={onChange}
+                    showToast={showToast}
+                    autoOpenCreate={pendingAutoCreate === a.id}
+                    onAutoOpenConsumed={() => setPendingAutoCreate(null)}
+                  />
                 )}
               </div>
             );
@@ -1895,13 +1845,24 @@ function ResourceManager({ resources, onChange }: { resources: ModuleResource[];
   );
 }
 
-function ModuleManager({ activityId, modules, onChange, showToast }: { activityId: number | string; modules: ProgramModule[]; onChange: () => void; showToast: (m: string, t?: 'success' | 'error') => void }) {
+function ModuleManager({ activityId, modules, onChange, showToast, autoOpenCreate, onAutoOpenConsumed }: { activityId: number | string; modules: ProgramModule[]; onChange: () => void; showToast: (m: string, t?: 'success' | 'error') => void; autoOpenCreate?: boolean; onAutoOpenConsumed?: () => void }) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ModuleFormState>(EMPTY_MODULE);
   const [saving, setSaving] = useState(false);
 
   const startCreate = () => { setEditingId(null); setForm(EMPTY_MODULE); setShowForm(true); };
+
+  // Al llegar acá vía el botón "Recurso" de la fila del módulo, abrir directo
+  // el formulario de "Nuevo recurso" — el módulo ya se desplegó solo.
+  useEffect(() => {
+    if (autoOpenCreate) {
+      startCreate();
+      onAutoOpenConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenCreate]);
+
   const startEdit = (m: ProgramModule) => {
     setEditingId(m.id);
     setForm({
