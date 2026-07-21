@@ -1287,7 +1287,7 @@ function TabCronograma({ programId, activities, onChange, showToast }: { program
                       <div className="text-[13.5px] font-bold text-zinc-900">{a.name}</div>
                       <div className="text-[11px] text-zinc-500 mt-0.5 flex flex-wrap gap-2">
                         <span className="inline-flex items-center gap-1"><I.Globe className="w-3 h-3" />{MODALITY_META[a.modality]?.label || a.modality}</span>
-                        <span className="inline-flex items-center gap-1"><I.Module className="w-3 h-3" />{a.modules?.length || 0} módulos</span>
+                        <span className="inline-flex items-center gap-1"><I.Module className="w-3 h-3" />{a.modules?.length || 0} recursos</span>
                         {hasDate && !dirty && (
                           <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
                             <I.CheckCircle className="w-3 h-3" />
@@ -1356,7 +1356,7 @@ function TabCronograma({ programId, activities, onChange, showToast }: { program
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-[11px] text-zinc-500 mt-2">
                       <span className="inline-flex items-center gap-1"><I.Globe className="w-3 h-3" />{MODALITY_META[a.modality]?.label || a.modality}</span>
-                      <span className="inline-flex items-center gap-1"><I.Module className="w-3 h-3" />{a.modules?.length || 0} módulos</span>
+                      <span className="inline-flex items-center gap-1"><I.Module className="w-3 h-3" />{a.modules?.length || 0} recursos</span>
                       {a.is_certificate_issued && <span className="inline-flex items-center gap-1 text-amber-600"><I.Award className="w-3 h-3" />Certifica</span>}
                       {a.meeting_url && <a href={a.meeting_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-zinc-800 hover:text-zinc-900"><I.Link className="w-3 h-3" />Sala</a>}
                     </div>
@@ -1387,11 +1387,46 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
 
-  // Menú "Agregar módulo / Agregar actividad" del botón principal
+  // Menú "Agregar módulo / Agregar recurso / Agregar actividad" del botón principal
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [showModuloForm, setShowModuloForm] = useState(false);
   const [moduloForm, setModuloForm] = useState<ModuleFormState>(EMPTY_MODULE);
   const [savingModulo, setSavingModulo] = useState(false);
+
+  // "Agregar recurso": crea un recurso (Content) directo dentro de un módulo existente,
+  // elegido desde un desplegable, sin tener que desplegar ese módulo primero.
+  const trainingActivities = activities.filter(a => a.type === 'training');
+  const [showRecursoForm, setShowRecursoForm] = useState(false);
+  const [recursoActivityId, setRecursoActivityId] = useState<number | string>('');
+  const [recursoForm, setRecursoForm] = useState<ModuleFormState>(EMPTY_MODULE);
+  const [savingRecurso, setSavingRecurso] = useState(false);
+
+  const startCreateRecurso = () => {
+    setShowCreateMenu(false);
+    setRecursoActivityId(trainingActivities[0]?.id ?? '');
+    setRecursoForm(EMPTY_MODULE);
+    setShowRecursoForm(true);
+  };
+  const cancelRecurso = () => setShowRecursoForm(false);
+  const submitRecurso = async () => {
+    if (!recursoActivityId) { showToast('Elegí a qué módulo pertenece este recurso', 'error'); return; }
+    if (!recursoForm.title.trim()) { showToast('El título del recurso es obligatorio', 'error'); return; }
+    setSavingRecurso(true);
+    try {
+      const res = await apiFetch(`${API_URL}/api/activities/${recursoActivityId}/modules`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: recursoForm.title, description: recursoForm.description, duration_minutes: recursoForm.duration_minutes,
+          requires_evaluation: recursoForm.requires_evaluation, minimum_score: recursoForm.minimum_score,
+          resources: recursoForm.resources,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showToast('Recurso creado');
+      cancelRecurso(); onChange();
+    } catch (e: unknown) { showToast(e instanceof Error ? e.message : 'Error', 'error'); }
+    finally { setSavingRecurso(false); }
+  };
 
   const startEdit = (a: ProgramActivity) => {
     setEditingId(a.id);
@@ -1406,7 +1441,11 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
   const startCreate = () => { setEditingId(null); setForm(EMPTY_ACTIVITY); setShowForm(true); };
   const cancel = () => { setShowForm(false); setEditingId(null); };
 
-  const startCreateModulo = () => { setShowCreateMenu(false); setModuloForm(EMPTY_MODULE); setShowModuloForm(true); };
+  const startCreateModulo = () => {
+    setShowCreateMenu(false);
+    setModuloForm({ ...EMPTY_MODULE, title: `Módulo ${activities.length + 1}` });
+    setShowModuloForm(true);
+  };
   const cancelModulo = () => setShowModuloForm(false);
   const submitModulo = async () => {
     if (!moduloForm.title.trim()) { showToast('El título del módulo es obligatorio', 'error'); return; }
@@ -1468,7 +1507,7 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
 
   return (
     <Card title="Módulos" subtitle={`${activities.length} actividad${activities.length === 1 ? '' : 'es'} en el programa`} action={
-      !showForm && !showModuloForm ? (
+      !showForm && !showModuloForm && !showRecursoForm ? (
         <div className="relative">
           <button onClick={() => setShowCreateMenu(o => !o)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold hover:bg-zinc-800 transition">
             <I.Plus className="w-3.5 h-3.5" />Agregar
@@ -1476,9 +1515,16 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
           {showCreateMenu && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowCreateMenu(false)} />
-              <div className="absolute right-0 top-full mt-1.5 w-52 rounded-lg bg-white border border-zinc-200 shadow-lg z-20 overflow-hidden">
+              <div className="absolute right-0 top-full mt-1.5 w-56 rounded-lg bg-white border border-zinc-200 shadow-lg z-20 overflow-hidden">
                 <button onClick={startCreateModulo} className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-semibold text-zinc-800 hover:bg-zinc-50 transition">
-                  Agregar módulo
+                  Agregar módulo nuevo
+                </button>
+                <button
+                  onClick={startCreateRecurso}
+                  disabled={trainingActivities.length === 0}
+                  className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-semibold text-zinc-800 hover:bg-zinc-50 transition disabled:text-zinc-400 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                >
+                  Agregar recurso
                 </button>
                 <div className="w-full text-left px-3.5 py-2.5 text-[12.5px] font-semibold text-zinc-400 flex items-center justify-between cursor-not-allowed">
                   Agregar actividad
@@ -1490,6 +1536,40 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
         </div>
       ) : null
     }>
+      {showRecursoForm && (
+        <div className="mb-5 p-5 rounded-xl bg-zinc-100/40 border border-zinc-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[14px] font-bold text-zinc-900">Nuevo recurso</h3>
+            <button onClick={cancelRecurso} className="p-1.5 rounded-md text-zinc-500 hover:bg-white"><I.Close className="w-4 h-4" /></button>
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            <div className="md:col-span-2">
+              <Field label="Módulo">
+                <select className={inputCls} value={recursoActivityId} onChange={e => setRecursoActivityId(e.target.value)}>
+                  {trainingActivities.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </Field>
+            </div>
+            <div className="md:col-span-2"><Field label="Título"><input className={inputCls} value={recursoForm.title} onChange={e => setRecursoForm({ ...recursoForm, title: e.target.value })} /></Field></div>
+            <div className="md:col-span-2"><Field label="Descripción"><textarea className={inputCls} rows={2} value={recursoForm.description} onChange={e => setRecursoForm({ ...recursoForm, description: e.target.value })} /></Field></div>
+            <Field label="Duración (minutos)"><input type="number" min={1} className={inputCls} value={recursoForm.duration_minutes} onChange={e => setRecursoForm({ ...recursoForm, duration_minutes: Number(e.target.value) })} /></Field>
+            <Field label="Puntaje mínimo de aprobación (%)"><input type="number" min={0} max={100} className={inputCls} value={recursoForm.minimum_score} onChange={e => setRecursoForm({ ...recursoForm, minimum_score: Number(e.target.value) })} disabled={!recursoForm.requires_evaluation} /></Field>
+            <div className="md:col-span-2">
+              <label className="inline-flex items-center gap-2.5 text-[12.5px] text-zinc-700 cursor-pointer">
+                <input type="checkbox" checked={recursoForm.requires_evaluation} onChange={e => setRecursoForm({ ...recursoForm, requires_evaluation: e.target.checked })} className="w-4 h-4 accent-blue-600" />
+                Requiere evaluación para aprobar
+              </label>
+            </div>
+          </div>
+          <div className="border-t border-zinc-100">
+            <ResourceManager resources={recursoForm.resources} onChange={(resources) => setRecursoForm({ ...recursoForm, resources })} />
+          </div>
+          <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-zinc-200">
+            <button onClick={cancelRecurso} className="px-3.5 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:bg-zinc-50">Cancelar</button>
+            <button onClick={submitRecurso} disabled={savingRecurso} className="px-3.5 py-2 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold disabled:opacity-50">{savingRecurso ? 'Guardando…' : 'Crear recurso'}</button>
+          </div>
+        </div>
+      )}
       {showModuloForm && (
         <div className="mb-5 p-5 rounded-xl bg-zinc-100/40 border border-zinc-200">
           <div className="flex items-center justify-between mb-4">
@@ -1586,7 +1666,7 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
                     <div className="flex flex-wrap items-center gap-3 text-[11.5px] text-zinc-500">
                       {a.start_date && <span className="inline-flex items-center gap-1"><I.Calendar className="w-3 h-3" />{new Date(a.start_date).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}</span>}
                       <span className="inline-flex items-center gap-1"><I.Globe className="w-3 h-3" />{MODALITY_META[a.modality]?.label || a.modality}</span>
-                      <span className="inline-flex items-center gap-1"><I.Module className="w-3 h-3" />{a.modules?.length || 0} módulos</span>
+                      <span className="inline-flex items-center gap-1"><I.Module className="w-3 h-3" />{a.modules?.length || 0} recursos</span>
                       {a.is_certificate_issued && <span className="inline-flex items-center gap-1 text-amber-600"><I.Award className="w-3 h-3" />Certifica</span>}
                     </div>
                   </div>
@@ -1597,7 +1677,7 @@ function TabActividades({ programId, activities, onChange, showToast }: { progra
                         className="px-3 py-2 rounded-lg text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition inline-flex items-center gap-1.5 text-[12px] font-semibold"
                       >
                         <I.Layers className="w-3.5 h-3.5" />
-                        Módulos
+                        Recursos
                         <I.Chevron className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                       </button>
                     )}
@@ -1710,7 +1790,7 @@ function ResourceManager({ resources, onChange }: { resources: ModuleResource[];
   return (
     <div className="pt-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[12px] font-semibold text-zinc-700">Recursos ({resources.length})</span>
+        <span className="text-[12px] font-semibold text-zinc-700">Archivos adjuntos ({resources.length})</span>
       </div>
 
       {/* Type tabs */}
@@ -1835,7 +1915,7 @@ function ModuleManager({ activityId, modules, onChange, showToast }: { activityI
   const cancel = () => { setShowForm(false); setEditingId(null); };
 
   const submit = async () => {
-    if (!form.title.trim()) { showToast('El título del módulo es obligatorio', 'error'); return; }
+    if (!form.title.trim()) { showToast('El título del recurso es obligatorio', 'error'); return; }
     setSaving(true);
     try {
       const payload = {
@@ -1848,18 +1928,18 @@ function ModuleManager({ activityId, modules, onChange, showToast }: { activityI
       const url = editingId ? `${API_URL}/api/modules/${editingId}` : `${API_URL}/api/activities/${activityId}/modules`;
       const res = await apiFetch(url, { method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error(await res.text());
-      showToast(editingId ? 'Módulo actualizado' : 'Módulo creado');
+      showToast(editingId ? 'Recurso actualizado' : 'Recurso creado');
       cancel(); onChange();
     } catch (e: unknown) { showToast(e instanceof Error ? e.message : 'Error', 'error'); }
     finally { setSaving(false); }
   };
 
   const remove = async (id: number) => {
-    if (!confirm('¿Eliminar este módulo? Esta acción no se puede deshacer.')) return;
+    if (!confirm('¿Eliminar este recurso? Esta acción no se puede deshacer.')) return;
     try {
       const res = await apiFetch(`${API_URL}/api/modules/${id}`, { method: 'DELETE' });
       if (!res.ok && res.status !== 204) throw new Error(await res.text());
-      showToast('Módulo eliminado'); onChange();
+      showToast('Recurso eliminado'); onChange();
     } catch (e: unknown) { showToast(e instanceof Error ? e.message : 'Error', 'error'); }
   };
 
@@ -1869,7 +1949,7 @@ function ModuleManager({ activityId, modules, onChange, showToast }: { activityI
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_published: !m.is_published }),
       });
       if (!res.ok) throw new Error(await res.text());
-      showToast(m.is_published ? 'Módulo despublicado' : 'Módulo publicado'); onChange();
+      showToast(m.is_published ? 'Recurso despublicado' : 'Recurso publicado'); onChange();
     } catch (e: unknown) { showToast(e instanceof Error ? e.message : 'Error', 'error'); }
   };
 
@@ -1880,7 +1960,7 @@ function ModuleManager({ activityId, modules, onChange, showToast }: { activityI
       {showForm && (
         <div className="mb-4 p-4 rounded-xl bg-white border border-zinc-200">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-[13px] font-bold text-zinc-900">{editingId ? 'Editar módulo' : 'Nuevo módulo'}</h4>
+            <h4 className="text-[13px] font-bold text-zinc-900">{editingId ? 'Editar recurso' : 'Nuevo recurso'}</h4>
             <button onClick={cancel} className="p-1.5 rounded-md text-zinc-500 hover:bg-zinc-100"><I.Close className="w-4 h-4" /></button>
           </div>
           <div className="grid md:grid-cols-2 gap-3">
@@ -1904,16 +1984,16 @@ function ModuleManager({ activityId, modules, onChange, showToast }: { activityI
 
           <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-zinc-200">
             <button onClick={cancel} className="px-3.5 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:bg-zinc-50">Cancelar</button>
-            <button onClick={submit} disabled={saving} className="px-3.5 py-2 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold disabled:opacity-50">{saving ? 'Guardando…' : editingId ? 'Guardar cambios' : 'Crear módulo'}</button>
+            <button onClick={submit} disabled={saving} className="px-3.5 py-2 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold disabled:opacity-50">{saving ? 'Guardando…' : editingId ? 'Guardar cambios' : 'Crear recurso'}</button>
           </div>
         </div>
       )}
 
       {sorted.length === 0 && !showForm ? (
         <div className="text-center py-6">
-          <p className="text-[12.5px] text-zinc-500 mb-3">Esta actividad todavía no tiene módulos.</p>
+          <p className="text-[12.5px] text-zinc-500 mb-3">Este módulo todavía no tiene recursos.</p>
           <button onClick={startCreate} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold hover:bg-zinc-800 transition">
-            <I.Plus className="w-3.5 h-3.5" />Agregar módulo
+            <I.Plus className="w-3.5 h-3.5" />Agregar recurso
           </button>
         </div>
       ) : (
@@ -1931,7 +2011,7 @@ function ModuleManager({ activityId, modules, onChange, showToast }: { activityI
                   </div>
                   <div className="flex items-center gap-3 text-[11px] text-zinc-500 mt-0.5">
                     <span className="inline-flex items-center gap-1"><I.Clock className="w-3 h-3" />{m.duration_minutes} min</span>
-                    <span className="inline-flex items-center gap-1"><I.FileText className="w-3 h-3" />{(m.resources || []).length} recursos</span>
+                    <span className="inline-flex items-center gap-1"><I.FileText className="w-3 h-3" />{(m.resources || []).length} archivos</span>
                     {m.requires_evaluation && <span className="inline-flex items-center gap-1"><I.Award className="w-3 h-3" />Aprobar con {m.minimum_score}%</span>}
                   </div>
                 </div>
@@ -1945,7 +2025,7 @@ function ModuleManager({ activityId, modules, onChange, showToast }: { activityI
           </div>
           {!showForm && (
             <button onClick={startCreate} className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:bg-zinc-50 transition">
-              <I.Plus className="w-3.5 h-3.5" />Agregar módulo
+              <I.Plus className="w-3.5 h-3.5" />Agregar recurso
             </button>
           )}
         </>
