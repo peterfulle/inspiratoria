@@ -47,9 +47,10 @@ class Program(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     last_follow_up = models.DateTimeField(null=True, blank=True)  # Último seguimiento
 
-    # Banner del programa: SVG generado por IA (Claude) para el header de Studio.
-    # Se genera una vez y se cachea acá — no se regenera en cada carga de página.
+    # Banner del programa. Si el admin sube una foto propia (banner_image, data
+    # URI base64), esa tiene prioridad sobre el fondo generado por IA (banner_svg).
     banner_svg = models.TextField(blank=True)
+    banner_image = models.TextField(blank=True)
 
     class Meta:
         ordering = ["-created_at"]

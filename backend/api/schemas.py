@@ -39,6 +39,7 @@ class ProgramOut(ProgramIn):
     template: Optional[Dict[str, Any]] = None  # plantilla de origen (id, name, slug)
     requires_certification: Optional[bool] = False
     banner_svg: Optional[str] = None  # SVG de fondo del header, generado por IA
+    banner_image: Optional[str] = None  # Foto subida a mano (data URI), prioridad sobre banner_svg
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

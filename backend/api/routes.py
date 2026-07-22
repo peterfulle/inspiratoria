@@ -10,9 +10,10 @@ django.setup()
 
 from django.db import IntegrityError, transaction
 from django.db import models as django_models
-from fastapi import FastAPI, HTTPException, Header, Response
+from fastapi import FastAPI, HTTPException, Header, Response, UploadFile, File as FastAPIFile
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
+from asgiref.sync import sync_to_async
 
 from api.schemas import (
     MatchOut,
@@ -842,6 +843,7 @@ def get_program(program_id: str, authorization: Optional[str] = Header(None)) ->
             "participants_count": participants_count,
             "requires_certification": program.requires_certification,
             "banner_svg": program.banner_svg or None,
+            "banner_image": program.banner_image or None,
             "created_at": program.created_at.isoformat() if program.created_at else None,
             "updated_at": program.updated_at.isoformat() if program.updated_at else None,
         }
@@ -875,6 +877,59 @@ def generate_program_banner(program_id: str, authorization: Optional[str] = Head
     program.banner_svg = svg
     program.save(update_fields=["banner_svg"])
     return {"banner_svg": svg}
+
+
+@router.post("/programs/{program_id}/banner-image")
+async def upload_program_banner_image(program_id: str, authorization: Optional[str] = Header(None), image: UploadFile = FastAPIFile(...)) -> dict:
+    """Sube una foto propia para el banner del programa (reemplaza al fondo generado por IA)."""
+    from django.db import close_old_connections
+    close_old_connections()
+    from companies.auth_deps import get_current_user, require_company_access
+    import uuid, base64
+
+    actor = await sync_to_async(get_current_user)(authorization)
+    try:
+        program = await sync_to_async(
+            lambda: Program.objects.select_related('company').get(id=uuid.UUID(program_id))
+        )()
+    except (Program.DoesNotExist, ValueError) as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+    await sync_to_async(require_company_access)(actor, program.company_id)
+
+    allowed_types = {"image/jpeg", "image/png", "image/webp"}
+    if image.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Formato no soportado. Usa JPG, PNG o WebP.")
+
+    contents = await image.read()
+    if len(contents) > 3 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="La imagen no debe superar 3 MB.")
+
+    b64 = base64.b64encode(contents).decode("utf-8")
+    data_uri = f"data:{image.content_type};base64,{b64}"
+
+    program.banner_image = data_uri
+    await sync_to_async(program.save)(update_fields=["banner_image"])
+    return {"banner_image": data_uri}
+
+
+@router.delete("/programs/{program_id}/banner-image")
+async def delete_program_banner_image(program_id: str, authorization: Optional[str] = Header(None)) -> dict:
+    """Quita la foto subida — vuelve a mostrar el fondo generado por IA (o el degradado)."""
+    from django.db import close_old_connections
+    close_old_connections()
+    from companies.auth_deps import get_current_user, require_company_access
+    import uuid
+
+    actor = await sync_to_async(get_current_user)(authorization)
+    try:
+        program = await sync_to_async(Program.objects.get)(id=uuid.UUID(program_id))
+    except (Program.DoesNotExist, ValueError) as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+    await sync_to_async(require_company_access)(actor, program.company_id)
+
+    program.banner_image = ""
+    await sync_to_async(program.save)(update_fields=["banner_image"])
+    return {"success": True}
 
 
 @router.put("/programs/{program_id}", response_model=ProgramOut)

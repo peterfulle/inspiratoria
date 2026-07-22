@@ -1,6 +1,6 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -40,6 +40,7 @@ interface ProgramDetail {
   activities: ProgramActivity[]; activities_count: number; participants_count: number;
   requires_certification: boolean; created_at: string | null; updated_at: string | null;
   banner_svg?: string | null;
+  banner_image?: string | null;
 }
 interface Participant {
   id: string;
@@ -125,6 +126,7 @@ const I = {
   Chart:       SvgBase(<><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></>),
   FileText:    SvgBase(<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" /></>),
   Download:    SvgBase(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>),
+  Upload:      SvgBase(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>),
   Refresh:     SvgBase(<><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></>),
   Swap:        SvgBase(<><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>),
   Zap:         SvgBase(<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />),
@@ -244,6 +246,36 @@ export default function ProgramManagerConsole() {
       showToast(e instanceof Error ? e.message : 'No se pudo generar el fondo', 'error');
     } finally {
       setGeneratingBanner(false);
+    }
+  };
+
+  const [uploadingBannerImage, setUploadingBannerImage] = useState(false);
+  const bannerImageInputRef = useRef<HTMLInputElement>(null);
+  const uploadBannerImage = async (file: File) => {
+    if (file.size > 3 * 1024 * 1024) { showToast('La imagen no debe superar 3 MB', 'error'); return; }
+    setUploadingBannerImage(true);
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/banner-image`, { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setProgram(prev => prev ? { ...prev, banner_image: data.banner_image } : prev);
+      showToast('Foto actualizada');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'No se pudo subir la imagen', 'error');
+    } finally {
+      setUploadingBannerImage(false);
+    }
+  };
+  const removeBannerImage = async () => {
+    try {
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/banner-image`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+      setProgram(prev => prev ? { ...prev, banner_image: null } : prev);
+      showToast('Foto quitada');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'No se pudo quitar la imagen', 'error');
     }
   };
 
@@ -430,33 +462,61 @@ export default function ProgramManagerConsole() {
           return (
             <section className="px-8 pt-7 bg-white border-b border-zinc-100">
               <div className="w-full">
-                {/* Banner con fondo generado por IA (o degradado de respaldo) */}
-                <div className="relative w-full rounded-2xl overflow-hidden mb-6" style={{ minHeight: 220, background: fallbackGradient }}>
-                  {program.banner_svg && (
+                {/* Banner: foto propia si hay una, si no el fondo generado por IA, si no un degradado */}
+                <div className="relative w-full rounded-2xl overflow-hidden mb-6" style={{ minHeight: 240, background: fallbackGradient }}>
+                  {program.banner_image ? (
+                    <img src={program.banner_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  ) : program.banner_svg ? (
                     <div
                       className="absolute inset-0 w-full h-full [&>svg]:w-full [&>svg]:h-full"
                       dangerouslySetInnerHTML={{ __html: program.banner_svg }}
                     />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                  ) : null}
+                  <div className="absolute inset-0 bg-black/35" />
 
-                  <button
-                    onClick={generateBanner}
-                    disabled={generatingBanner}
-                    className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-[11.5px] font-semibold transition disabled:opacity-60 z-10"
-                  >
-                    <I.Sparkles className="w-3.5 h-3.5" />
-                    {generatingBanner ? 'Generando…' : program.banner_svg ? 'Regenerar fondo' : 'Generar fondo con IA'}
-                  </button>
+                  <input
+                    ref={bannerImageInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadBannerImage(f); e.target.value = ''; }}
+                  />
+                  <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+                    {program.banner_image && (
+                      <button
+                        onClick={removeBannerImage}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-[11.5px] font-semibold transition"
+                      >
+                        <I.Close className="w-3.5 h-3.5" />
+                        Quitar foto
+                      </button>
+                    )}
+                    <button
+                      onClick={() => bannerImageInputRef.current?.click()}
+                      disabled={uploadingBannerImage}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-[11.5px] font-semibold transition disabled:opacity-60"
+                    >
+                      <I.Upload className="w-3.5 h-3.5" />
+                      {uploadingBannerImage ? 'Subiendo…' : 'Subir foto'}
+                    </button>
+                    <button
+                      onClick={generateBanner}
+                      disabled={generatingBanner}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-[11.5px] font-semibold transition disabled:opacity-60"
+                    >
+                      <I.Sparkles className="w-3.5 h-3.5" />
+                      {generatingBanner ? 'Generando…' : program.banner_svg ? 'Regenerar fondo' : 'Generar fondo con IA'}
+                    </button>
+                  </div>
 
-                  <div className="relative z-[1] p-7 flex flex-col justify-end h-full" style={{ minHeight: 220 }}>
-                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <div className="relative z-[1] flex flex-col items-center justify-center text-center h-full px-7 py-10" style={{ minHeight: 240 }}>
+                    <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
                       <TagOnDark>{program.theme}</TagOnDark>
                       <TagOnDark icon={<I.Building className="w-3 h-3" />}>{program.company?.name || 'Sin cuenta'}</TagOnDark>
                       {program.cohort_year ? <TagOnDark icon={<I.Calendar className="w-3 h-3" />}>{program.cohort_year}</TagOnDark> : null}
                       {program.requires_certification && <TagOnDark icon={<I.Award className="w-3 h-3" />}>Certificación</TagOnDark>}
                     </div>
-                    <h1 className="text-[25px] font-semibold text-white tracking-tight leading-tight mb-0.5">{titleLine}</h1>
+                    <h1 className="text-[26px] font-semibold text-white tracking-tight leading-tight mb-1">{titleLine}</h1>
                     {subtitleLine && <p className="text-[14px] text-white/75 font-medium">{subtitleLine}</p>}
                   </div>
                 </div>
