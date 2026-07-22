@@ -37,6 +37,8 @@ class ProgramOut(ProgramIn):
     activities_count: Optional[int] = 0
     participants_count: Optional[int] = 0
     template: Optional[Dict[str, Any]] = None  # plantilla de origen (id, name, slug)
+    requires_certification: Optional[bool] = False
+    banner_svg: Optional[str] = None  # SVG de fondo del header, generado por IA
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

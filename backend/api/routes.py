@@ -841,11 +841,40 @@ def get_program(program_id: str, authorization: Optional[str] = Header(None)) ->
             "activities_count": len(activities_data),
             "participants_count": participants_count,
             "requires_certification": program.requires_certification,
+            "banner_svg": program.banner_svg or None,
             "created_at": program.created_at.isoformat() if program.created_at else None,
             "updated_at": program.updated_at.isoformat() if program.updated_at else None,
         }
     except Program.DoesNotExist as exc:
         raise HTTPException(status_code=404, detail="Program not found") from exc
+
+
+@router.post("/programs/{program_id}/generate-banner")
+def generate_program_banner(program_id: str, authorization: Optional[str] = Header(None)) -> dict:
+    """Genera (con Claude) el SVG de fondo del header del programa y lo cachea."""
+    from django.db import close_old_connections
+    close_old_connections()
+    from companies.auth_deps import get_current_user, require_company_access
+    from programs.banner_service import generate_program_banner_svg
+    import uuid
+
+    actor = get_current_user(authorization)
+    try:
+        program = Program.objects.select_related('company').get(id=uuid.UUID(program_id))
+    except (Program.DoesNotExist, ValueError) as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+    require_company_access(actor, program.company_id)
+
+    svg = generate_program_banner_svg(
+        theme=program.theme or "General",
+        company_name=program.company.name if program.company else program.name,
+    )
+    if not svg:
+        raise HTTPException(status_code=502, detail="No se pudo generar el fondo, intentá de nuevo")
+
+    program.banner_svg = svg
+    program.save(update_fields=["banner_svg"])
+    return {"banner_svg": svg}
 
 
 @router.put("/programs/{program_id}", response_model=ProgramOut)

@@ -3102,6 +3102,8 @@ async def login_with_otp(payload: LoginOTPRequest):
 async def get_portal_data(portal_code: str):
     """Obtener datos de usuario y programa por portal_code (para ruta /p/{code})"""
     def _resolve():
+        from django.db import close_old_connections
+        close_old_connections()
         try:
             user = User.objects.get(portal_code=portal_code)
         except User.DoesNotExist:

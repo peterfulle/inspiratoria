@@ -39,6 +39,7 @@ interface ProgramDetail {
   design_snapshot?: Record<string, any> | null;
   activities: ProgramActivity[]; activities_count: number; participants_count: number;
   requires_certification: boolean; created_at: string | null; updated_at: string | null;
+  banner_svg?: string | null;
 }
 interface Participant {
   id: string;
@@ -230,6 +231,22 @@ export default function ProgramManagerConsole() {
     setToast({ msg, type }); setTimeout(() => setToast(null), 3500);
   };
 
+  const [generatingBanner, setGeneratingBanner] = useState(false);
+  const generateBanner = async () => {
+    setGeneratingBanner(true);
+    try {
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/generate-banner`, { method: 'POST' });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setProgram(prev => prev ? { ...prev, banner_svg: data.banner_svg } : prev);
+      showToast('Fondo generado');
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'No se pudo generar el fondo', 'error');
+    } finally {
+      setGeneratingBanner(false);
+    }
+  };
+
   const transitionStatus = async (newStatus: string) => {
     if (!program) return;
     try {
@@ -406,29 +423,62 @@ export default function ProgramManagerConsole() {
         </header>
 
         {/* Hero — solo en la pestaña Resumen */}
-        {activeTab === 'resumen' && (
-          <section className="px-8 pt-7 pb-6 bg-white border-b border-zinc-100">
-            <div className="w-full">
-              <div className="flex flex-wrap items-center gap-2 mb-3">
-                <Tag>{program.theme}</Tag>
-                <TagSoft icon={<I.Building className="w-3 h-3" />}>{program.company?.name || 'Sin cuenta'}</TagSoft>
-                {program.cohort_year ? <TagSoft icon={<I.Calendar className="w-3 h-3" />}>{program.cohort_year}</TagSoft> : null}
-                {program.requires_certification && <TagAccent icon={<I.Award className="w-3 h-3" />}>Certificación</TagAccent>}
-              </div>
-              <h1 className="text-[25px] font-semibold text-zinc-900 tracking-tight leading-tight mb-1.5">{program.name}</h1>
-              {program.description && <p className="text-[14px] text-zinc-500 max-w-3xl leading-relaxed mb-6">{program.description}</p>}
+        {activeTab === 'resumen' && (() => {
+          const [titleLine, ...subtitleParts] = program.name.split(' · ');
+          const subtitleLine = subtitleParts.join(' · ');
+          const fallbackGradient = HERO_FALLBACK_GRADIENTS[(program.theme || '').toLowerCase()] || HERO_FALLBACK_GRADIENTS.general;
+          return (
+            <section className="px-8 pt-7 bg-white border-b border-zinc-100">
+              <div className="w-full">
+                {/* Banner con fondo generado por IA (o degradado de respaldo) */}
+                <div className="relative w-full rounded-2xl overflow-hidden mb-6" style={{ minHeight: 220, background: fallbackGradient }}>
+                  {program.banner_svg && (
+                    <div
+                      className="absolute inset-0 w-full h-full [&>svg]:w-full [&>svg]:h-full"
+                      dangerouslySetInnerHTML={{ __html: program.banner_svg }}
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
 
-              {kpis && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <Kpi icon={<I.Users />} label="Participantes" value={program.participants_count} sub={`${kpis.mentors} mentores · ${kpis.mentees} mentees`} />
-                  <Kpi icon={<I.Activity />} label="Actividades" value={kpis.totalActivities} sub={`${kpis.completed} completadas · ${kpis.inProgress} activas`} />
-                  <Kpi icon={<I.Module />} label="Módulos" value={kpis.totalModules} sub={`${kpis.totalHours} h de contenido`} />
-                  <Kpi icon={<I.Target />} label="Estado" value={stMeta.label} sub={program.updated_at ? `Actualizado ${formatDate(program.updated_at)}` : ''} />
+                  <button
+                    onClick={generateBanner}
+                    disabled={generatingBanner}
+                    className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-[11.5px] font-semibold transition disabled:opacity-60 z-10"
+                  >
+                    <I.Sparkles className="w-3.5 h-3.5" />
+                    {generatingBanner ? 'Generando…' : program.banner_svg ? 'Regenerar fondo' : 'Generar fondo con IA'}
+                  </button>
+
+                  <div className="relative z-[1] p-7 flex flex-col justify-end h-full" style={{ minHeight: 220 }}>
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <TagOnDark>{program.theme}</TagOnDark>
+                      <TagOnDark icon={<I.Building className="w-3 h-3" />}>{program.company?.name || 'Sin cuenta'}</TagOnDark>
+                      {program.cohort_year ? <TagOnDark icon={<I.Calendar className="w-3 h-3" />}>{program.cohort_year}</TagOnDark> : null}
+                      {program.requires_certification && <TagOnDark icon={<I.Award className="w-3 h-3" />}>Certificación</TagOnDark>}
+                    </div>
+                    <h1 className="text-[25px] font-semibold text-white tracking-tight leading-tight mb-0.5">{titleLine}</h1>
+                    {subtitleLine && <p className="text-[14px] text-white/75 font-medium">{subtitleLine}</p>}
+                  </div>
                 </div>
-              )}
-            </div>
-          </section>
-        )}
+
+                {program.description && (
+                  <div className="rounded-xl bg-zinc-50 border border-zinc-100 p-5 mb-6">
+                    <p className="text-[13.5px] text-zinc-600 leading-relaxed max-w-3xl">{program.description}</p>
+                  </div>
+                )}
+
+                {kpis && (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pb-6">
+                    <Kpi icon={<I.Users />} label="Participantes" value={program.participants_count} sub={`${kpis.mentors} mentores · ${kpis.mentees} mentees`} />
+                    <Kpi icon={<I.Activity />} label="Actividades" value={kpis.totalActivities} sub={`${kpis.completed} completadas · ${kpis.inProgress} activas`} />
+                    <Kpi icon={<I.Module />} label="Módulos" value={kpis.totalModules} sub={`${kpis.totalHours} h de contenido`} />
+                    <Kpi icon={<I.Target />} label="Estado" value={stMeta.label} sub={program.updated_at ? `Actualizado ${formatDate(program.updated_at)}` : ''} />
+                  </div>
+                )}
+              </div>
+            </section>
+          );
+        })()}
 
         <div className="px-8 py-7 w-full">
           {activeTab === 'resumen' && <TabResumen program={program} participants={participants} assignedPM={assignedPM} pms={pms} onAssignPM={assignPM} onTab={setActiveTab} />}
@@ -651,6 +701,22 @@ function TagSoft({ children, icon }: { children: React.ReactNode; icon?: React.R
 function TagAccent({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
   return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">{icon}{children}</span>;
 }
+function TagOnDark({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
+  return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/15 text-white backdrop-blur-sm border border-white/10">{icon}{children}</span>;
+}
+
+// Degradado de respaldo del banner mientras no se generó (o falló) el SVG por IA —
+// misma paleta por tema que usa el backend (programs/banner_service.py) para que
+// combine si más tarde se genera el fondo real.
+const HERO_FALLBACK_GRADIENTS: Record<string, string> = {
+  leadership: 'linear-gradient(135deg, #0c4a6e 0%, #0e7490 40%, #0891b2 100%)',
+  innovation: 'linear-gradient(135deg, #0c4a6e 0%, #0369a1 40%, #0ea5e9 100%)',
+  diversity: 'linear-gradient(135deg, #134e4a 0%, #0f766e 40%, #14b8a6 100%)',
+  onboarding: 'linear-gradient(135deg, #064e3b 0%, #047857 40%, #10b981 100%)',
+  technical: 'linear-gradient(135deg, #0c4a6e 0%, #075985 40%, #0284c7 100%)',
+  empleabilidad: 'linear-gradient(135deg, #3730a3 0%, #4338ca 40%, #6366f1 100%)',
+  general: 'linear-gradient(135deg, #164e63 0%, #155e75 40%, #0891b2 100%)',
+};
 
 const KPI_ACCENTS: Record<string, { bg: string; fg: string }> = {
   indigo:  { bg: 'bg-zinc-100',  fg: 'text-zinc-800' },
