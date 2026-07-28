@@ -523,7 +523,7 @@ export default function ProgramManagerConsole() {
 
                 {program.description && (
                   <div className="rounded-xl bg-zinc-50 border border-zinc-100 p-5 mb-6">
-                    <p className="text-[13.5px] text-zinc-600 leading-relaxed max-w-3xl">{program.description}</p>
+                    <p className="text-[13.5px] text-zinc-600 leading-[1.7] max-w-3xl text-justify" style={{ hyphens: 'auto' }}>{program.description}</p>
                   </div>
                 )}
 
