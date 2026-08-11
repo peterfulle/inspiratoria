@@ -1982,6 +1982,7 @@ def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bo
     import urllib.parse
     encoded_email = urllib.parse.quote(user_email)
     frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+    logo_url = f"{frontend_url}/images/logo.png"
     if activation_token:
         login_link = f"{frontend_url}/activate/{activation_token}"
     else:
@@ -2021,6 +2022,16 @@ def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bo
             </p>
         """
         btn_text = "Ingresar a Inspiratoria"
+        instructions_html = f"""
+          <div style="margin:28px 0 0 0;padding-top:20px;border-top:1px solid #f3f4f6;">
+            <p style="margin:0 0 8px 0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;">Cómo ingresar</p>
+            <p style="margin:0;color:#6b7280;font-size:12.5px;line-height:1.8;">
+              1. Hacé clic en "{btn_text}" arriba (o entrá a {frontend_url}).<br/>
+              2. Ingresá tu email: {user_email}.<br/>
+              3. Escribí el código de 4 dígitos de arriba cuando te lo pida.
+            </p>
+          </div>
+        """
     else:
         html_body = f"""
             <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:1.7;">
@@ -2034,6 +2045,16 @@ def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bo
             </p>
         """
         btn_text = "Activar mi cuenta"
+        instructions_html = f"""
+          <div style="margin:28px 0 0 0;padding-top:20px;border-top:1px solid #f3f4f6;">
+            <p style="margin:0 0 8px 0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;">Cómo ingresar</p>
+            <p style="margin:0;color:#6b7280;font-size:12.5px;line-height:1.8;">
+              1. Hacé clic en "{btn_text}" arriba.<br/>
+              2. Ingresá tu email: {user_email}.<br/>
+              3. Escribí el código de 4 dígitos de arriba cuando te lo pida.
+            </p>
+          </div>
+        """
 
     html_message = f"""
     <div style="background-color:#f9fafb;padding:40px 16px;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
@@ -2041,7 +2062,7 @@ def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bo
 
         <!-- Logo -->
         <div style="text-align:center;padding-bottom:32px;">
-          <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#0a0a0a;">Inspiratoria</span>
+          <img src="{logo_url}" alt="Inspiratoria" style="height:36px;width:auto;" />
         </div>
 
         <!-- Card -->
@@ -2069,6 +2090,8 @@ def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bo
           <div style="text-align:center;margin:32px 0 0 0;">
             <a href="{login_link}" style="display:inline-block;background:#0a0a0a;color:#FFD902;padding:14px 40px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.3px;">{btn_text}</a>
           </div>
+
+          {instructions_html}
 
         </div>
 

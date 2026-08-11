@@ -60,20 +60,61 @@ def generate_otp_code() -> str:
     return f"{random.randint(0, 9999):04d}"
 
 
-def send_participant_access_email(user: User, otp_code: str, activation_token: str):
-    """Envía email HTML con código OTP — diseño Inspiratoria (mismo que _send_otp_email)"""
+PARTICIPANT_ROLE_LABELS = {
+    "mentor": "Mentor",
+    "mentee": "Mentee",
+    "facilitator": "Facilitador",
+    "participant_cell": "Participante",
+}
+
+
+def send_participant_access_email(user: User, otp_code: str, activation_token: str, program: "Program | None" = None, role: str = ""):
+    """Envía el email de bienvenida al programa, con logo real e instrucciones de acceso."""
     frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
     activation_link = f"{frontend_url}/activate/{activation_token}"
+    logo_url = f"{frontend_url}/images/logo.png"
 
     first_name = (user.full_name or user.first_name or "participante").split()[0]
     d1, d2, d3, d4 = otp_code[0], otp_code[1], otp_code[2], otp_code[3]
 
-    subject = "Bienvenido a tu programa · Inspiratoria"
+    role_label = PARTICIPANT_ROLE_LABELS.get(role, "")
+    program_name = program.name if program else ""
+    company_name = program.company.name if (program and program.company) else ""
+
+    context_lines = []
+    if program_name:
+        context_lines.append(f"Programa: {program_name}")
+    if company_name:
+        context_lines.append(f"Empresa: {company_name}")
+    if role_label:
+        context_lines.append(f"Tu rol: {role_label}")
+    context_plain = ("\n".join(context_lines) + "\n\n") if context_lines else ""
+
+    context_html = ""
+    if context_lines:
+        rows_html = "".join(
+            f"""<tr>
+                <td style="padding:6px 0;color:#6b7280;font-size:13px;width:110px;">{line.split(':')[0]}</td>
+                <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{line.split(':', 1)[1].strip()}</td>
+              </tr>"""
+            for line in context_lines
+        )
+        context_html = f"""
+          <div style="background:#f0fdfa;border:1px solid #ccfbf1;border-radius:12px;padding:16px 20px;margin:0 0 24px 0;">
+            <table style="width:100%;border-collapse:collapse;">{rows_html}</table>
+          </div>
+        """
+
+    subject = f"Invitación al programa {program_name} · Inspiratoria" if program_name else "Bienvenido a tu programa · Inspiratoria"
     plain_message = (
         f"Hola, {first_name}.\n\n"
         f"Has sido agregado a un programa en Inspiratoria.\n\n"
+        f"{context_plain}"
         f"Tu código de activación es: {otp_code}\n\n"
-        f"Activa tu cuenta aquí: {activation_link}\n\n"
+        f"Cómo ingresar:\n"
+        f"1. Abrí este link: {activation_link}\n"
+        f"2. Confirmá tu email si te lo pide.\n"
+        f"3. Ingresá el código de 4 dígitos de arriba.\n\n"
         f"Este código expira en 15 minutos.\n\n"
         f"Equipo Inspiratoria"
     )
@@ -82,7 +123,7 @@ def send_participant_access_email(user: User, otp_code: str, activation_token: s
     <div style="background-color:#f9fafb;padding:40px 16px;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
       <div style="max-width:520px;margin:0 auto;">
         <div style="text-align:center;padding-bottom:32px;">
-          <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#0a0a0a;">Inspiratoria</span>
+          <img src="{logo_url}" alt="Inspiratoria" style="height:36px;width:auto;" />
         </div>
         <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:40px 36px;">
           <p style="margin:0 0 24px 0;color:#111827;font-size:17px;font-weight:500;">
@@ -91,6 +132,7 @@ def send_participant_access_email(user: User, otp_code: str, activation_token: s
           <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:1.7;">
             Has sido agregado a un programa en Inspiratoria. Ya tienes acceso a la plataforma donde podrás participar, conectar con tu equipo y avanzar en tu proceso.
           </p>
+          {context_html}
           <p style="margin:0 0 28px 0;color:#374151;font-size:15px;line-height:1.7;">
             Para comenzar, activa tu cuenta haciendo clic en el botón de abajo e ingresa tu código de acceso.
           </p>
@@ -106,6 +148,14 @@ def send_participant_access_email(user: User, otp_code: str, activation_token: s
           </div>
           <div style="text-align:center;margin:32px 0 0 0;">
             <a href="{activation_link}" style="display:inline-block;background:#0a0a0a;color:#FFD902;padding:14px 40px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.3px;">Activar mi cuenta</a>
+          </div>
+          <div style="margin:28px 0 0 0;padding-top:20px;border-top:1px solid #f3f4f6;">
+            <p style="margin:0 0 8px 0;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;">Cómo ingresar</p>
+            <p style="margin:0;color:#6b7280;font-size:12.5px;line-height:1.8;">
+              1. Hacé clic en "Activar mi cuenta" arriba.<br/>
+              2. Si te pide confirmar tu email, ingresá {user.email}.<br/>
+              3. Escribí el código de 4 dígitos cuando te lo pida.
+            </p>
           </div>
         </div>
         <div style="text-align:center;padding-top:28px;">
@@ -132,7 +182,7 @@ def send_participant_access_email(user: User, otp_code: str, activation_token: s
         print(f"[PARTICIPANT EMAIL ERROR] No se pudo enviar a {user.email}: {e}")
 
 
-def prepare_user_secure_access(user: User, send_invitation: bool):
+def prepare_user_secure_access(user: User, send_invitation: bool, program: "Program | None" = None, role: str = ""):
     if not send_invitation:
         return
 
@@ -154,7 +204,7 @@ def prepare_user_secure_access(user: User, send_invitation: bool):
         "is_onboarded",
     ])
 
-    send_participant_access_email(user, otp_code, activation_token)
+    send_participant_access_email(user, otp_code, activation_token, program=program, role=role)
 
 
 def send_match_notification_email(
@@ -844,8 +894,8 @@ async def create_participant(program_id: str, payload: ParticipantCreateRequest,
                 )
             except ProgramParticipant.DoesNotExist:
                 pass  # Silenciar error si no existe el mentor
-        
-        prepare_user_secure_access(user, payload.send_invitation)
+
+        prepare_user_secure_access(user, payload.send_invitation, program=program, role=participant_role)
         
         # Construir respuesta
         return {
@@ -1345,7 +1395,7 @@ async def import_batch(program_id: str, payload: BatchImportRequest, authorizati
                         'user_created': user_created
                     })
                     
-                    prepare_user_secure_access(user, payload.send_invitations)
+                    prepare_user_secure_access(user, payload.send_invitations, program=program, role=normalized_role)
                 
             except Exception as e:
                 errors.append({
@@ -1817,7 +1867,7 @@ async def self_enroll_in_program(program_id: str, payload: SelfEnrollRequest):
             program=program, user=user, deleted_at__isnull=True
         ).first()
         if existing:
-            prepare_user_secure_access(user, True)
+            prepare_user_secure_access(user, True, program=program, role=role)
             return {
                 "ok": True,
                 "already_enrolled": True,
@@ -1851,7 +1901,7 @@ async def self_enroll_in_program(program_id: str, payload: SelfEnrollRequest):
             user.role = user_role
             user.save(update_fields=['role'])
 
-        prepare_user_secure_access(user, True)
+        prepare_user_secure_access(user, True, program=program, role=role)
 
         return {
             "ok": True,
@@ -1877,7 +1927,7 @@ async def resend_participant_invitation(program_id: str, participant_id: str, au
         except ProgramParticipant.DoesNotExist:
             raise HTTPException(status_code=404, detail="Participante no encontrado")
 
-        prepare_user_secure_access(participant.user, True)
+        prepare_user_secure_access(participant.user, True, program=participant.program, role=participant.role)
         participant.invitation_sent_at = datetime.now()
         participant.save(update_fields=['invitation_sent_at'])
 
