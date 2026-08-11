@@ -474,12 +474,8 @@ export default function LoginPage() {
       <div className="w-full lg:w-[45%] flex flex-col min-h-screen bg-gray-50/50">
         {/* Mobile Header */}
         <div className="lg:hidden p-6 pb-0">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-400 to-primary-600">
-              <span className="text-lg font-bold text-white">I</span>
-            </div>
-            <span className="text-xl font-bold text-gray-900">Inspiratoria</span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/logo.png" alt="Inspiratoria" className="h-8 w-auto" />
         </div>
 
         {/* Form Area */}

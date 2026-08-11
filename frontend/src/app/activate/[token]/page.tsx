@@ -186,12 +186,8 @@ export default function ActivatePage() {
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0a0a0a] mb-4">
-            <svg className="h-6 w-6 text-[#FFD902]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9.937 15.5A2 2 0 008.5 14.063l-6.135-1.582a.5.5 0 010-.962L8.5 9.936A2 2 0 009.937 8.5l1.582-6.135a.5.5 0 01.962 0L14.063 8.5A2 2 0 0015.5 9.937l6.135 1.582a.5.5 0 010 .962L15.5 14.063a2 2 0 00-1.437 1.437l-1.582 6.135a.5.5 0 01-.962 0z" />
-            </svg>
-          </div>
-          <h2 className="text-lg font-semibold text-gray-900">Inspiratoria</h2>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/logo.png" alt="Inspiratoria" className="h-10 w-auto mx-auto" />
         </div>
 
         {/* ── LOADING ── */}

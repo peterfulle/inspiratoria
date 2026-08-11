@@ -289,12 +289,8 @@ function AdminLoginContent() {
         <div className="relative z-10 flex flex-col justify-between h-full p-10">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 backdrop-blur-md border border-white/15">
-              <svg className="h-5 w-5 text-[#FFD902]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9.937 15.5A2 2 0 008.5 14.063l-6.135-1.582a.5.5 0 010-.962L8.5 9.936A2 2 0 009.937 8.5l1.582-6.135a.5.5 0 01.962 0L14.063 8.5A2 2 0 0015.5 9.937l6.135 1.582a.5.5 0 010 .962L15.5 14.063a2 2 0 00-1.437 1.437l-1.582 6.135a.5.5 0 01-.962 0z" />
-              </svg>
-            </div>
-            <span className="text-lg font-semibold text-white/80 tracking-tight">Inspiratoria</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/home/inspiratoria_negro-negro-300x68.png" alt="Inspiratoria" className="h-8 w-auto brightness-0 invert opacity-90" />
           </div>
 
           {/* Center Hero */}
