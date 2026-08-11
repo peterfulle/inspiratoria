@@ -2749,6 +2749,10 @@ class ProfileUpdateRequest(BaseModel):
     gender: Optional[str] = None
     personal_email: Optional[str] = None
     presentation: Optional[str] = None
+    residence_city: Optional[str] = None
+    work_location: Optional[str] = None
+    area_or_function: Optional[str] = None
+    career: Optional[str] = None
     mentor_topics: Optional[list] = None
     mentor_objectives: Optional[list] = None
     mentor_style: Optional[list] = None
@@ -2840,6 +2844,18 @@ async def update_profile(payload: ProfileUpdateRequest, authorization: Optional[
     if payload.presentation is not None:
         user.presentation = payload.presentation.strip()[:2000]
         update_fields.append('presentation')
+    if payload.residence_city is not None:
+        user.residence_city = payload.residence_city.strip()[:150]
+        update_fields.append('residence_city')
+    if payload.work_location is not None:
+        user.work_location = payload.work_location.strip()[:150]
+        update_fields.append('work_location')
+    if payload.area_or_function is not None:
+        user.area_or_function = payload.area_or_function.strip()[:150]
+        update_fields.append('area_or_function')
+    if payload.career is not None:
+        user.career = payload.career.strip()[:150]
+        update_fields.append('career')
     if payload.mentor_topics is not None:
         user.mentor_topics = [str(s).strip()[:100] for s in payload.mentor_topics[:15] if str(s).strip()]
         update_fields.append('mentor_topics')
@@ -2905,6 +2921,10 @@ async def update_profile(payload: ProfileUpdateRequest, authorization: Optional[
         "gender": getattr(user, 'gender', '') or "",
         "personal_email": getattr(user, 'personal_email', '') or "",
         "presentation": getattr(user, 'presentation', '') or "",
+        "residence_city": getattr(user, 'residence_city', '') or "",
+        "work_location": getattr(user, 'work_location', '') or "",
+        "area_or_function": getattr(user, 'area_or_function', '') or "",
+        "career": getattr(user, 'career', '') or "",
         "mentor_topics": getattr(user, 'mentor_topics', []) or [],
         "mentor_objectives": getattr(user, 'mentor_objectives', []) or [],
         "mentor_style": getattr(user, 'mentor_style', []) or [],
@@ -3167,6 +3187,10 @@ async def get_portal_data(portal_code: str):
                 "gender": getattr(user, 'gender', '') or "",
                 "personal_email": getattr(user, 'personal_email', '') or "",
                 "presentation": getattr(user, 'presentation', '') or "",
+                "residence_city": getattr(user, 'residence_city', '') or "",
+                "work_location": getattr(user, 'work_location', '') or "",
+                "area_or_function": getattr(user, 'area_or_function', '') or "",
+                "career": getattr(user, 'career', '') or "",
                 "mentor_topics": getattr(user, 'mentor_topics', []) or [],
                 "mentor_objectives": getattr(user, 'mentor_objectives', []) or [],
                 "mentor_style": getattr(user, 'mentor_style', []) or [],

@@ -366,6 +366,10 @@ class User(AbstractUser):
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True, default="")
     personal_email = models.EmailField(max_length=254, blank=True, default="")
     presentation = models.TextField(blank=True, default="")  # Breve presentación 3-5 líneas
+    residence_city = models.CharField(max_length=150, blank=True, default="")  # Ciudad de residencia (mentor + mentee)
+    work_location = models.CharField(max_length=150, blank=True, default="")  # Localidad laboral (mentor)
+    area_or_function = models.CharField(max_length=150, blank=True, default="")  # Área o función (mentee)
+    career = models.CharField(max_length=150, blank=True, default="")  # Carrera (mentee)
     mentor_topics = models.JSONField(default=list, blank=True)  # Temas de valor como mentor
     mentor_objectives = models.JSONField(default=list, blank=True)  # Objetivos a acompañar
     mentor_style = models.JSONField(default=list, blank=True)  # Estilo de acompañamiento

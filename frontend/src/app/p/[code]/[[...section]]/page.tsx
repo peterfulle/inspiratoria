@@ -339,7 +339,7 @@ const styles = `
   @media (max-width: 900px) { .prof-grid { grid-template-columns: 1fr; } }
 
   .prof-avatar-card { background: #fff; border-radius: 16px; border: 1px solid #f0f0f0; padding: 28px; display: flex; flex-direction: column; align-items: center; text-align: center; }
-  .prof-avatar { width: 120px; height: 120px; border-radius: 999px; overflow: hidden; background: linear-gradient(135deg, #0891b2, #06b6d4); display: flex; align-items: center; justify-content: center; font-size: 2.4rem; font-weight: 800; color: #fff; position: relative; margin-bottom: 16px; }
+  .prof-avatar { width: 120px; height: 120px; border-radius: 999px; overflow: hidden; background: linear-gradient(135deg, #FFD902, #FFC700); display: flex; align-items: center; justify-content: center; font-size: 2.4rem; font-weight: 800; color: #1a1a1a; position: relative; margin-bottom: 16px; }
   .prof-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .prof-avatar-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; cursor: pointer; border-radius: 999px; }
   .prof-avatar:hover .prof-avatar-overlay { opacity: 1; }
@@ -358,7 +358,7 @@ const styles = `
   .prof-field.full { grid-column: 1 / -1; }
   .prof-field label { font-size: 0.72rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
   .prof-field input, .prof-field textarea { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 14px; font-size: 0.85rem; color: #111827; outline: none; transition: border-color 0.15s; font-family: inherit; }
-  .prof-field input:focus, .prof-field textarea:focus { border-color: #0891b2; box-shadow: 0 0 0 3px rgba(8,145,178,0.08); }
+  .prof-field input:focus, .prof-field textarea:focus { border-color: #FFD902; box-shadow: 0 0 0 3px rgba(255,217,2,0.18); }
   .prof-field input:disabled, .prof-field textarea:disabled { background: #f9fafb; color: #9ca3af; cursor: not-allowed; }
   .prof-field textarea { resize: vertical; min-height: 80px; }
   .prof-field .prof-hint { font-size: 0.66rem; color: #9ca3af; }
@@ -728,6 +728,7 @@ export default function ParticipantPortalPage() {
     full_name: '', phone: '', position: '', department: '',
     linkedin_url: '', bio: '', headline: '', skills: [] as string[],
     gender: '', personal_email: '', presentation: '',
+    residence_city: '', work_location: '', area_or_function: '', career: '',
     mentor_topics: [] as string[], mentor_objectives: [] as string[],
     mentor_style: [] as string[], experience_level: '',
     experience_area: [] as string[], mentee_preference: [] as string[],
@@ -2427,6 +2428,10 @@ export default function ParticipantPortalPage() {
       gender: portalUser?.gender || '',
       personal_email: portalUser?.personal_email || '',
       presentation: portalUser?.presentation || '',
+      residence_city: portalUser?.residence_city || '',
+      work_location: portalUser?.work_location || '',
+      area_or_function: portalUser?.area_or_function || '',
+      career: portalUser?.career || '',
       mentor_topics: Array.isArray(portalUser?.mentor_topics) ? [...portalUser.mentor_topics] : [],
       mentor_objectives: Array.isArray(portalUser?.mentor_objectives) ? [...portalUser.mentor_objectives] : [],
       mentor_style: Array.isArray(portalUser?.mentor_style) ? [...portalUser.mentor_style] : [],
@@ -2610,8 +2615,8 @@ export default function ParticipantPortalPage() {
         const selected = ((profileForm as any)[field] as string[]).includes(opt);
         return (
           <button key={opt} type="button" onClick={() => toggleArrayItem(field, opt)} style={{
-            padding: '8px 16px', borderRadius: 20, border: selected ? '2px solid #0891b2' : '1.5px solid #d1d5db',
-            background: selected ? '#ecfeff' : '#fff', color: selected ? '#0e7490' : '#4b5563',
+            padding: '8px 16px', borderRadius: 20, border: selected ? '2px solid #FFD902' : '1.5px solid #d1d5db',
+            background: selected ? '#FFFBD6' : '#fff', color: selected ? '#8a6d00' : '#4b5563',
             fontSize: '0.8rem', fontWeight: selected ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s',
           }}>{opt}</button>
         );
@@ -2619,8 +2624,8 @@ export default function ParticipantPortalPage() {
       {/* Custom items not in predefined list */}
       {((profileForm as any)[field] as string[]).filter((v: string) => !options.includes(v)).map((v: string) => (
         <button key={v} type="button" onClick={() => toggleArrayItem(field, v)} style={{
-          padding: '8px 16px', borderRadius: 20, border: '2px solid #0891b2',
-          background: '#ecfeff', color: '#0e7490', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+          padding: '8px 16px', borderRadius: 20, border: '2px solid #FFD902',
+          background: '#FFFBD6', color: '#8a6d00', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
         }}>{v} ×</button>
       ))}
       {allowOther && (
@@ -2630,7 +2635,7 @@ export default function ParticipantPortalPage() {
             placeholder="Otra…" maxLength={60}
             style={{ padding: '8px 12px', borderRadius: 20, border: '1.5px solid #d1d5db', fontSize: '0.8rem', width: 130 }} />
           <button type="button" onClick={onOtherAdd} style={{
-            padding: '6px 12px', borderRadius: 20, border: 'none', background: '#0891b2', color: '#fff',
+            padding: '6px 12px', borderRadius: 20, border: 'none', background: '#FFD902', color: '#1a1a1a',
             fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
           }}>+</button>
         </div>
@@ -2644,8 +2649,8 @@ export default function ParticipantPortalPage() {
         const selected = (profileForm as any)[field] === opt;
         return (
           <button key={opt} type="button" onClick={() => setProfileForm(f => ({ ...f, [field]: opt }))} style={{
-            padding: '8px 16px', borderRadius: 20, border: selected ? '2px solid #0891b2' : '1.5px solid #d1d5db',
-            background: selected ? '#ecfeff' : '#fff', color: selected ? '#0e7490' : '#4b5563',
+            padding: '8px 16px', borderRadius: 20, border: selected ? '2px solid #FFD902' : '1.5px solid #d1d5db',
+            background: selected ? '#FFFBD6' : '#fff', color: selected ? '#8a6d00' : '#4b5563',
             fontSize: '0.8rem', fontWeight: selected ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s',
           }}>{opt}</button>
         );
@@ -2656,6 +2661,18 @@ export default function ParticipantPortalPage() {
   const renderProfile = () => {
     // If editing (wizard mode), show the multi-step wizard
     if (profileEditing && mentorStep >= 1) {
+      const personalEmailInvalid = profileForm.personal_email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileForm.personal_email.trim());
+      const step1MissingLabels: string[] = [];
+      if (mentorStep === 1) {
+        if (!profileForm.position.trim()) step1MissingLabels.push(isMentee ? 'Cargo actual o etapa profesional' : 'Cargo actual');
+        if (!profileForm.department.trim()) step1MissingLabels.push(isMentee ? 'Empresa / institución' : 'Empresa / Área');
+        if (!profileForm.residence_city.trim()) step1MissingLabels.push('Ciudad de residencia');
+        if (!isMentee && !profileForm.work_location.trim()) step1MissingLabels.push('Localidad laboral');
+        if (isMentee && !profileForm.area_or_function.trim()) step1MissingLabels.push('Área o función');
+        if (isMentee && !profileForm.career.trim()) step1MissingLabels.push('Carrera');
+        if (!profileForm.presentation.trim()) step1MissingLabels.push('Breve presentación');
+        if (personalEmailInvalid) step1MissingLabels.push('Mail personal (formato inválido)');
+      }
       return (
         <>
           <div className="dash-header">
@@ -2676,13 +2693,13 @@ export default function ParticipantPortalPage() {
                 <div style={{
                   width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontWeight: 700, fontSize: '0.8rem', flexShrink: 0, transition: 'all 0.2s',
-                  background: s < mentorStep ? '#0891b2' : s === mentorStep ? '#0891b2' : '#e5e7eb',
-                  color: s <= mentorStep ? '#fff' : '#9ca3af',
+                  background: s < mentorStep ? '#FFD902' : s === mentorStep ? '#FFD902' : '#e5e7eb',
+                  color: s <= mentorStep ? '#1a1a1a' : '#9ca3af',
                 }}>
                   {s < mentorStep ? '✓' : s}
                 </div>
                 {s < 4 && (
-                  <div style={{ flex: 1, height: 3, background: s < mentorStep ? '#0891b2' : '#e5e7eb', transition: 'background 0.2s' }} />
+                  <div style={{ flex: 1, height: 3, background: s < mentorStep ? '#FFD902' : '#e5e7eb', transition: 'background 0.2s' }} />
                 )}
               </div>
             ))}
@@ -2706,7 +2723,7 @@ export default function ParticipantPortalPage() {
                     <div>
                       <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#111827' }}>Foto de perfil</div>
                       <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Sube una foto profesional (máx. 2 MB)</div>
-                      {avatarUploading && <div style={{ fontSize: '0.72rem', color: '#0891b2', marginTop: 4 }}>Subiendo...</div>}
+                      {avatarUploading && <div style={{ fontSize: '0.72rem', color: '#8a6d00', marginTop: 4 }}>Subiendo...</div>}
                     </div>
                   </div>
 
@@ -2722,17 +2739,6 @@ export default function ParticipantPortalPage() {
                       <span className="prof-hint" style={{ color: '#6b7280' }}>Recogido al invitarte. Pídele a tu coordinador modificarlo si es necesario.</span>
                     </div>
                     <div className="prof-field">
-                      <label>Género</label>
-                      <select value={profileForm.gender} onChange={e => setProfileForm(f => ({ ...f, gender: e.target.value }))}
-                        style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: '0.85rem', background: '#fff' }}>
-                        <option value="">Seleccionar...</option>
-                        <option value="masculino">Masculino</option>
-                        <option value="femenino">Femenino</option>
-                        <option value="no_binario">No binario</option>
-                        <option value="prefiero_no_decir">Prefiero no decir</option>
-                      </select>
-                    </div>
-                    <div className="prof-field">
                       <label>Email de acceso</label>
                       <input
                         type="email"
@@ -2741,32 +2747,93 @@ export default function ParticipantPortalPage() {
                         title="Este es el email con el que accedes al portal."
                         style={{ background: '#f3f4f6', color: '#374151', cursor: 'not-allowed' }}
                       />
-                      <span className="prof-hint" style={{ color: '#6b7280' }}>Este es tu email de acceso a la plataforma.</span>
+                      <span className="prof-hint" style={{ color: '#6b7280' }}>Este es tu email de acceso a la plataforma. No se puede modificar.</span>
                     </div>
-                    <div className="prof-field">
-                      <label>Email personal alternativo</label>
-                      <input type="email" value={profileForm.personal_email} onChange={e => setProfileForm(f => ({ ...f, personal_email: e.target.value }))} placeholder="(opcional) otro@correo.com" />
-                    </div>
-                    <div className="prof-field">
-                      <label>Cargo actual *</label>
-                      <input value={profileForm.position} onChange={e => setProfileForm(f => ({ ...f, position: e.target.value }))} placeholder="Ej: Gerente de Innovación" />
-                    </div>
-                    <div className="prof-field">
-                      <label>Empresa / Área *</label>
-                      <input value={profileForm.department} onChange={e => setProfileForm(f => ({ ...f, department: e.target.value }))} placeholder="Ej: Acme Corp / Tecnología" />
-                    </div>
-                    <div className="prof-field">
-                      <label>Perfil LinkedIn</label>
-                      <input type="url" value={profileForm.linkedin_url} onChange={e => setProfileForm(f => ({ ...f, linkedin_url: e.target.value }))} placeholder="https://www.linkedin.com/in/tu-perfil" />
-                    </div>
+
+                    {!isMentee && (
+                      <>
+                        <div className="prof-field">
+                          <label>Género</label>
+                          <select value={profileForm.gender} onChange={e => setProfileForm(f => ({ ...f, gender: e.target.value }))}
+                            style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: '0.85rem', background: '#fff' }}>
+                            <option value="">Seleccionar...</option>
+                            <option value="masculino">Masculino</option>
+                            <option value="femenino">Femenino</option>
+                            <option value="no_binario">No binario</option>
+                            <option value="prefiero_no_decir">Prefiero no decir</option>
+                          </select>
+                        </div>
+                        <div className="prof-field">
+                          <label>Mail personal</label>
+                          <input type="email" value={profileForm.personal_email} onChange={e => setProfileForm(f => ({ ...f, personal_email: e.target.value }))} placeholder="tu@correo-personal.com"
+                            style={personalEmailInvalid ? { borderColor: '#dc2626' } : undefined} />
+                          {personalEmailInvalid && <span className="prof-hint" style={{ color: '#dc2626' }}>Ese email no parece válido.</span>}
+                        </div>
+                        <div className="prof-field">
+                          <label>Cargo actual *</label>
+                          <input value={profileForm.position} onChange={e => setProfileForm(f => ({ ...f, position: e.target.value }))} placeholder="Ej: Gerente de Innovación" />
+                        </div>
+                        <div className="prof-field">
+                          <label>Empresa / Área *</label>
+                          <input value={profileForm.department} onChange={e => setProfileForm(f => ({ ...f, department: e.target.value }))} placeholder="Ej: Acme Corp / Tecnología" />
+                        </div>
+                        <div className="prof-field">
+                          <label>Ciudad de residencia *</label>
+                          <input value={profileForm.residence_city} onChange={e => setProfileForm(f => ({ ...f, residence_city: e.target.value }))} placeholder="Ej: Santiago, Chile" />
+                        </div>
+                        <div className="prof-field">
+                          <label>Localidad laboral *</label>
+                          <input value={profileForm.work_location} onChange={e => setProfileForm(f => ({ ...f, work_location: e.target.value }))} placeholder="Ej: Santiago, Chile" />
+                        </div>
+                        <div className="prof-field">
+                          <label>Perfil LinkedIn</label>
+                          <input type="url" value={profileForm.linkedin_url} onChange={e => setProfileForm(f => ({ ...f, linkedin_url: e.target.value }))} placeholder="https://www.linkedin.com/in/tu-perfil" />
+                        </div>
+                      </>
+                    )}
+
+                    {isMentee && (
+                      <>
+                        <div className="prof-field">
+                          <label>Cargo actual o etapa profesional *</label>
+                          <input value={profileForm.position} onChange={e => setProfileForm(f => ({ ...f, position: e.target.value }))} placeholder="Ej: Estudiante de Ingeniería, 5to año" />
+                        </div>
+                        <div className="prof-field">
+                          <label>Empresa / institución *</label>
+                          <input value={profileForm.department} onChange={e => setProfileForm(f => ({ ...f, department: e.target.value }))} placeholder="Ej: Universidad de Chile" />
+                        </div>
+                        <div className="prof-field">
+                          <label>Área o función *</label>
+                          <input value={profileForm.area_or_function} onChange={e => setProfileForm(f => ({ ...f, area_or_function: e.target.value }))} placeholder="Ej: Ingeniería / Marketing" />
+                        </div>
+                        <div className="prof-field">
+                          <label>Carrera *</label>
+                          <input value={profileForm.career} onChange={e => setProfileForm(f => ({ ...f, career: e.target.value }))} placeholder="Ej: Ingeniería Civil Industrial" />
+                        </div>
+                        <div className="prof-field">
+                          <label>Ciudad de residencia *</label>
+                          <input value={profileForm.residence_city} onChange={e => setProfileForm(f => ({ ...f, residence_city: e.target.value }))} placeholder="Ej: Santiago, Chile" />
+                        </div>
+                        <div className="prof-field">
+                          <label>Perfil LinkedIn</label>
+                          <input type="url" value={profileForm.linkedin_url} onChange={e => setProfileForm(f => ({ ...f, linkedin_url: e.target.value }))} placeholder="https://www.linkedin.com/in/tu-perfil" />
+                        </div>
+                      </>
+                    )}
+
                     <div className="prof-field full">
                       <label>Breve presentación *</label>
                       <textarea value={profileForm.presentation} onChange={e => setProfileForm(f => ({ ...f, presentation: e.target.value }))}
-                        placeholder={isMentee ? "Cuéntanos en 3 a 5 líneas quién eres, a qué te dedicas y qué te motiva a participar como mentee en este programa." : "Cuéntanos en 3 a 5 líneas quién eres, a qué te dedicas y qué te motiva a ser mentor/a en este programa."}
+                        placeholder={isMentee ? "Cuéntanos en 3 a 5 líneas quién eres, en qué momento profesional estás y qué te gustaría trabajar en este proceso." : "Cuéntanos en 3 a 5 líneas quién eres, qué haces y qué tipo de acompañamiento te gustaría brindar."}
                         maxLength={500} rows={4} />
                       <span className="prof-hint">{profileForm.presentation.length}/500 caracteres</span>
                     </div>
                   </div>
+                  {step1MissingLabels.length > 0 && (
+                    <div style={{ fontSize: '0.75rem', color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px' }}>
+                      Falta completar: {step1MissingLabels.join(', ')}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2892,21 +2959,27 @@ export default function ParticipantPortalPage() {
               </button>
               <div style={{ display: 'flex', gap: 10 }}>
                 {mentorStep < 4 ? (
-                  <button onClick={() => { saveProfile(mentorStep); setMentorStep(s => s + 1); }}
-                    disabled={profileSaving} style={{
-                      padding: '10px 28px', borderRadius: 10, border: 'none', background: '#0891b2',
-                      color: '#fff', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer', transition: 'background 0.15s',
+                  <button onClick={() => {
+                    if (mentorStep === 1 && step1MissingLabels.length > 0) { setProfileMsg('err:Completa los campos obligatorios antes de continuar.'); return; }
+                    saveProfile(mentorStep); setMentorStep(s => s + 1);
+                  }}
+                    disabled={profileSaving || (mentorStep === 1 && step1MissingLabels.length > 0)} style={{
+                      padding: '10px 28px', borderRadius: 10, border: 'none',
+                      background: (mentorStep === 1 && step1MissingLabels.length > 0) ? '#e5e7eb' : '#FFD902',
+                      color: (mentorStep === 1 && step1MissingLabels.length > 0) ? '#9ca3af' : '#1a1a1a',
+                      fontWeight: 600, fontSize: '0.82rem',
+                      cursor: (mentorStep === 1 && step1MissingLabels.length > 0) ? 'not-allowed' : 'pointer', transition: 'background 0.15s',
                     }}
-                    onMouseOver={e => (e.currentTarget.style.background = '#0e7490')}
-                    onMouseOut={e => (e.currentTarget.style.background = '#0891b2')}>
+                    onMouseOver={e => { if (!(mentorStep === 1 && step1MissingLabels.length > 0)) e.currentTarget.style.background = '#E6C300'; }}
+                    onMouseOut={e => { if (!(mentorStep === 1 && step1MissingLabels.length > 0)) e.currentTarget.style.background = '#FFD902'; }}>
                     {profileSaving ? 'Guardando…' : 'Siguiente →'}
                   </button>
                 ) : (
                   <button onClick={() => saveProfile(4)}
                     disabled={profileSaving} style={{
                       padding: '10px 28px', borderRadius: 10, border: 'none',
-                      background: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
-                      color: '#fff', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'transform 0.15s',
+                      background: 'linear-gradient(135deg, #FFD902 0%, #FFC700 100%)',
+                      color: '#1a1a1a', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'transform 0.15s',
                     }}
                     onMouseOver={e => (e.currentTarget.style.transform = 'scale(1.03)')}
                     onMouseOut={e => (e.currentTarget.style.transform = 'scale(1)')}>
@@ -3042,9 +3115,13 @@ export default function ParticipantPortalPage() {
               <div className="prof-form-body">
                 <div className="prof-form-grid">
                   <div className="prof-field"><label>Nombre</label><input disabled value={portalUser?.full_name || '—'} /></div>
-                  <div className="prof-field"><label>Cargo</label><input disabled value={portalUser?.position || '—'} /></div>
-                  <div className="prof-field"><label>Empresa / Área</label><input disabled value={portalUser?.department || '—'} /></div>
+                  <div className="prof-field"><label>{isMentee ? 'Cargo / Etapa profesional' : 'Cargo'}</label><input disabled value={portalUser?.position || '—'} /></div>
+                  <div className="prof-field"><label>{isMentee ? 'Empresa / Institución' : 'Empresa / Área'}</label><input disabled value={portalUser?.department || '—'} /></div>
                   <div className="prof-field"><label>Experiencia</label><input disabled value={portalUser?.experience_level || '—'} /></div>
+                  <div className="prof-field"><label>Ciudad de residencia</label><input disabled value={portalUser?.residence_city || '—'} /></div>
+                  {!isMentee && <div className="prof-field"><label>Localidad laboral</label><input disabled value={portalUser?.work_location || '—'} /></div>}
+                  {isMentee && <div className="prof-field"><label>Área o función</label><input disabled value={portalUser?.area_or_function || '—'} /></div>}
+                  {isMentee && <div className="prof-field"><label>Carrera</label><input disabled value={portalUser?.career || '—'} /></div>}
                 </div>
               </div>
             </div>
@@ -4551,7 +4628,7 @@ export default function ParticipantPortalPage() {
           onMouseEnter={() => setSidebarExpanded(true)}
           onMouseLeave={() => setSidebarExpanded(false)}>
           <div className="p-sidebar-header" style={{ justifyContent: sidebarExpanded ? 'flex-start' : 'center', gap: sidebarExpanded ? 12 : 0 }}>
-            <Image src="/images/logo.png" alt="Inspiratoria" width={36} height={36} className="p-sidebar-logo-img" style={{ borderRadius: 10 }} />
+            <Image src="/images/isologo-amarillo.png" alt="Inspiratoria" width={36} height={36} className="p-sidebar-logo-img" />
             {sidebarExpanded && <span className="p-sidebar-logo-text" style={{ display: 'inline' }}>Inspiratoria</span>}
           </div>
 
