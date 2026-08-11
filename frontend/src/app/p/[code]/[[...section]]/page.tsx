@@ -47,62 +47,65 @@ const styles = `
   .p-sidebar {
     width: ${SIDEBAR_W_COLLAPSED}px;
     background: #ffffff;
-    border-right: 1px solid #edeef0;
+    border-right: 1px solid #f1f2f4;
     display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 40;
-    transition: width 0.28s cubic-bezier(0.4,0,0.2,1); overflow: hidden;
-    box-shadow: 1px 0 0 rgba(15,23,42,0.02);
+    transition: width 0.32s cubic-bezier(0.4,0,0.2,1); overflow: hidden;
+    box-shadow: 2px 0 24px rgba(15,23,42,0.045), 1px 0 0 rgba(15,23,42,0.02);
   }
   .p-sidebar.expanded { width: ${SIDEBAR_W_EXPANDED}px; }
 
-  .p-sidebar-header { padding: 14px; border-bottom: 1px solid #f0f1f2; display: flex; align-items: center; justify-content: center; gap: 0; min-height: 64px; position: relative; z-index: 1; }
+  .p-sidebar-header { padding: 14px; border-bottom: 1px solid #f1f2f4; display: flex; align-items: center; justify-content: center; gap: 0; min-height: 64px; position: relative; z-index: 1; }
   .p-sidebar.expanded .p-sidebar-header { justify-content: flex-start; gap: 12px; }
-  .p-sidebar-logo-img { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; }
+  .p-sidebar-logo-img { width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0; filter: drop-shadow(0 3px 8px rgba(255,217,2,0.35)); transition: transform 0.25s cubic-bezier(0.4,0,0.2,1); }
+  .p-sidebar-header:hover .p-sidebar-logo-img { transform: scale(1.05) rotate(-4deg); }
   .p-sidebar-logo-text { font-size: 1.05rem; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; white-space: nowrap; display: none; }
   .p-sidebar.expanded .p-sidebar-logo-text { display: inline; }
 
   /* Program card in sidebar */
   .p-program-card {
-    margin: 4px 10px 8px; padding: 10px 12px; border-radius: 10px;
-    background: linear-gradient(135deg, rgba(6,182,212,0.07), rgba(34,211,153,0.05));
-    border: 1px solid rgba(6,182,212,0.15);
+    margin: 4px 10px 8px; padding: 12px 13px; border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255,217,2,0.14), rgba(255,199,0,0.05));
+    border: 1px solid rgba(255,217,2,0.35);
     opacity: 0; max-height: 0; overflow: hidden; transition: all 0.25s;
   }
   .p-sidebar.expanded .p-program-card { opacity: 1; max-height: 100px; }
-  .p-program-card-name { font-size: 0.72rem; font-weight: 700; color: #0e7490; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+  .p-program-card-name { font-size: 0.72rem; font-weight: 700; color: #8a6d00; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
   .p-program-card-meta { font-size: 0.62rem; color: #6b7280; display: flex; gap: 8px; }
 
   /* Nav */
-  .p-nav { flex: 1; padding: 8px; overflow-y: auto; overflow-x: hidden; position: relative; z-index: 1; }
+  .p-nav { flex: 1; padding: 10px 8px; overflow-y: auto; overflow-x: hidden; position: relative; z-index: 1; }
   .p-nav::-webkit-scrollbar { width: 3px; }
   .p-nav::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.1); border-radius: 3px; }
-  .p-nav-section { margin-bottom: 12px; }
-  .p-nav-section-title { font-size: 0.6rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; padding: 0 8px; margin-bottom: 6px; white-space: nowrap; overflow: hidden; opacity: 0; height: 0; transition: opacity 0.2s, height 0.2s; }
-  .p-sidebar.expanded .p-nav-section-title { opacity: 1; height: auto; margin-bottom: 6px; }
+  .p-nav-section { margin-bottom: 14px; }
+  .p-nav-section-title { font-size: 0.6rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; padding: 0 10px; margin-bottom: 8px; white-space: nowrap; overflow: hidden; opacity: 0; height: 0; transition: opacity 0.2s, height 0.2s; }
+  .p-sidebar.expanded .p-nav-section-title { opacity: 1; height: auto; margin-bottom: 8px; }
 
-  .p-nav-item { display: flex; align-items: center; justify-content: center; gap: 0; padding: 10px 0; border-radius: 10px; cursor: pointer; font-size: 0.82rem; font-weight: 500; color: #52525b; transition: all 0.18s; border: none; background: none; width: 100%; text-align: left; position: relative; white-space: nowrap; }
+  .p-nav-item { display: flex; align-items: center; justify-content: center; gap: 0; padding: 10px 0; margin-bottom: 2px; border-radius: 12px; cursor: pointer; font-size: 0.82rem; font-weight: 500; color: #6b7280; transition: background 0.18s, color 0.18s, transform 0.18s; border: none; background: none; width: 100%; text-align: left; position: relative; white-space: nowrap; }
   .p-sidebar.expanded .p-nav-item { justify-content: flex-start; padding: 10px 14px; gap: 12px; }
-  .p-nav-item:hover { background: #f4f5f6; color: #111827; }
-  .p-nav-item.active { background: rgba(6,182,212,0.1); color: #0e7490; font-weight: 600; }
-  .p-nav-item.active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 24px; background: #06b6d4; border-radius: 0 4px 4px 0; }
-  .p-nav-item .nav-icon { width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: filter 0.18s; color: inherit; }
-  .p-nav-item.active .nav-icon { color: #0891b2; }
+  .p-nav-item:hover { background: #f6f7f8; color: #111827; transform: translateX(1px); }
+  .p-nav-item.active { background: linear-gradient(135deg, rgba(255,217,2,0.22), rgba(255,217,2,0.1)); color: #1a1a1a; font-weight: 700; box-shadow: inset 0 0 0 1px rgba(255,217,2,0.4); }
+  .p-nav-item.active::before { content: ''; position: absolute; left: -8px; top: 50%; transform: translateY(-50%); width: 4px; height: 18px; background: #FFD902; border-radius: 4px; box-shadow: 0 0 8px rgba(255,217,2,0.6); }
+  .p-sidebar.expanded .p-nav-item.active::before { left: 0; }
+  .p-nav-item .nav-icon { width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: transform 0.18s; color: inherit; }
+  .p-nav-item:hover .nav-icon { transform: scale(1.08); }
+  .p-nav-item.active .nav-icon { color: #8a6d00; }
   .p-nav-item .nav-icon svg { width: 20px; height: 20px; stroke: currentColor; }
   .p-nav-label { display: none; }
   .p-sidebar.expanded .p-nav-label { display: inline; }
   .p-nav-count { display: none; }
   .p-sidebar.expanded .p-nav-count { display: inline-block; margin-left: auto; font-size: 0.65rem; font-weight: 700; background: rgba(15,23,42,0.06); color: #6b7280; padding: 2px 8px; border-radius: 10px; }
-  .p-nav-item.active .p-nav-count { background: rgba(6,182,212,0.15); color: #0e7490; }
+  .p-nav-item.active .p-nav-count { background: rgba(255,217,2,0.3); color: #8a6d00; }
 
   /* Tooltip on collapsed */
-  .p-nav-item .nav-tooltip { position: absolute; left: 68px; top: 50%; transform: translateY(-50%); background: #111827; color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 100; }
-  .p-nav-item .nav-tooltip::before { content: ''; position: absolute; left: -4px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 8px; height: 8px; background: #111827; }
-  .p-sidebar:not(.expanded) .p-nav-item:hover .nav-tooltip { opacity: 1; }
+  .p-nav-item .nav-tooltip { position: absolute; left: 68px; top: 50%; transform: translateY(-50%) translateX(-4px); background: #1c1c1c; color: #fff; padding: 7px 13px; border-radius: 9px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.18s, transform 0.18s; box-shadow: 0 8px 20px rgba(0,0,0,0.25); z-index: 100; border-left: 2px solid #FFD902; }
+  .p-nav-item .nav-tooltip::before { content: ''; position: absolute; left: -4px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 8px; height: 8px; background: #1c1c1c; }
+  .p-sidebar:not(.expanded) .p-nav-item:hover .nav-tooltip { opacity: 1; transform: translateY(-50%) translateX(0); }
 
-  .p-sidebar-footer { padding: 12px; border-top: 1px solid #f0f1f2; position: relative; z-index: 1; }
-  .p-user-card { display: flex; align-items: center; justify-content: center; gap: 0; padding: 8px; border-radius: 10px; transition: background 0.15s; }
+  .p-sidebar-footer { padding: 12px; border-top: 1px solid #f1f2f4; position: relative; z-index: 1; }
+  .p-user-card { display: flex; align-items: center; justify-content: center; gap: 0; padding: 8px; border-radius: 12px; transition: background 0.15s; }
   .p-sidebar.expanded .p-user-card { justify-content: flex-start; gap: 10px; }
-  .p-user-card:hover { background: #f4f5f6; }
-  .p-user-avatar { width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(135deg, #0891b2, #06b6d4); display: flex; align-items: center; justify-content: center; font-size: 0.82rem; font-weight: 800; color: #fff; flex-shrink: 0; box-shadow: 0 2px 8px rgba(6,182,212,0.3); }
+  .p-user-card:hover { background: #f6f7f8; }
+  .p-user-avatar { width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(135deg, #FFD902, #FFC700); display: flex; align-items: center; justify-content: center; font-size: 0.82rem; font-weight: 800; color: #1a1a1a; flex-shrink: 0; box-shadow: 0 3px 10px rgba(255,217,2,0.4); }
   .p-user-info { display: none; }
   .p-sidebar.expanded .p-user-info { display: block; }
   .p-user-name { font-size: 0.8rem; font-weight: 600; color: #111827; white-space: nowrap; }
@@ -110,16 +113,16 @@ const styles = `
   .p-user-online { position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background: #22c55e; border: 2px solid #ffffff; }
 
   /* Support button */
-  .p-support-btn { display: flex; align-items: center; justify-content: center; gap: 0; padding: 10px 0; border-radius: 10px; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: #52525b; transition: all 0.18s; border: none; background: none; width: 100%; text-align: left; white-space: nowrap; }
+  .p-support-btn { display: flex; align-items: center; justify-content: center; gap: 0; padding: 10px 0; border-radius: 12px; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: #6b7280; transition: all 0.18s; border: none; background: none; width: 100%; text-align: left; white-space: nowrap; }
   .p-sidebar.expanded .p-support-btn { justify-content: flex-start; padding: 10px 14px; gap: 10px; }
-  .p-support-btn:hover { background: #f4f5f6; color: #111827; }
+  .p-support-btn:hover { background: #f6f7f8; color: #111827; }
   .p-support-btn .nav-icon { width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: inherit; }
   .p-support-btn .nav-icon svg { width: 20px; height: 20px; stroke: currentColor; }
   .p-support-label { display: none; }
   .p-sidebar.expanded .p-support-label { display: inline; }
 
   /* Logout button */
-  .p-logout-btn { display: flex; align-items: center; justify-content: center; gap: 0; padding: 8px 0; border-radius: 8px; cursor: pointer; font-size: 0.75rem; font-weight: 500; color: #9ca3af; transition: all 0.18s; border: none; background: none; width: 100%; white-space: nowrap; margin-top: 6px; }
+  .p-logout-btn { display: flex; align-items: center; justify-content: center; gap: 0; padding: 8px 0; border-radius: 10px; cursor: pointer; font-size: 0.75rem; font-weight: 500; color: #9ca3af; transition: all 0.18s; border: none; background: none; width: 100%; white-space: nowrap; margin-top: 6px; }
   .p-sidebar.expanded .p-logout-btn { justify-content: flex-start; padding: 8px 14px; gap: 10px; }
   .p-logout-btn:hover { background: rgba(239,68,68,0.08); color: #dc2626; }
   .p-logout-label { display: none; }
@@ -338,51 +341,94 @@ const styles = `
   .prof-grid { display: grid; grid-template-columns: 280px 1fr; gap: 24px; align-items: start; }
   @media (max-width: 900px) { .prof-grid { grid-template-columns: 1fr; } }
 
-  .prof-avatar-card { background: #fff; border-radius: 16px; border: 1px solid #f0f0f0; padding: 28px; display: flex; flex-direction: column; align-items: center; text-align: center; }
-  .prof-avatar { width: 120px; height: 120px; border-radius: 999px; overflow: hidden; background: linear-gradient(135deg, #FFD902, #FFC700); display: flex; align-items: center; justify-content: center; font-size: 2.4rem; font-weight: 800; color: #1a1a1a; position: relative; margin-bottom: 16px; }
+  .prof-avatar-card { background: #fff; border-radius: 20px; border: 1px solid #f0f0f0; padding: 28px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 1px 2px rgba(15,23,42,0.03), 0 16px 40px -16px rgba(15,23,42,0.08); }
+  .prof-avatar { width: 120px; height: 120px; border-radius: 999px; overflow: hidden; background: linear-gradient(135deg, #FFD902, #FFC700); display: flex; align-items: center; justify-content: center; font-size: 2.4rem; font-weight: 800; color: #1a1a1a; position: relative; margin-bottom: 16px; box-shadow: 0 6px 20px -4px rgba(255,217,2,0.5); }
   .prof-avatar img { width: 100%; height: 100%; object-fit: cover; }
-  .prof-avatar-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; cursor: pointer; border-radius: 999px; }
+  .prof-avatar-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; cursor: pointer; border-radius: 999px; }
   .prof-avatar:hover .prof-avatar-overlay { opacity: 1; }
   .prof-avatar-name { font-size: 1.1rem; font-weight: 800; color: #111827; margin-bottom: 4px; }
   .prof-avatar-role { font-size: 0.78rem; color: #6b7280; margin-bottom: 12px; }
-  .prof-avatar-btn { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; font-size: 0.78rem; font-weight: 600; color: #374151; cursor: pointer; transition: all 0.15s; }
-  .prof-avatar-btn:hover { background: #f9fafb; border-color: #d1d5db; }
+  .prof-avatar-btn { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; font-size: 0.78rem; font-weight: 600; color: #374151; cursor: pointer; transition: all 0.15s; }
+  .prof-avatar-btn:hover { background: #fffbeb; border-color: #FFD902; color: #8a6d00; }
 
-  .prof-form-card { background: #fff; border-radius: 16px; border: 1px solid #f0f0f0; overflow: hidden; }
-  .prof-form-head { padding: 18px 24px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; }
+  .prof-form-card { background: #fff; border-radius: 22px; border: 1px solid #f2f2f3; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,0.03), 0 20px 48px -20px rgba(15,23,42,0.09); }
+  .prof-form-head { padding: 20px 26px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; }
   .prof-form-title { font-size: 0.92rem; font-weight: 700; color: #111827; }
-  .prof-form-body { padding: 24px; }
-  .prof-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .prof-form-body { padding: 26px; animation: profStepIn 0.32s cubic-bezier(0.16,1,0.3,1); }
+  @keyframes profStepIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .prof-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   @media (max-width: 640px) { .prof-form-grid { grid-template-columns: 1fr; } }
-  .prof-field { display: flex; flex-direction: column; gap: 5px; }
+  .prof-field { display: flex; flex-direction: column; gap: 6px; }
   .prof-field.full { grid-column: 1 / -1; }
   .prof-field label { font-size: 0.72rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
-  .prof-field input, .prof-field textarea { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 14px; font-size: 0.85rem; color: #111827; outline: none; transition: border-color 0.15s; font-family: inherit; }
-  .prof-field input:focus, .prof-field textarea:focus { border-color: #FFD902; box-shadow: 0 0 0 3px rgba(255,217,2,0.18); }
+  .prof-field input, .prof-field select, .prof-field textarea { border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 11px 14px; font-size: 0.85rem; color: #111827; outline: none; transition: border-color 0.15s, box-shadow 0.15s; font-family: inherit; }
+  .prof-field input:hover, .prof-field select:hover, .prof-field textarea:hover { border-color: #d1d5db; }
+  .prof-field input:focus, .prof-field select:focus, .prof-field textarea:focus { border-color: #FFD902; box-shadow: 0 0 0 3px rgba(255,217,2,0.18); }
   .prof-field input:disabled, .prof-field textarea:disabled { background: #f9fafb; color: #9ca3af; cursor: not-allowed; }
   .prof-field textarea { resize: vertical; min-height: 80px; }
   .prof-field .prof-hint { font-size: 0.66rem; color: #9ca3af; }
 
+  .chip-btn { transition: transform 0.15s, box-shadow 0.15s, background 0.15s, border-color 0.15s, color 0.15s; }
+  .chip-btn:hover { transform: translateY(-1.5px); box-shadow: 0 3px 10px rgba(15,23,42,0.08); }
+  .chip-btn:active { transform: translateY(0); }
+
   .prof-skills-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-  .prof-skill-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 20px; font-size: 0.72rem; font-weight: 600; color: #0369a1; }
+  .prof-skill-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; background: #fffbd6; border: 1px solid rgba(255,217,2,0.4); border-radius: 20px; font-size: 0.72rem; font-weight: 600; color: #8a6d00; }
   .prof-skill-tag button { border: none; background: none; color: #9ca3af; cursor: pointer; font-size: 0.8rem; padding: 0; line-height: 1; }
   .prof-skill-tag button:hover { color: #ef4444; }
   .prof-skill-add { display: flex; gap: 6px; }
   .prof-skill-add input { flex: 1; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px 12px; font-size: 0.78rem; outline: none; }
-  .prof-skill-add input:focus { border-color: #0891b2; }
-  .prof-skill-add button { padding: 6px 14px; border-radius: 8px; border: none; background: #0891b2; color: #fff; font-size: 0.72rem; font-weight: 700; cursor: pointer; }
+  .prof-skill-add input:focus { border-color: #FFD902; }
+  .prof-skill-add button { padding: 6px 14px; border-radius: 8px; border: none; background: #FFD902; color: #1a1a1a; font-size: 0.72rem; font-weight: 700; cursor: pointer; }
 
   .prof-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 18px 24px; border-top: 1px solid #f3f4f6; }
-  .prof-btn-save { padding: 10px 28px; border-radius: 10px; border: none; background: #0891b2; color: #fff; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: background 0.15s; }
-  .prof-btn-save:hover { background: #0e7490; }
+  .prof-btn-save { padding: 10px 28px; border-radius: 12px; border: none; background: #FFD902; color: #1a1a1a; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: background 0.15s, transform 0.15s; }
+  .prof-btn-save:hover { background: #E6C300; transform: translateY(-1px); }
   .prof-btn-save:disabled { background: #9ca3af; cursor: not-allowed; }
-  .prof-btn-cancel { padding: 10px 28px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; color: #374151; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+  .prof-btn-cancel { padding: 10px 28px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #374151; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
   .prof-btn-cancel:hover { background: #f9fafb; }
-  .prof-btn-edit { padding: 6px 16px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; font-size: 0.75rem; font-weight: 600; color: #374151; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
-  .prof-btn-edit:hover { background: #f3f4f6; }
-  .prof-msg { font-size: 0.78rem; padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; }
+  .prof-btn-edit { padding: 6px 16px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; font-size: 0.75rem; font-weight: 600; color: #374151; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s; }
+  .prof-btn-edit:hover { background: #fffbeb; border-color: #FFD902; color: #8a6d00; }
+  .prof-msg { font-size: 0.78rem; padding: 10px 16px; border-radius: 12px; margin-bottom: 16px; }
   .prof-msg-ok { background: #d1fae5; color: #065f46; }
   .prof-msg-err { background: #fef2f2; color: #991b1b; }
+
+  /* Step indicator */
+  .prof-step-track { display: flex; align-items: flex-start; gap: 0; margin-bottom: 30px; padding: 0 4px; }
+  .prof-step-item { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
+  .prof-step-item:last-child { flex: none; }
+  .prof-step-circle { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.82rem; flex-shrink: 0; transition: all 0.25s cubic-bezier(0.4,0,0.2,1); position: relative; z-index: 2; }
+  .prof-step-circle.done, .prof-step-circle.current { background: #FFD902; color: #1a1a1a; box-shadow: 0 0 0 4px rgba(255,217,2,0.18); }
+  .prof-step-circle.current { transform: scale(1.08); box-shadow: 0 0 0 5px rgba(255,217,2,0.22), 0 4px 12px rgba(255,217,2,0.35); }
+  .prof-step-circle.upcoming { background: #eef0f2; color: #9ca3af; }
+  .prof-step-label { font-size: 0.66rem; font-weight: 600; color: #9ca3af; margin-top: 8px; text-align: center; white-space: nowrap; transition: color 0.2s; }
+  .prof-step-label.active { color: #1a1a1a; }
+  .prof-step-line { position: absolute; top: 19px; left: calc(50% + 24px); right: calc(-50% + 24px); height: 3px; border-radius: 3px; background: #eef0f2; z-index: 1; overflow: hidden; }
+  .prof-step-line::after { content: ''; position: absolute; inset: 0; background: #FFD902; transform: scaleX(var(--fill, 0)); transform-origin: left; transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+
+  /* Profile wizard modal */
+  .prof-modal-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,0.58); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center; padding: 28px; z-index: 500;
+    animation: profOverlayIn 0.22s ease-out;
+  }
+  @keyframes profOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+  .prof-modal-dialog {
+    width: 100%; max-width: 780px; max-height: 92vh; overflow-y: auto; position: relative;
+    background: #fff; border-radius: 26px; padding: 30px 34px 26px; box-shadow: 0 30px 80px -20px rgba(15,23,42,0.45);
+    animation: profDialogIn 0.28s cubic-bezier(0.16,1,0.3,1);
+  }
+  @keyframes profDialogIn { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .prof-modal-dialog::-webkit-scrollbar { width: 6px; }
+  .prof-modal-dialog::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 6px; }
+  .prof-modal-dialog .prof-form-card { border: none; box-shadow: none; background: #fbfbfc; }
+  .prof-modal-close {
+    position: absolute; top: 18px; right: 18px; width: 34px; height: 34px; border-radius: 50%; border: none;
+    background: #f3f4f6; color: #6b7280; font-size: 1.2rem; line-height: 1; cursor: pointer; z-index: 10;
+    transition: all 0.15s; display: flex; align-items: center; justify-content: center;
+  }
+  .prof-modal-close:hover { background: #fef2f2; color: #dc2626; transform: rotate(90deg); }
+  @media (max-width: 640px) { .prof-modal-overlay { padding: 0; } .prof-modal-dialog { max-height: 100vh; height: 100vh; border-radius: 0; padding: 24px 18px; } }
 
   /* Loading */
   .p-loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #fafafa; }
@@ -808,12 +854,12 @@ export default function ParticipantPortalPage() {
   const totalSessions = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.sessions || 0), 0) || 0;
   const totalResources = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.resources?.length || 0), 0) || 0;
 
-  // Profile completeness gate — mentors need wizard step 4, mentees need mentee wizard step 4
+  // Profile completeness gate — mentors need wizard step 6, mentees need mentee wizard step 6
   const userRole = portalUser?.role || '';
   const isMentee = userRole === 'mentee';
-  const isProfileComplete = isMentee 
-    ? (portalUser?.mentee_profile_step || 0) >= 4 
-    : (portalUser?.mentor_profile_step || 0) >= 4;
+  const isProfileComplete = isMentee
+    ? (portalUser?.mentee_profile_step || 0) >= 6
+    : (portalUser?.mentor_profile_step || 0) >= 6;
 
   // Derive detail tab from URL section
   const detailTab = (() => {
@@ -924,6 +970,15 @@ export default function ParticipantPortalPage() {
     setProgramParticipants([]);
     reloadProgramData();
   }, [selectedProgram?.id, selectedProgram?.name, reloadProgramData]);
+
+  // Lock body scroll while the profile wizard modal is open
+  useEffect(() => {
+    if (profileEditing) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [profileEditing]);
 
   // Auto-refresh on window focus / tab visibility (silent)
   useEffect(() => {
@@ -2451,9 +2506,9 @@ export default function ParticipantPortalPage() {
     setProfileMsg('');
     // Start from where user left off, or step 1
     if (isMentee) {
-      setMentorStep(Math.max(1, Math.min(4, (portalUser?.mentee_profile_step || 0) + 1)));
+      setMentorStep(Math.max(1, Math.min(6, (portalUser?.mentee_profile_step || 0) + 1)));
     } else {
-      setMentorStep(Math.max(1, Math.min(4, (portalUser?.mentor_profile_step || 0) + 1)));
+      setMentorStep(Math.max(1, Math.min(6, (portalUser?.mentor_profile_step || 0) + 1)));
     }
   };
 
@@ -2489,7 +2544,7 @@ export default function ParticipantPortalPage() {
       }
       const updated = await res.json();
       setPortalUser((prev: any) => ({ ...prev, ...updated }));
-      if (stepOverride !== undefined && stepOverride >= 4) {
+      if (stepOverride !== undefined && stepOverride >= 6) {
         setProfileEditing(false);
         setMentorStep(0);
         setProfileMsg('ok:¡Perfil completado exitosamente!');
@@ -2603,9 +2658,10 @@ export default function ParticipantPortalPage() {
     setter('');
   };
 
-  const wizardStepLabels = isMentee 
-    ? ['', 'Información Básica', 'Objetivos de Desarrollo', 'Experiencia y Contexto', 'Expectativas del Proceso']
-    : ['', 'Información Básica', 'Expertise del Mentor', 'Experiencia', 'Expectativas'];
+  const TOTAL_WIZARD_STEPS = 6;
+  const wizardStepLabels = isMentee
+    ? ['', 'Sobre ti', 'Tu rol', 'Tu historia', 'Objetivos', 'Experiencia', 'Expectativas']
+    : ['', 'Sobre ti', 'Tu rol', 'Tu historia', 'Expertise del Mentor', 'Experiencia', 'Expectativas'];
 
   const MultiChip = ({ options, field, allowOther, otherValue, onOtherChange, onOtherAdd }: {
     options: string[]; field: string; allowOther?: boolean; otherValue?: string; onOtherChange?: (v: string) => void; onOtherAdd?: () => void;
@@ -2614,18 +2670,20 @@ export default function ParticipantPortalPage() {
       {options.map(opt => {
         const selected = ((profileForm as any)[field] as string[]).includes(opt);
         return (
-          <button key={opt} type="button" onClick={() => toggleArrayItem(field, opt)} style={{
+          <button key={opt} type="button" className="chip-btn" onClick={() => toggleArrayItem(field, opt)} style={{
             padding: '8px 16px', borderRadius: 20, border: selected ? '2px solid #FFD902' : '1.5px solid #d1d5db',
             background: selected ? '#FFFBD6' : '#fff', color: selected ? '#8a6d00' : '#4b5563',
-            fontSize: '0.8rem', fontWeight: selected ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s',
+            fontSize: '0.8rem', fontWeight: selected ? 600 : 400, cursor: 'pointer',
+            boxShadow: selected ? '0 2px 8px rgba(255,217,2,0.28)' : 'none',
           }}>{opt}</button>
         );
       })}
       {/* Custom items not in predefined list */}
       {((profileForm as any)[field] as string[]).filter((v: string) => !options.includes(v)).map((v: string) => (
-        <button key={v} type="button" onClick={() => toggleArrayItem(field, v)} style={{
+        <button key={v} type="button" className="chip-btn" onClick={() => toggleArrayItem(field, v)} style={{
           padding: '8px 16px', borderRadius: 20, border: '2px solid #FFD902',
           background: '#FFFBD6', color: '#8a6d00', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+          boxShadow: '0 2px 8px rgba(255,217,2,0.28)',
         }}>{v} ×</button>
       ))}
       {allowOther && (
@@ -2634,7 +2692,7 @@ export default function ParticipantPortalPage() {
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onOtherAdd?.(); } }}
             placeholder="Otra…" maxLength={60}
             style={{ padding: '8px 12px', borderRadius: 20, border: '1.5px solid #d1d5db', fontSize: '0.8rem', width: 130 }} />
-          <button type="button" onClick={onOtherAdd} style={{
+          <button type="button" className="chip-btn" onClick={onOtherAdd} style={{
             padding: '6px 12px', borderRadius: 20, border: 'none', background: '#FFD902', color: '#1a1a1a',
             fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
           }}>+</button>
@@ -2648,10 +2706,11 @@ export default function ParticipantPortalPage() {
       {options.map(opt => {
         const selected = (profileForm as any)[field] === opt;
         return (
-          <button key={opt} type="button" onClick={() => setProfileForm(f => ({ ...f, [field]: opt }))} style={{
+          <button key={opt} type="button" className="chip-btn" onClick={() => setProfileForm(f => ({ ...f, [field]: opt }))} style={{
             padding: '8px 16px', borderRadius: 20, border: selected ? '2px solid #FFD902' : '1.5px solid #d1d5db',
             background: selected ? '#FFFBD6' : '#fff', color: selected ? '#8a6d00' : '#4b5563',
-            fontSize: '0.8rem', fontWeight: selected ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s',
+            fontSize: '0.8rem', fontWeight: selected ? 600 : 400, cursor: 'pointer',
+            boxShadow: selected ? '0 2px 8px rgba(255,217,2,0.28)' : 'none',
           }}>{opt}</button>
         );
       })}
@@ -2659,186 +2718,212 @@ export default function ParticipantPortalPage() {
   );
 
   const renderProfile = () => {
-    // If editing (wizard mode), show the multi-step wizard
-    if (profileEditing && mentorStep >= 1) {
+    // If editing (wizard mode), show the multi-step wizard inside a modal overlay
+    const wizardModal = profileEditing && mentorStep >= 1 && (() => {
       const personalEmailInvalid = profileForm.personal_email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileForm.personal_email.trim());
-      const step1MissingLabels: string[] = [];
-      if (mentorStep === 1) {
-        if (!profileForm.position.trim()) step1MissingLabels.push(isMentee ? 'Cargo actual o etapa profesional' : 'Cargo actual');
-        if (!profileForm.department.trim()) step1MissingLabels.push(isMentee ? 'Empresa / institución' : 'Empresa / Área');
-        if (!profileForm.residence_city.trim()) step1MissingLabels.push('Ciudad de residencia');
-        if (!isMentee && !profileForm.work_location.trim()) step1MissingLabels.push('Localidad laboral');
-        if (isMentee && !profileForm.area_or_function.trim()) step1MissingLabels.push('Área o función');
-        if (isMentee && !profileForm.career.trim()) step1MissingLabels.push('Carrera');
-        if (!profileForm.presentation.trim()) step1MissingLabels.push('Breve presentación');
-        if (personalEmailInvalid) step1MissingLabels.push('Mail personal (formato inválido)');
+      const stepMissingLabels: string[] = [];
+      if (mentorStep === 1 && personalEmailInvalid) stepMissingLabels.push('Mail personal (formato inválido)');
+      if (mentorStep === 2) {
+        if (!profileForm.position.trim()) stepMissingLabels.push(isMentee ? 'Cargo actual o etapa profesional' : 'Cargo actual');
+        if (!profileForm.department.trim()) stepMissingLabels.push(isMentee ? 'Empresa / institución' : 'Empresa / Área');
+        if (!profileForm.residence_city.trim()) stepMissingLabels.push('Ciudad de residencia');
+        if (!isMentee && !profileForm.work_location.trim()) stepMissingLabels.push('Localidad laboral');
+        if (isMentee && !profileForm.area_or_function.trim()) stepMissingLabels.push('Área o función');
+        if (isMentee && !profileForm.career.trim()) stepMissingLabels.push('Carrera');
       }
+      if (mentorStep === 3 && !profileForm.presentation.trim()) stepMissingLabels.push('Breve presentación');
+
       return (
-        <>
-          <div className="dash-header">
-            <h1 className="dash-title">Completa tu Perfil {isMentee ? 'de Mentee' : 'de Mentor'}</h1>
-            <p className="dash-subtitle">Paso {mentorStep} de 4 — {wizardStepLabels[mentorStep]}</p>
-          </div>
-
-          {profileMsg && (
-            <div className={`prof-msg ${profileMsg.startsWith('ok:') ? 'prof-msg-ok' : 'prof-msg-err'}`}>
-              {profileMsg.replace(/^(ok:|err:)/, '')}
+        <div className="prof-modal-overlay" onClick={cancelEditProfile}>
+          <div className="prof-modal-dialog" onClick={e => e.stopPropagation()}>
+            <button className="prof-modal-close" onClick={cancelEditProfile} aria-label="Cerrar">×</button>
+            <div className="dash-header" style={{ marginBottom: 18 }}>
+              <h1 className="dash-title">Completa tu Perfil {isMentee ? 'de Mentee' : 'de Mentor'}</h1>
+              <p className="dash-subtitle">Paso {mentorStep} de {TOTAL_WIZARD_STEPS} — {wizardStepLabels[mentorStep]}</p>
             </div>
-          )}
 
-          {/* Step indicator */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 28, padding: '0 4px' }}>
-            {[1, 2, 3, 4].map(s => (
-              <div key={s} style={{ display: 'flex', alignItems: 'center', flex: s < 4 ? 1 : 'none' }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, fontSize: '0.8rem', flexShrink: 0, transition: 'all 0.2s',
-                  background: s < mentorStep ? '#FFD902' : s === mentorStep ? '#FFD902' : '#e5e7eb',
-                  color: s <= mentorStep ? '#1a1a1a' : '#9ca3af',
-                }}>
-                  {s < mentorStep ? '✓' : s}
-                </div>
-                {s < 4 && (
-                  <div style={{ flex: 1, height: 3, background: s < mentorStep ? '#FFD902' : '#e5e7eb', transition: 'background 0.2s' }} />
-                )}
+            {profileMsg && (
+              <div className={`prof-msg ${profileMsg.startsWith('ok:') ? 'prof-msg-ok' : 'prof-msg-err'}`}>
+                {profileMsg.replace(/^(ok:|err:)/, '')}
               </div>
-            ))}
-          </div>
+            )}
 
-          <div className="prof-form-card" style={{ maxWidth: mentorStep === 1 ? '100%' : 720 }}>
-            <div className="prof-form-body" style={{ padding: '28px 24px' }}>
-
-              {/* ════ STEP 1: Información Básica ════ */}
-              {mentorStep === 1 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  {/* Avatar upload */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 4 }}>
-                    <div className="prof-avatar" style={{ width: 80, height: 80, fontSize: '1.4rem' }}>
-                      {portalUser?.avatar_url ? <img src={portalUser.avatar_url} alt="Avatar" /> : initials}
-                      <label className="prof-avatar-overlay" htmlFor="avatar-upload" style={{ borderRadius: '50%' }}>
-                        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
-                      </label>
-                      <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#111827' }}>Foto de perfil</div>
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Sube una foto profesional (máx. 2 MB)</div>
-                      {avatarUploading && <div style={{ fontSize: '0.72rem', color: '#8a6d00', marginTop: 4 }}>Subiendo...</div>}
-                    </div>
+            {/* Step indicator */}
+            <div className="prof-step-track">
+              {Array.from({ length: TOTAL_WIZARD_STEPS }, (_, i) => i + 1).map(s => (
+                <div key={s} className="prof-step-item">
+                  {s < TOTAL_WIZARD_STEPS && <div className="prof-step-line" style={{ '--fill': s < mentorStep ? 1 : 0 } as React.CSSProperties} />}
+                  <div className={`prof-step-circle ${s < mentorStep ? 'done' : s === mentorStep ? 'current' : 'upcoming'}`}>
+                    {s < mentorStep ? '✓' : s}
                   </div>
+                  <div className={`prof-step-label ${s <= mentorStep ? 'active' : ''}`}>{wizardStepLabels[s]}</div>
+                </div>
+              ))}
+            </div>
 
-                  <div className="prof-form-grid">
-                    <div className="prof-field">
-                      <label>Nombre y apellido *</label>
-                      <input
-                        value={profileForm.full_name}
-                        readOnly
-                        title="Este dato fue recogido al momento de la invitación. Si necesitas modificarlo, contacta a tu coordinador."
-                        style={{ background: '#f3f4f6', color: '#374151', cursor: 'not-allowed' }}
-                      />
-                      <span className="prof-hint" style={{ color: '#6b7280' }}>Recogido al invitarte. Pídele a tu coordinador modificarlo si es necesario.</span>
+            <div className="prof-form-card">
+              <div className="prof-form-body" key={mentorStep}>
+
+                {/* ════ STEP 1: Sobre ti ════ */}
+                {mentorStep === 1 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>Empecemos por lo básico — esto nos ayuda a identificarte en la plataforma.</div>
+                    {/* Avatar upload */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 4 }}>
+                      <div className="prof-avatar" style={{ width: 84, height: 84, fontSize: '1.4rem' }}>
+                        {portalUser?.avatar_url ? <img src={portalUser.avatar_url} alt="Avatar" /> : initials}
+                        <label className="prof-avatar-overlay" htmlFor="avatar-upload" style={{ borderRadius: '50%' }}>
+                          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
+                        </label>
+                        <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#111827' }}>Foto de perfil</div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Sube una foto profesional (máx. 2 MB)</div>
+                        {avatarUploading && <div style={{ fontSize: '0.72rem', color: '#8a6d00', marginTop: 4 }}>Subiendo...</div>}
+                      </div>
                     </div>
-                    <div className="prof-field">
-                      <label>Email de acceso</label>
-                      <input
-                        type="email"
-                        value={portalUser?.email || ''}
-                        readOnly
-                        title="Este es el email con el que accedes al portal."
-                        style={{ background: '#f3f4f6', color: '#374151', cursor: 'not-allowed' }}
-                      />
-                      <span className="prof-hint" style={{ color: '#6b7280' }}>Este es tu email de acceso a la plataforma. No se puede modificar.</span>
+
+                    <div className="prof-form-grid">
+                      <div className="prof-field">
+                        <label>Nombre y apellido *</label>
+                        <input
+                          value={profileForm.full_name}
+                          readOnly
+                          title="Este dato fue recogido al momento de la invitación. Si necesitas modificarlo, contacta a tu coordinador."
+                          style={{ background: '#f3f4f6', color: '#374151', cursor: 'not-allowed' }}
+                        />
+                        <span className="prof-hint" style={{ color: '#6b7280' }}>Recogido al invitarte. Pídele a tu coordinador modificarlo si es necesario.</span>
+                      </div>
+                      <div className="prof-field">
+                        <label>Email de acceso</label>
+                        <input
+                          type="email"
+                          value={portalUser?.email || ''}
+                          readOnly
+                          title="Este es el email con el que accedes al portal."
+                          style={{ background: '#f3f4f6', color: '#374151', cursor: 'not-allowed' }}
+                        />
+                        <span className="prof-hint" style={{ color: '#6b7280' }}>Este es tu email de acceso a la plataforma. No se puede modificar.</span>
+                      </div>
+                      {!isMentee && (
+                        <>
+                          <div className="prof-field">
+                            <label>Género</label>
+                            <select value={profileForm.gender} onChange={e => setProfileForm(f => ({ ...f, gender: e.target.value }))}>
+                              <option value="">Seleccionar...</option>
+                              <option value="masculino">Masculino</option>
+                              <option value="femenino">Femenino</option>
+                              <option value="no_binario">No binario</option>
+                              <option value="prefiero_no_decir">Prefiero no decir</option>
+                            </select>
+                          </div>
+                          <div className="prof-field">
+                            <label>Mail personal</label>
+                            <input type="email" value={profileForm.personal_email} onChange={e => setProfileForm(f => ({ ...f, personal_email: e.target.value }))} placeholder="tu@correo-personal.com"
+                              style={personalEmailInvalid ? { borderColor: '#dc2626' } : undefined} />
+                            {personalEmailInvalid && <span className="prof-hint" style={{ color: '#dc2626' }}>Ese email no parece válido.</span>}
+                          </div>
+                        </>
+                      )}
                     </div>
-
-                    {!isMentee && (
-                      <>
-                        <div className="prof-field">
-                          <label>Género</label>
-                          <select value={profileForm.gender} onChange={e => setProfileForm(f => ({ ...f, gender: e.target.value }))}
-                            style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: '0.85rem', background: '#fff' }}>
-                            <option value="">Seleccionar...</option>
-                            <option value="masculino">Masculino</option>
-                            <option value="femenino">Femenino</option>
-                            <option value="no_binario">No binario</option>
-                            <option value="prefiero_no_decir">Prefiero no decir</option>
-                          </select>
-                        </div>
-                        <div className="prof-field">
-                          <label>Mail personal</label>
-                          <input type="email" value={profileForm.personal_email} onChange={e => setProfileForm(f => ({ ...f, personal_email: e.target.value }))} placeholder="tu@correo-personal.com"
-                            style={personalEmailInvalid ? { borderColor: '#dc2626' } : undefined} />
-                          {personalEmailInvalid && <span className="prof-hint" style={{ color: '#dc2626' }}>Ese email no parece válido.</span>}
-                        </div>
-                        <div className="prof-field">
-                          <label>Cargo actual *</label>
-                          <input value={profileForm.position} onChange={e => setProfileForm(f => ({ ...f, position: e.target.value }))} placeholder="Ej: Gerente de Innovación" />
-                        </div>
-                        <div className="prof-field">
-                          <label>Empresa / Área *</label>
-                          <input value={profileForm.department} onChange={e => setProfileForm(f => ({ ...f, department: e.target.value }))} placeholder="Ej: Acme Corp / Tecnología" />
-                        </div>
-                        <div className="prof-field">
-                          <label>Ciudad de residencia *</label>
-                          <input value={profileForm.residence_city} onChange={e => setProfileForm(f => ({ ...f, residence_city: e.target.value }))} placeholder="Ej: Santiago, Chile" />
-                        </div>
-                        <div className="prof-field">
-                          <label>Localidad laboral *</label>
-                          <input value={profileForm.work_location} onChange={e => setProfileForm(f => ({ ...f, work_location: e.target.value }))} placeholder="Ej: Santiago, Chile" />
-                        </div>
-                        <div className="prof-field">
-                          <label>Perfil LinkedIn</label>
-                          <input type="url" value={profileForm.linkedin_url} onChange={e => setProfileForm(f => ({ ...f, linkedin_url: e.target.value }))} placeholder="https://www.linkedin.com/in/tu-perfil" />
-                        </div>
-                      </>
+                    {stepMissingLabels.length > 0 && (
+                      <div style={{ fontSize: '0.75rem', color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px' }}>
+                        Falta completar: {stepMissingLabels.join(', ')}
+                      </div>
                     )}
+                  </div>
+                )}
 
-                    {isMentee && (
-                      <>
-                        <div className="prof-field">
-                          <label>Cargo actual o etapa profesional *</label>
-                          <input value={profileForm.position} onChange={e => setProfileForm(f => ({ ...f, position: e.target.value }))} placeholder="Ej: Estudiante de Ingeniería, 5to año" />
-                        </div>
-                        <div className="prof-field">
-                          <label>Empresa / institución *</label>
-                          <input value={profileForm.department} onChange={e => setProfileForm(f => ({ ...f, department: e.target.value }))} placeholder="Ej: Universidad de Chile" />
-                        </div>
-                        <div className="prof-field">
-                          <label>Área o función *</label>
-                          <input value={profileForm.area_or_function} onChange={e => setProfileForm(f => ({ ...f, area_or_function: e.target.value }))} placeholder="Ej: Ingeniería / Marketing" />
-                        </div>
-                        <div className="prof-field">
-                          <label>Carrera *</label>
-                          <input value={profileForm.career} onChange={e => setProfileForm(f => ({ ...f, career: e.target.value }))} placeholder="Ej: Ingeniería Civil Industrial" />
-                        </div>
-                        <div className="prof-field">
-                          <label>Ciudad de residencia *</label>
-                          <input value={profileForm.residence_city} onChange={e => setProfileForm(f => ({ ...f, residence_city: e.target.value }))} placeholder="Ej: Santiago, Chile" />
-                        </div>
-                        <div className="prof-field">
-                          <label>Perfil LinkedIn</label>
-                          <input type="url" value={profileForm.linkedin_url} onChange={e => setProfileForm(f => ({ ...f, linkedin_url: e.target.value }))} placeholder="https://www.linkedin.com/in/tu-perfil" />
-                        </div>
-                      </>
+                {/* ════ STEP 2: Tu rol profesional ════ */}
+                {mentorStep === 2 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>Esto es clave para encontrarte el match ideal — sé lo más específico posible.</div>
+                    <div className="prof-form-grid">
+                      {!isMentee && (
+                        <>
+                          <div className="prof-field">
+                            <label>Cargo actual *</label>
+                            <input value={profileForm.position} onChange={e => setProfileForm(f => ({ ...f, position: e.target.value }))} placeholder="Ej: Gerente de Innovación" />
+                          </div>
+                          <div className="prof-field">
+                            <label>Empresa / Área *</label>
+                            <input value={profileForm.department} onChange={e => setProfileForm(f => ({ ...f, department: e.target.value }))} placeholder="Ej: Acme Corp / Tecnología" />
+                          </div>
+                          <div className="prof-field">
+                            <label>Ciudad de residencia *</label>
+                            <input value={profileForm.residence_city} onChange={e => setProfileForm(f => ({ ...f, residence_city: e.target.value }))} placeholder="Ej: Santiago, Chile" />
+                          </div>
+                          <div className="prof-field">
+                            <label>Localidad laboral *</label>
+                            <input value={profileForm.work_location} onChange={e => setProfileForm(f => ({ ...f, work_location: e.target.value }))} placeholder="Ej: Santiago, Chile" />
+                          </div>
+                          <div className="prof-field">
+                            <label>Perfil LinkedIn</label>
+                            <input type="url" value={profileForm.linkedin_url} onChange={e => setProfileForm(f => ({ ...f, linkedin_url: e.target.value }))} placeholder="https://www.linkedin.com/in/tu-perfil" />
+                          </div>
+                        </>
+                      )}
+                      {isMentee && (
+                        <>
+                          <div className="prof-field">
+                            <label>Cargo actual o etapa profesional *</label>
+                            <input value={profileForm.position} onChange={e => setProfileForm(f => ({ ...f, position: e.target.value }))} placeholder="Ej: Estudiante de Ingeniería, 5to año" />
+                          </div>
+                          <div className="prof-field">
+                            <label>Empresa / institución *</label>
+                            <input value={profileForm.department} onChange={e => setProfileForm(f => ({ ...f, department: e.target.value }))} placeholder="Ej: Universidad de Chile" />
+                          </div>
+                          <div className="prof-field">
+                            <label>Área o función *</label>
+                            <input value={profileForm.area_or_function} onChange={e => setProfileForm(f => ({ ...f, area_or_function: e.target.value }))} placeholder="Ej: Ingeniería / Marketing" />
+                          </div>
+                          <div className="prof-field">
+                            <label>Carrera *</label>
+                            <input value={profileForm.career} onChange={e => setProfileForm(f => ({ ...f, career: e.target.value }))} placeholder="Ej: Ingeniería Civil Industrial" />
+                          </div>
+                          <div className="prof-field">
+                            <label>Ciudad de residencia *</label>
+                            <input value={profileForm.residence_city} onChange={e => setProfileForm(f => ({ ...f, residence_city: e.target.value }))} placeholder="Ej: Santiago, Chile" />
+                          </div>
+                          <div className="prof-field">
+                            <label>Perfil LinkedIn</label>
+                            <input type="url" value={profileForm.linkedin_url} onChange={e => setProfileForm(f => ({ ...f, linkedin_url: e.target.value }))} placeholder="https://www.linkedin.com/in/tu-perfil" />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    {stepMissingLabels.length > 0 && (
+                      <div style={{ fontSize: '0.75rem', color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px' }}>
+                        Falta completar: {stepMissingLabels.join(', ')}
+                      </div>
                     )}
+                  </div>
+                )}
 
+                {/* ════ STEP 3: Tu historia ════ */}
+                {mentorStep === 3 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#111827', marginBottom: 4 }}>Cuéntanos tu historia en pocas líneas</div>
+                      <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>Esto es lo primero que verá la otra persona de tu match — hazlo genuino.</div>
+                    </div>
                     <div className="prof-field full">
-                      <label>Breve presentación *</label>
                       <textarea value={profileForm.presentation} onChange={e => setProfileForm(f => ({ ...f, presentation: e.target.value }))}
                         placeholder={isMentee ? "Cuéntanos en 3 a 5 líneas quién eres, en qué momento profesional estás y qué te gustaría trabajar en este proceso." : "Cuéntanos en 3 a 5 líneas quién eres, qué haces y qué tipo de acompañamiento te gustaría brindar."}
-                        maxLength={500} rows={4} />
+                        maxLength={500} rows={7} style={{ fontSize: '0.92rem' }} />
                       <span className="prof-hint">{profileForm.presentation.length}/500 caracteres</span>
                     </div>
+                    {stepMissingLabels.length > 0 && (
+                      <div style={{ fontSize: '0.75rem', color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px' }}>
+                        Falta completar: {stepMissingLabels.join(', ')}
+                      </div>
+                    )}
                   </div>
-                  {step1MissingLabels.length > 0 && (
-                    <div style={{ fontSize: '0.75rem', color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px' }}>
-                      Falta completar: {step1MissingLabels.join(', ')}
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
 
-              {/* ════ STEP 2: Role-specific ════ */}
-              {mentorStep === 2 && !isMentee && (
+                {/* ════ STEP 4: Role-specific ════ */}
+                {mentorStep === 4 && !isMentee && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿En qué temas puedes aportar mayor valor como mentor/a?</div>
@@ -2857,7 +2942,7 @@ export default function ParticipantPortalPage() {
                   </div>
                 </div>
               )}
-              {mentorStep === 2 && isMentee && (
+              {mentorStep === 4 && isMentee && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Qué te gustaría lograr con este proceso de mentoría?</div>
@@ -2872,8 +2957,8 @@ export default function ParticipantPortalPage() {
                 </div>
               )}
 
-              {/* ════ STEP 3: Role-specific ════ */}
-              {mentorStep === 3 && !isMentee && (
+              {/* ════ STEP 5: Role-specific ════ */}
+              {mentorStep === 5 && !isMentee && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Cuál es tu nivel de experiencia profesional?</div>
@@ -2892,7 +2977,7 @@ export default function ParticipantPortalPage() {
                   </div>
                 </div>
               )}
-              {mentorStep === 3 && isMentee && (
+              {mentorStep === 5 && isMentee && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Cuál es tu nivel de experiencia profesional?</div>
@@ -2912,8 +2997,8 @@ export default function ParticipantPortalPage() {
                 </div>
               )}
 
-              {/* ════ STEP 4: Role-specific ════ */}
-              {mentorStep === 4 && !isMentee && (
+              {/* ════ STEP 6: Role-specific ════ */}
+              {mentorStep === 6 && !isMentee && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Qué esperas que logre una persona al finalizar un proceso de mentoría contigo?</div>
@@ -2927,7 +3012,7 @@ export default function ParticipantPortalPage() {
                   </div>
                 </div>
               )}
-              {mentorStep === 4 && isMentee && (
+              {mentorStep === 6 && isMentee && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827', marginBottom: 4 }}>¿Qué esperas de tu mentor/a en este proceso?</div>
@@ -2949,53 +3034,55 @@ export default function ParticipantPortalPage() {
             </div>
 
             {/* Wizard navigation buttons */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderTop: '1px solid #f3f4f6' }}>
-              <button onClick={() => { if (mentorStep > 1) setMentorStep(s => s - 1); else cancelEditProfile(); }}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 26px', borderTop: '1px solid #f3f4f6', background: '#fbfbfc' }}>
+              <button className="chip-btn" onClick={() => { if (mentorStep > 1) setMentorStep(s => s - 1); else cancelEditProfile(); }}
                 disabled={profileSaving} style={{
-                  padding: '10px 22px', borderRadius: 10, border: '1.5px solid #d1d5db', background: '#fff',
+                  padding: '10px 22px', borderRadius: 12, border: '1.5px solid #d1d5db', background: '#fff',
                   color: '#4b5563', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer',
                 }}>
                 {mentorStep === 1 ? 'Cancelar' : '← Anterior'}
               </button>
               <div style={{ display: 'flex', gap: 10 }}>
-                {mentorStep < 4 ? (
-                  <button onClick={() => {
-                    if (mentorStep === 1 && step1MissingLabels.length > 0) { setProfileMsg('err:Completa los campos obligatorios antes de continuar.'); return; }
+                {mentorStep < TOTAL_WIZARD_STEPS ? (
+                  <button className={(stepMissingLabels.length > 0) ? '' : 'chip-btn'} onClick={() => {
+                    if (stepMissingLabels.length > 0) { setProfileMsg('err:Completa los campos obligatorios antes de continuar.'); return; }
                     saveProfile(mentorStep); setMentorStep(s => s + 1);
                   }}
-                    disabled={profileSaving || (mentorStep === 1 && step1MissingLabels.length > 0)} style={{
-                      padding: '10px 28px', borderRadius: 10, border: 'none',
-                      background: (mentorStep === 1 && step1MissingLabels.length > 0) ? '#e5e7eb' : '#FFD902',
-                      color: (mentorStep === 1 && step1MissingLabels.length > 0) ? '#9ca3af' : '#1a1a1a',
+                    disabled={profileSaving || stepMissingLabels.length > 0} style={{
+                      padding: '10px 28px', borderRadius: 12, border: 'none',
+                      background: stepMissingLabels.length > 0 ? '#e5e7eb' : '#FFD902',
+                      color: stepMissingLabels.length > 0 ? '#9ca3af' : '#1a1a1a',
                       fontWeight: 600, fontSize: '0.82rem',
-                      cursor: (mentorStep === 1 && step1MissingLabels.length > 0) ? 'not-allowed' : 'pointer', transition: 'background 0.15s',
-                    }}
-                    onMouseOver={e => { if (!(mentorStep === 1 && step1MissingLabels.length > 0)) e.currentTarget.style.background = '#E6C300'; }}
-                    onMouseOut={e => { if (!(mentorStep === 1 && step1MissingLabels.length > 0)) e.currentTarget.style.background = '#FFD902'; }}>
+                      boxShadow: stepMissingLabels.length > 0 ? 'none' : '0 4px 14px -2px rgba(255,217,2,0.45)',
+                      cursor: stepMissingLabels.length > 0 ? 'not-allowed' : 'pointer',
+                    }}>
                     {profileSaving ? 'Guardando…' : 'Siguiente →'}
                   </button>
                 ) : (
-                  <button onClick={() => saveProfile(4)}
+                  <button onClick={() => saveProfile(TOTAL_WIZARD_STEPS)}
                     disabled={profileSaving} style={{
-                      padding: '10px 28px', borderRadius: 10, border: 'none',
+                      padding: '11px 30px', borderRadius: 12, border: 'none',
                       background: 'linear-gradient(135deg, #FFD902 0%, #FFC700 100%)',
-                      color: '#1a1a1a', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'transform 0.15s',
+                      color: '#1a1a1a', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'transform 0.18s, box-shadow 0.18s',
+                      boxShadow: '0 6px 20px -4px rgba(255,217,2,0.55)',
                     }}
-                    onMouseOver={e => (e.currentTarget.style.transform = 'scale(1.03)')}
-                    onMouseOut={e => (e.currentTarget.style.transform = 'scale(1)')}>
+                    onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 10px 26px -4px rgba(255,217,2,0.6)'; }}
+                    onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0) scale(1)'; e.currentTarget.style.boxShadow = '0 6px 20px -4px rgba(255,217,2,0.55)'; }}>
                     {profileSaving ? 'Guardando…' : '✓ Finalizar y desbloquear plataforma'}
                   </button>
                 )}
               </div>
             </div>
           </div>
-        </>
+          </div>
+        </div>
       );
-    }
+    })();
 
     // Read-only profile view (after wizard is complete)
     return (
       <>
+        {wizardModal}
         <div className="dash-header">
           <h1 className="dash-title">Mi Perfil</h1>
           <p className="dash-subtitle">{roleLabel} en {companyName || 'Inspiratoria'}</p>
@@ -3015,7 +3102,7 @@ export default function ParticipantPortalPage() {
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#92400e', marginBottom: 4 }}>Completa tu perfil para desbloquear la plataforma</div>
               <div style={{ fontSize: '0.78rem', color: '#a16207', lineHeight: 1.5 }}>
-                Necesitas completar los 4 pasos del perfil para acceder a todas las funcionalidades.
+                Necesitas completar los 6 pasos del perfil para acceder a todas las funcionalidades.
               </div>
               <button onClick={startEditProfile} style={{
                 marginTop: 10, padding: '8px 20px', borderRadius: 10, border: 'none',

@@ -2881,7 +2881,7 @@ async def update_profile(payload: ProfileUpdateRequest, authorization: Optional[
         user.session_structure = [str(s).strip()[:100] for s in payload.session_structure[:10] if str(s).strip()]
         update_fields.append('session_structure')
     if payload.mentor_profile_step is not None:
-        user.mentor_profile_step = max(0, min(4, payload.mentor_profile_step))
+        user.mentor_profile_step = max(0, min(6, payload.mentor_profile_step))
         update_fields.append('mentor_profile_step')
     # Mentee profile fields
     if payload.mentee_goals is not None:
@@ -2903,7 +2903,7 @@ async def update_profile(payload: ProfileUpdateRequest, authorization: Optional[
         user.session_format_preference = [str(s).strip()[:100] for s in payload.session_format_preference[:10] if str(s).strip()]
         update_fields.append('session_format_preference')
     if payload.mentee_profile_step is not None:
-        user.mentee_profile_step = max(0, min(4, payload.mentee_profile_step))
+        user.mentee_profile_step = max(0, min(6, payload.mentee_profile_step))
         update_fields.append('mentee_profile_step')
 
     if update_fields:
