@@ -5639,6 +5639,11 @@ async def get_ecosystem_graph(portal_code: str, program_id: Optional[str] = None
                 viewer_dupla_partner_id = v.participant1.user_id
                 break
 
+        message_senders = set(
+            ProgramChatMessage.objects.filter(program=program, sender_id__in=[p.user_id for p in participants])
+            .values_list("sender_id", flat=True).distinct()
+        )
+
         nodes = []
         for p in participants:
             u = p.user
@@ -5657,6 +5662,7 @@ async def get_ecosystem_graph(portal_code: str, program_id: Optional[str] = None
                 "is_viewer": u.id == viewer.id,
                 "is_my_dupla": u.id == viewer_dupla_partner_id,
                 "extra_links": max(0, vinc_count_by_user.get(u.id, 0) - (1 if u.id == viewer.id or u.id == viewer_dupla_partner_id else 0)),
+                "has_sent_message": u.id in message_senders,
             })
 
         edges = []

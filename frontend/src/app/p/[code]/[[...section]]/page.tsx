@@ -154,6 +154,7 @@ const styles = `
   .p-main { margin-left: ${SIDEBAR_W_COLLAPSED}px; margin-top: 64px; padding: 32px 32px 64px; flex: 1; background: #fafafa; transition: all 0.28s cubic-bezier(0.4,0,0.2,1); }
   .p-sidebar.expanded ~ .p-topbar ~ .p-main,
   .p-sidebar.expanded ~ .p-main { margin-left: ${SIDEBAR_W_EXPANDED}px; }
+  .p-main-fullscreen { padding: 0; height: calc(100vh - 64px); overflow: hidden; }
 
   /* Dashboard */
   .dash-header { margin-bottom: 20px; }
@@ -663,9 +664,9 @@ const styles = `
     .cht-profile-card { width: 95vw; }
   }
 
-  /* ═══ Ecosistema (grafo de vínculos) ═══ */
-  .eco-wrap { display: flex; flex-direction: column; gap: 16px; }
-  .eco-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  /* ═══ Ecosistema (grafo de vínculos) — vista full screen ═══ */
+  .eco-wrap { display: flex; flex-direction: column; gap: 14px; height: 100%; padding: 18px 26px; box-sizing: border-box; overflow: hidden; }
+  .eco-header-row { flex-shrink: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .eco-stat-cards { display: flex; gap: 12px; flex-wrap: wrap; }
   .eco-stat-card { background: #fff; border: 1px solid #eef0f2; border-radius: 14px; padding: 12px 18px; min-width: 150px; position: relative; box-shadow: 0 1px 2px rgba(15,23,42,0.03); }
   .eco-stat-label { font-size: 0.68rem; color: #6b7280; font-weight: 600; margin-bottom: 4px; }
@@ -683,10 +684,10 @@ const styles = `
   .eco-toggle-row:hover { background: #f9fafb; }
   .eco-dropdown-sep { height: 1px; background: #f0f0f0; margin: 6px 0; }
 
-  .eco-main-grid { display: grid; grid-template-columns: 260px 1fr 300px; gap: 16px; align-items: start; }
-  @media (max-width: 1100px) { .eco-main-grid { grid-template-columns: 1fr; } }
-  .eco-left-col, .eco-right-col { display: flex; flex-direction: column; gap: 14px; }
-  .eco-graph-col { min-width: 0; }
+  .eco-main-grid { display: grid; grid-template-columns: 260px 1fr 300px; gap: 16px; align-items: stretch; flex: 1; min-height: 0; }
+  @media (max-width: 1100px) { .eco-main-grid { grid-template-columns: 1fr; overflow-y: auto; } }
+  .eco-left-col, .eco-right-col { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; min-height: 0; }
+  .eco-graph-col { min-width: 0; min-height: 0; height: 100%; }
 
   .eco-panel { background: #fff; border: 1px solid #eef0f2; border-radius: 16px; padding: 16px; box-shadow: 0 1px 2px rgba(15,23,42,0.03); }
   .eco-panel-title { font-size: 0.82rem; font-weight: 700; color: #111827; margin-bottom: 10px; }
@@ -711,7 +712,18 @@ const styles = `
   .eco-mini-bar { height: 4px; border-radius: 4px; background: #eef0f2; overflow: hidden; }
   .eco-mini-bar div { height: 100%; background: #14b8a6; border-radius: 4px; }
 
-  .eco-canvas { position: relative; overflow: hidden; border-radius: 16px; background: #fbfbfc; border: 1px solid #eef0f2; }
+  .eco-canvas {
+    position: relative; overflow: hidden; border-radius: 16px; border: 1px solid #eef0f2;
+    background-color: #fbfbfc;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cg stroke='%23dbe3ea' stroke-width='1' fill='none' opacity='0.7'%3E%3Cline x1='15' y1='25' x2='70' y2='55'/%3E%3Cline x1='70' y1='55' x2='130' y2='30'/%3E%3Cline x1='50' y1='120' x2='110' y2='150'/%3E%3Cline x1='110' y1='150' x2='170' y2='115'/%3E%3Cline x1='20' y1='160' x2='50' y2='120'/%3E%3Cline x1='130' y1='30' x2='175' y2='70'/%3E%3C/g%3E%3Cg fill='%23c9d4de'%3E%3Ccircle cx='15' cy='25' r='2.2'/%3E%3Ccircle cx='70' cy='55' r='2.2'/%3E%3Ccircle cx='130' cy='30' r='2.2'/%3E%3Ccircle cx='50' cy='120' r='2.2'/%3E%3Ccircle cx='110' cy='150' r='2.2'/%3E%3Ccircle cx='170' cy='115' r='2.2'/%3E%3Ccircle cx='20' cy='160' r='2.2'/%3E%3Ccircle cx='175' cy='70' r='2.2'/%3E%3C/g%3E%3C/svg%3E"),
+      radial-gradient(circle at 12% 18%, rgba(20,184,166,0.10), transparent 42%),
+      radial-gradient(circle at 88% 12%, rgba(59,130,246,0.09), transparent 42%),
+      radial-gradient(circle at 30% 88%, rgba(139,92,246,0.07), transparent 40%),
+      radial-gradient(circle at 92% 82%, rgba(34,197,94,0.08), transparent 42%);
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+    background-size: 200px 200px, auto, auto, auto, auto;
+  }
   .eco-zoom-controls { position: absolute; left: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px 10px; box-shadow: 0 4px 14px rgba(15,23,42,0.08); font-size: 0.75rem; color: #374151; font-weight: 600; }
   .eco-zoom-controls button { border: none; background: #f3f4f6; width: 22px; height: 22px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; color: #374151; display: flex; align-items: center; justify-content: center; }
   .eco-zoom-controls button:hover { background: #e5e7eb; }
@@ -740,7 +752,7 @@ const styles = `
   .eco-insight-row { font-size: 0.76rem; color: #374151; padding: 8px 0; border-bottom: 1px solid #f6f7f8; line-height: 1.4; }
   .eco-insight-row:last-child { border-bottom: none; }
 
-  .eco-bottom-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; background: #fff; border: 1px solid #eef0f2; border-radius: 16px; padding: 18px 20px; }
+  .eco-bottom-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; background: #fff; border: 1px solid #eef0f2; border-radius: 16px; padding: 18px 20px; flex-shrink: 0; max-height: 34%; overflow-y: auto; }
   @media (max-width: 900px) { .eco-bottom-bar { grid-template-columns: 1fr; } }
   .eco-bottom-numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .eco-bottom-numbers div { display: flex; flex-direction: column; }
@@ -792,7 +804,7 @@ const InlineSpinner = ({ minH = 300 }: { minH?: number }) => (
 type EcoNodeDatum = {
   id: string; full_name: string; role: string; avatar_url: string; city: string; area: string;
   position: string; organization: string; career: string; profile_complete: boolean;
-  is_viewer: boolean; is_my_dupla: boolean; extra_links: number;
+  is_viewer: boolean; is_my_dupla: boolean; extra_links: number; has_sent_message?: boolean;
   x?: number; y?: number; vx?: number; vy?: number; fx?: number | null; fy?: number | null;
 };
 type EcoEdgeDatum = {
@@ -823,9 +835,20 @@ function EcosystemGraph({
   const simRef = useRef<Simulation<EcoNodeDatum, undefined> | null>(null);
   const nodesRef = useRef<EcoNodeDatum[]>([]);
   const [, setTick] = useState(0);
+  const [dims, setDims] = useState({ w: width, h: height });
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   const [dragId, setDragId] = useState<string | null>(null);
   const panningRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number; moved: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    const update = () => setDims({ w: el.clientWidth || width, h: el.clientHeight || height });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [width, height]);
 
   useEffect(() => {
     const w0 = containerRef.current?.clientWidth || width;
@@ -969,9 +992,9 @@ function EcosystemGraph({
   return (
     <div ref={containerRef} className="eco-canvas"
       onWheel={handleWheel} onPointerDown={handleBgPointerDown} onPointerMove={handleBgPointerMove} onPointerUp={handleBgPointerUp}
-      style={{ width: '100%', height, cursor: panningRef.current ? 'grabbing' : 'grab' }}>
+      style={{ width: '100%', height: '100%', cursor: panningRef.current ? 'grabbing' : 'grab' }}>
       <div style={{ position: 'absolute', inset: 0, transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`, transformOrigin: '0 0' }}>
-        <svg style={{ position: 'absolute', left: 0, top: 0, width, height, overflow: 'visible', pointerEvents: 'none' }}>
+        <svg style={{ position: 'absolute', left: 0, top: 0, width: dims.w, height: dims.h, overflow: 'visible', pointerEvents: 'none' }}>
           {rawEdges.map((e, i) => {
             if (viewDuplasOnly && e.type !== 'MENTORSHIP') return null;
             const s = nodesRef.current.find(n => n.id === e.source), t = nodesRef.current.find(n => n.id === e.target);
@@ -1016,17 +1039,28 @@ function EcosystemGraph({
                 opacity: dimmed ? 0.22 : 1, transition: 'opacity 0.25s', zIndex: node.is_viewer ? 6 : isSelected ? 5 : 3,
                 touchAction: 'none',
               }}>
-              <div style={{
-                width: size, height: size, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
-                border: `${node.is_viewer ? 4 : 3}px solid ${node.is_viewer ? '#14b8a6' : ringColor}`,
-                background: node.avatar_url ? '#fff' : (node.role === 'mentor' ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#3b82f6,#2563eb)'),
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: isSelected ? `0 0 0 4px ${ringColor}33, 0 6px 18px rgba(15,23,42,0.25)` : '0 2px 8px rgba(15,23,42,0.12)',
-              }}>
-                {node.avatar_url ? (
-                  <img src={node.avatar_url} alt={node.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ color: '#fff', fontWeight: 800, fontSize: size > 70 ? '1.3rem' : '1rem' }}>{ecoInitials(node.full_name)}</span>
+              <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+                <div style={{
+                  width: size, height: size, borderRadius: '50%', overflow: 'hidden',
+                  border: `${node.is_viewer ? 4 : 3}px solid ${node.is_viewer ? '#14b8a6' : ringColor}`,
+                  background: node.avatar_url ? '#fff' : (node.role === 'mentor' ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#3b82f6,#2563eb)'),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: isSelected ? `0 0 0 4px ${ringColor}33, 0 6px 18px rgba(15,23,42,0.25)` : '0 2px 8px rgba(15,23,42,0.12)',
+                }}>
+                  {node.avatar_url ? (
+                    <img src={node.avatar_url} alt={node.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ color: '#fff', fontWeight: 800, fontSize: size > 70 ? '1.3rem' : '1rem' }}>{ecoInitials(node.full_name)}</span>
+                  )}
+                </div>
+                {node.has_sent_message && !node.is_viewer && (
+                  <div title="Ha enviado mensajes" style={{
+                    position: 'absolute', top: -3, right: -3, width: 20, height: 20, borderRadius: '50%',
+                    background: '#8b5cf6', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 2px 6px rgba(139,92,246,0.5)',
+                  }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
+                  </div>
                 )}
               </div>
               <div style={{ marginTop: 6, textAlign: 'center', pointerEvents: 'none', maxWidth: 100 }}>
@@ -5126,7 +5160,7 @@ export default function ParticipantPortalPage() {
         </header>
 
         {/* MAIN */}
-        <main className="p-main" style={{ marginLeft: sidebarExpanded ? SIDEBAR_W_EXPANDED : SIDEBAR_W_COLLAPSED }}>
+        <main className={`p-main${activeNav === 'my-ecosystem' ? ' p-main-fullscreen' : ''}`} style={{ marginLeft: sidebarExpanded ? SIDEBAR_W_EXPANDED : SIDEBAR_W_COLLAPSED }}>
           {renderContent()}
         </main>
       </div>
