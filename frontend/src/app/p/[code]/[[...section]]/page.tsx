@@ -208,6 +208,8 @@ const styles = `
   /* ═══ Program Detail ═══ */
   .pd-wrapper { background: #fafafa; min-height: calc(100vh - 64px); width: 100%; }
   .pd-content { max-width: 1200px; margin: 0 auto; padding: 28px 36px 60px; }
+  .pd-wrapper-eco { height: 100%; min-height: 0; overflow: hidden; }
+  .pd-content-eco { max-width: none; margin: 0; padding: 0; height: 100%; }
   .pd-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
   .pd-stat { background: #fff; border-radius: 16px; padding: 20px; border: 1px solid #f0f0f0; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
   .pd-stat:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
@@ -673,7 +675,7 @@ const styles = `
   .eco-stat-value { font-size: 1.05rem; font-weight: 800; color: #111827; }
   .eco-stat-bar { height: 4px; border-radius: 4px; background: #eef0f2; margin-top: 8px; overflow: hidden; }
   .eco-stat-bar div { height: 100%; background: linear-gradient(90deg,#14b8a6,#22c55e); border-radius: 4px; }
-  .eco-stat-icon { position: absolute; right: 14px; top: 12px; font-size: 1.1rem; opacity: 0.7; }
+  .eco-stat-icon { position: absolute; right: 14px; top: 12px; color: #94a3b8; }
   .eco-header-actions { display: flex; gap: 10px; }
   .eco-dropdown-btn { display: flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; font-size: 0.8rem; font-weight: 600; color: #374151; cursor: pointer; }
   .eco-dropdown-btn:hover { background: #f9fafb; }
@@ -736,7 +738,7 @@ const styles = `
   .eco-detail-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .eco-detail-name { font-size: 0.95rem; font-weight: 800; color: #111827; }
   .eco-detail-role { font-size: 0.72rem; font-weight: 700; }
-  .eco-detail-city { font-size: 0.7rem; color: #6b7280; margin-top: 2px; }
+  .eco-detail-city { font-size: 0.7rem; color: #6b7280; margin-top: 2px; display: inline-flex; align-items: center; gap: 4px; }
   .eco-incomplete-note { font-size: 0.76rem; color: #92400e; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
   .eco-detail-fields { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
   .eco-detail-fields div { display: flex; justify-content: space-between; font-size: 0.76rem; border-bottom: 1px solid #f6f7f8; padding-bottom: 6px; }
@@ -744,12 +746,13 @@ const styles = `
   .eco-detail-fields span:last-child { color: #111827; font-weight: 600; text-align: right; }
   .eco-detail-sessions { margin-bottom: 14px; font-size: 0.76rem; color: #374151; display: flex; flex-direction: column; gap: 6px; }
   .eco-detail-sessions span:nth-child(2) { font-weight: 700; color: #111827; }
-  .eco-btn-primary { width: 100%; padding: 11px; border-radius: 12px; border: none; background: linear-gradient(135deg,#8b5cf6,#7c3aed); color: #fff; font-weight: 700; font-size: 0.82rem; cursor: pointer; margin-bottom: 8px; transition: transform 0.15s; }
+  .eco-btn-primary { width: 100%; padding: 11px; border-radius: 12px; border: none; background: linear-gradient(135deg,#8b5cf6,#7c3aed); color: #fff; font-weight: 700; font-size: 0.82rem; cursor: pointer; margin-bottom: 8px; transition: transform 0.15s; display: flex; align-items: center; justify-content: center; gap: 7px; }
   .eco-btn-primary:hover { transform: translateY(-1px); }
   .eco-btn-secondary { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #374151; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
   .eco-btn-secondary:hover { background: #f9fafb; }
 
-  .eco-insight-row { font-size: 0.76rem; color: #374151; padding: 8px 0; border-bottom: 1px solid #f6f7f8; line-height: 1.4; }
+  .eco-insight-row { font-size: 0.76rem; color: #374151; padding: 8px 0; border-bottom: 1px solid #f6f7f8; line-height: 1.4; display: flex; align-items: flex-start; gap: 7px; }
+  .eco-insight-row svg { flex-shrink: 0; margin-top: 2px; color: #f59e0b; }
   .eco-insight-row:last-child { border-bottom: none; }
 
   .eco-bottom-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; background: #fff; border: 1px solid #eef0f2; border-radius: 16px; padding: 18px 20px; flex-shrink: 0; max-height: 34%; overflow-y: auto; }
@@ -822,6 +825,19 @@ function ecoInitials(name: string) {
   return (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
 }
 
+// Iconos SVG (mismo estilo trazo que navIcons) para el tab Ecosistema — sin emojis.
+const EcoIcons = {
+  eye: (p: { size?: number }) => <svg width={p.size || 15} height={p.size || 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+  filter: (p: { size?: number }) => <svg width={p.size || 15} height={p.size || 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M8 12h8M11 18h2" /></svg>,
+  trophy: (p: { size?: number }) => <svg width={p.size || 18} height={p.size || 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5" /><path d="M8.21 13.89L7 21l5-3 5 3-1.21-7.11" /></svg>,
+  users: (p: { size?: number }) => <svg width={p.size || 18} height={p.size || 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+  bulb: (p: { size?: number }) => <svg width={p.size || 15} height={p.size || 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M15.09 14c.3-.5.5-1.1.7-1.6.5-1.3 1.2-2.5 1.2-4.4 0-3.3-2.7-6-6-6S5 4.7 5 8c0 1.9.7 3.1 1.2 4.4.2.5.4 1.1.7 1.6" /></svg>,
+  pin: (p: { size?: number }) => <svg width={p.size || 13} height={p.size || 13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1118 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+  message: (p: { size?: number }) => <svg width={p.size || 14} height={p.size || 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>,
+  expand: (p: { size?: number }) => <svg width={p.size || 13} height={p.size || 13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" /></svg>,
+  chevronDown: (p: { size?: number }) => <svg width={p.size || 11} height={p.size || 11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>,
+};
+
 function EcosystemGraph({
   nodes: rawNodes, edges: rawEdges, width = 900, height = 620, selectedId, onSelect,
   viewDuplasOnly, roleFilter, viewerCity, cityOnly, interactedOnly, viewerId,
@@ -867,7 +883,7 @@ function EcosystemGraph({
         .distance((l: any) => l.type === 'MENTORSHIP' ? 95 : Math.max(110, 260 - (l.strength || 30) * 1.4))
         .strength((l: any) => l.type === 'MENTORSHIP' ? 0.95 : 0.15))
       .force('charge', forceManyBody().strength(-230).distanceMax(420))
-      .force('collide', forceCollide().radius((d: any) => (d.is_viewer ? 44 : d.is_my_dupla ? 38 : 32)))
+      .force('collide', forceCollide().radius((d: any) => (d.is_viewer ? 50 : d.is_my_dupla ? 44 : 38)))
       .force('x', forceX(w0 / 2).strength(0.06))
       .force('y', forceY(h0 / 2).strength(0.06))
       .alpha(1).alphaDecay(0.025);
@@ -894,7 +910,7 @@ function EcosystemGraph({
       const w = containerRef.current?.clientWidth || width;
       const h = containerRef.current?.clientHeight || height;
       for (const n of simNodes) {
-        const r = n.is_viewer ? 46 : n.is_my_dupla ? 40 : 34;
+        const r = n.is_viewer ? 52 : n.is_my_dupla ? 46 : 40;
         n.x = Math.max(r, Math.min(w - r, n.x!));
         n.y = Math.max(r, Math.min(h - r, n.y!));
       }
@@ -1079,7 +1095,7 @@ function EcosystemGraph({
         <button onClick={() => zoomBy(0.85)} aria-label="Alejar">−</button>
         <span>{Math.round(transform.k * 100)}%</span>
         <button onClick={() => zoomBy(1.18)} aria-label="Acercar">+</button>
-        <button onClick={() => setTransform({ x: 0, y: 0, k: 1 })} aria-label="Restablecer zoom">⤢</button>
+        <button onClick={() => setTransform({ x: 0, y: 0, k: 1 })} aria-label="Restablecer zoom"><EcoIcons.expand /></button>
       </div>
     </div>
   );
@@ -1769,26 +1785,28 @@ export default function ParticipantPortalPage() {
       : `${roleLabel} · ${programTemplate?.duration || mp.name}`;
 
     return (
-      <div className="pd-wrapper">
+      <div className={`pd-wrapper${detailTab === 'ecosystem' ? ' pd-wrapper-eco' : ''}`}>
         {/* ── CONTENT ── */}
-        <div className="pd-content">
+        <div className={`pd-content${detailTab === 'ecosystem' ? ' pd-content-eco' : ''}`}>
 
           {/* ── Encabezado de página — mismo estilo que Inicio, sin banner de color ── */}
-          <div className="pd-page-header">
-            <div>
-              <h1 className="dash-title">{pageTitle}</h1>
-              <p className="dash-subtitle">{pageSubtitle}</p>
-            </div>
-            {detailTab === 'overview' && (
-              <div className="pd-page-pills">
-                <span className="pd-pill-lite">{LABELS.theme[mp.theme] || mp.theme}</span>
-                <span className="pd-pill-lite">{LABELS.status[mp.status] || mp.status}</span>
-                {programTemplate?.tags?.map((tag: string, i: number) => (
-                  <span key={i} className="pd-pill-lite">#{tag}</span>
-                ))}
+          {detailTab !== 'ecosystem' && (
+            <div className="pd-page-header">
+              <div>
+                <h1 className="dash-title">{pageTitle}</h1>
+                <p className="dash-subtitle">{pageSubtitle}</p>
               </div>
-            )}
-          </div>
+              {detailTab === 'overview' && (
+                <div className="pd-page-pills">
+                  <span className="pd-pill-lite">{LABELS.theme[mp.theme] || mp.theme}</span>
+                  <span className="pd-pill-lite">{LABELS.status[mp.status] || mp.status}</span>
+                  {programTemplate?.tags?.map((tag: string, i: number) => (
+                    <span key={i} className="pd-pill-lite">#{tag}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ─── TAB: OVERVIEW ─── */}
           {detailTab === 'overview' && (
@@ -2260,18 +2278,18 @@ export default function ParticipantPortalPage() {
                         <div className="eco-stat-card">
                           <div className="eco-stat-label">Duplas activas</div>
                           <div className="eco-stat-value">{stats.duplas_active || 0} / {stats.duplas_total || 0}</div>
-                          <div className="eco-stat-icon">👥</div>
+                          <div className="eco-stat-icon"><EcoIcons.users /></div>
                         </div>
                         <div className="eco-stat-card">
                           <div className="eco-stat-label">Desafíos activos</div>
                           <div className="eco-stat-value">{stats.challenges_completed || 0} / {stats.challenges_total || 0}</div>
-                          <div className="eco-stat-icon">🏆</div>
+                          <div className="eco-stat-icon"><EcoIcons.trophy /></div>
                         </div>
                       </div>
                       <div className="eco-header-actions">
                         <div style={{ position: 'relative' }}>
                           <button className="eco-dropdown-btn" onClick={() => { setEcoViewMenuOpen(v => !v); setEcoFiltersOpen(false); }}>
-                            👁 Ver duplas {ecoViewDuplasOnly && <span className="eco-dot" />} ▾
+                            <EcoIcons.eye /> Ver duplas {ecoViewDuplasOnly && <span className="eco-dot" />} <EcoIcons.chevronDown />
                           </button>
                           {ecoViewMenuOpen && (
                             <div className="eco-dropdown-panel">
@@ -2284,7 +2302,7 @@ export default function ParticipantPortalPage() {
                         </div>
                         <div style={{ position: 'relative' }}>
                           <button className="eco-dropdown-btn" onClick={() => { setEcoFiltersOpen(v => !v); setEcoViewMenuOpen(false); }}>
-                            ⚟ Filtros {activeFilterCount > 0 && <span className="eco-badge-count">{activeFilterCount}</span>} ▾
+                            <EcoIcons.filter /> Filtros {activeFilterCount > 0 && <span className="eco-badge-count">{activeFilterCount}</span>} <EcoIcons.chevronDown />
                           </button>
                           {ecoFiltersOpen && (
                             <div className="eco-dropdown-panel">
@@ -2326,7 +2344,7 @@ export default function ParticipantPortalPage() {
                           {(stats.cities || []).length === 0 && <div className="eco-empty-hint">Sin datos de ciudad aún.</div>}
                           {(stats.cities || []).map((c: any) => (
                             <div key={c.city} className="eco-city-row">
-                              <span>📍 {c.city}</span><span className="eco-city-count">{c.count}</span>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><EcoIcons.pin /> {c.city}</span><span className="eco-city-count">{c.count}</span>
                             </div>
                           ))}
                         </div>
@@ -2371,7 +2389,7 @@ export default function ParticipantPortalPage() {
                                 <div className="eco-detail-role" style={{ color: selectedNode.role === 'mentor' ? '#22c55e' : '#3b82f6' }}>
                                   {selectedNode.role === 'mentor' ? 'Mentor' : 'Mentee'}
                                 </div>
-                                {selectedNode.city && <div className="eco-detail-city">📍 {selectedNode.city}</div>}
+                                {selectedNode.city && <div className="eco-detail-city"><EcoIcons.pin /> {selectedNode.city}</div>}
                               </div>
                             </div>
                             {!selectedNode.profile_complete ? (
@@ -2393,7 +2411,7 @@ export default function ParticipantPortalPage() {
                             )}
                             {!selectedNode.is_viewer && (
                               <>
-                                <button className="eco-btn-primary" onClick={() => navigate('my-chat')}>💬 Enviar mensaje</button>
+                                <button className="eco-btn-primary" onClick={() => navigate('my-chat')}><EcoIcons.message /> Enviar mensaje</button>
                                 {selectedNode.is_my_dupla && (
                                   <button className="eco-btn-secondary" onClick={() => navigate(isMentee ? 'my-mentor' : 'my-sessions')}>Ir a mi espacio de mentoría</button>
                                 )}
@@ -2404,7 +2422,7 @@ export default function ParticipantPortalPage() {
                           <div className="eco-panel">
                             <div className="eco-panel-title">Insights</div>
                             {(stats.insights || []).map((ins: string, i: number) => (
-                              <div key={i} className="eco-insight-row">💡 {ins}</div>
+                              <div key={i} className="eco-insight-row"><EcoIcons.bulb /> {ins}</div>
                             ))}
                             <div className="eco-empty-hint" style={{ marginTop: 10 }}>Haz clic en una persona del grafo para ver su ficha.</div>
                           </div>
