@@ -1,8 +1,9 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { apiFetch } from "@/lib/api";
+import { forceSimulation, forceLink, forceManyBody, forceCollide, forceX, forceY, type Simulation } from 'd3-force';
 
 // ============================================================================
 // CONSTANTS
@@ -661,6 +662,93 @@ const styles = `
     .cht-messages { padding: 16px 14px; }
     .cht-profile-card { width: 95vw; }
   }
+
+  /* ═══ Ecosistema (grafo de vínculos) ═══ */
+  .eco-wrap { display: flex; flex-direction: column; gap: 16px; }
+  .eco-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .eco-stat-cards { display: flex; gap: 12px; flex-wrap: wrap; }
+  .eco-stat-card { background: #fff; border: 1px solid #eef0f2; border-radius: 14px; padding: 12px 18px; min-width: 150px; position: relative; box-shadow: 0 1px 2px rgba(15,23,42,0.03); }
+  .eco-stat-label { font-size: 0.68rem; color: #6b7280; font-weight: 600; margin-bottom: 4px; }
+  .eco-stat-value { font-size: 1.05rem; font-weight: 800; color: #111827; }
+  .eco-stat-bar { height: 4px; border-radius: 4px; background: #eef0f2; margin-top: 8px; overflow: hidden; }
+  .eco-stat-bar div { height: 100%; background: linear-gradient(90deg,#14b8a6,#22c55e); border-radius: 4px; }
+  .eco-stat-icon { position: absolute; right: 14px; top: 12px; font-size: 1.1rem; opacity: 0.7; }
+  .eco-header-actions { display: flex; gap: 10px; }
+  .eco-dropdown-btn { display: flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; font-size: 0.8rem; font-weight: 600; color: #374151; cursor: pointer; }
+  .eco-dropdown-btn:hover { background: #f9fafb; }
+  .eco-dot { width: 7px; height: 7px; border-radius: 50%; background: #14b8a6; display: inline-block; }
+  .eco-badge-count { background: #14b8a6; color: #fff; font-size: 0.62rem; font-weight: 700; border-radius: 10px; padding: 1px 6px; }
+  .eco-dropdown-panel { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 12px 32px -8px rgba(15,23,42,0.18); padding: 10px; z-index: 50; min-width: 220px; }
+  .eco-toggle-row { display: flex; align-items: center; gap: 8px; padding: 7px 6px; font-size: 0.8rem; color: #374151; cursor: pointer; white-space: nowrap; border-radius: 8px; }
+  .eco-toggle-row:hover { background: #f9fafb; }
+  .eco-dropdown-sep { height: 1px; background: #f0f0f0; margin: 6px 0; }
+
+  .eco-main-grid { display: grid; grid-template-columns: 260px 1fr 300px; gap: 16px; align-items: start; }
+  @media (max-width: 1100px) { .eco-main-grid { grid-template-columns: 1fr; } }
+  .eco-left-col, .eco-right-col { display: flex; flex-direction: column; gap: 14px; }
+  .eco-graph-col { min-width: 0; }
+
+  .eco-panel { background: #fff; border: 1px solid #eef0f2; border-radius: 16px; padding: 16px; box-shadow: 0 1px 2px rgba(15,23,42,0.03); }
+  .eco-panel-title { font-size: 0.82rem; font-weight: 700; color: #111827; margin-bottom: 10px; }
+  .eco-panel-sub { font-size: 0.7rem; color: #6b7280; margin-bottom: 10px; margin-top: -6px; }
+  .eco-empty-hint { font-size: 0.75rem; color: #9ca3af; }
+
+  .eco-legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; color: #4b5563; margin-bottom: 8px; }
+  .eco-legend-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .eco-legend-line { width: 22px; height: 2px; background: #cbd5e1; flex-shrink: 0; display: inline-block; }
+  .eco-legend-line-dashed { background: repeating-linear-gradient(90deg, #94a3b8 0 4px, transparent 4px 8px); }
+
+  .eco-city-row { display: flex; justify-content: space-between; font-size: 0.78rem; color: #374151; padding: 6px 0; border-bottom: 1px solid #f6f7f8; }
+  .eco-city-row:last-child { border-bottom: none; }
+  .eco-city-count { font-weight: 700; color: #111827; }
+
+  .eco-challenge-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f6f7f8; }
+  .eco-challenge-row:last-child { border-bottom: none; }
+  .eco-challenge-check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #d1d5db; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: #fff; flex-shrink: 0; margin-top: 1px; }
+  .eco-challenge-check.done { background: #14b8a6; border-color: #14b8a6; }
+  .eco-challenge-label { font-size: 0.74rem; color: #374151; margin-bottom: 4px; }
+  .eco-challenge-frac { font-size: 0.7rem; font-weight: 700; color: #6b7280; flex-shrink: 0; }
+  .eco-mini-bar { height: 4px; border-radius: 4px; background: #eef0f2; overflow: hidden; }
+  .eco-mini-bar div { height: 100%; background: #14b8a6; border-radius: 4px; }
+
+  .eco-canvas { position: relative; overflow: hidden; border-radius: 16px; background: #fbfbfc; border: 1px solid #eef0f2; }
+  .eco-zoom-controls { position: absolute; left: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px 10px; box-shadow: 0 4px 14px rgba(15,23,42,0.08); font-size: 0.75rem; color: #374151; font-weight: 600; }
+  .eco-zoom-controls button { border: none; background: #f3f4f6; width: 22px; height: 22px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; color: #374151; display: flex; align-items: center; justify-content: center; }
+  .eco-zoom-controls button:hover { background: #e5e7eb; }
+
+  .eco-detail-panel { position: relative; }
+  .eco-detail-close { position: absolute; top: 12px; right: 12px; width: 26px; height: 26px; border-radius: 50%; border: none; background: #f3f4f6; color: #6b7280; cursor: pointer; font-size: 1rem; }
+  .eco-detail-close:hover { background: #fef2f2; color: #dc2626; }
+  .eco-detail-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .eco-detail-avatar { width: 56px; height: 56px; border-radius: 50%; border: 3px solid #e5e7eb; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #f3f4f6; font-weight: 800; color: #6b7280; }
+  .eco-detail-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .eco-detail-name { font-size: 0.95rem; font-weight: 800; color: #111827; }
+  .eco-detail-role { font-size: 0.72rem; font-weight: 700; }
+  .eco-detail-city { font-size: 0.7rem; color: #6b7280; margin-top: 2px; }
+  .eco-incomplete-note { font-size: 0.76rem; color: #92400e; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .eco-detail-fields { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .eco-detail-fields div { display: flex; justify-content: space-between; font-size: 0.76rem; border-bottom: 1px solid #f6f7f8; padding-bottom: 6px; }
+  .eco-detail-fields span:first-child { color: #9ca3af; font-weight: 600; }
+  .eco-detail-fields span:last-child { color: #111827; font-weight: 600; text-align: right; }
+  .eco-detail-sessions { margin-bottom: 14px; font-size: 0.76rem; color: #374151; display: flex; flex-direction: column; gap: 6px; }
+  .eco-detail-sessions span:nth-child(2) { font-weight: 700; color: #111827; }
+  .eco-btn-primary { width: 100%; padding: 11px; border-radius: 12px; border: none; background: linear-gradient(135deg,#8b5cf6,#7c3aed); color: #fff; font-weight: 700; font-size: 0.82rem; cursor: pointer; margin-bottom: 8px; transition: transform 0.15s; }
+  .eco-btn-primary:hover { transform: translateY(-1px); }
+  .eco-btn-secondary { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #374151; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
+  .eco-btn-secondary:hover { background: #f9fafb; }
+
+  .eco-insight-row { font-size: 0.76rem; color: #374151; padding: 8px 0; border-bottom: 1px solid #f6f7f8; line-height: 1.4; }
+  .eco-insight-row:last-child { border-bottom: none; }
+
+  .eco-bottom-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; background: #fff; border: 1px solid #eef0f2; border-radius: 16px; padding: 18px 20px; }
+  @media (max-width: 900px) { .eco-bottom-bar { grid-template-columns: 1fr; } }
+  .eco-bottom-numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .eco-bottom-numbers div { display: flex; flex-direction: column; }
+  .eco-bottom-numbers strong { font-size: 1.3rem; font-weight: 800; color: #111827; }
+  .eco-bottom-numbers span { font-size: 0.66rem; color: #6b7280; margin-top: 2px; }
+  .eco-level-row { display: flex; justify-content: space-between; font-size: 0.76rem; color: #374151; margin-bottom: 3px; }
+  .eco-level-track { height: 5px; border-radius: 5px; background: #f3f4f6; overflow: hidden; margin-bottom: 8px; }
+  .eco-level-track div { height: 100%; border-radius: 5px; }
 `;
 
 // ============================================================================
@@ -693,6 +781,275 @@ const InlineSpinner = ({ minH = 300 }: { minH?: number }) => (
     <div className="p-loading-spinner" />
   </div>
 );
+
+// ============================================================================
+// ECOSYSTEM FORCE-DIRECTED GRAPH
+// Modela el ecosistema de vínculos mentor-mentee según el instructivo del
+// algoritmo: la dupla es la relación estructural (línea gruesa + sesiones
+// visibles), el resto son vínculos sociales sutiles. La afinidad (misma
+// ciudad) NO dibuja línea — solo agrupa vía una fuerza adicional.
+// ============================================================================
+type EcoNodeDatum = {
+  id: string; full_name: string; role: string; avatar_url: string; city: string; area: string;
+  position: string; organization: string; career: string; profile_complete: boolean;
+  is_viewer: boolean; is_my_dupla: boolean; extra_links: number;
+  x?: number; y?: number; vx?: number; vy?: number; fx?: number | null; fy?: number | null;
+};
+type EcoEdgeDatum = {
+  source: string; target: string; type: string; strength: number;
+  sessions_completed: number; sessions_planned: number; status: string;
+};
+
+function seededRand(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) { h = (h << 5) - h + seed.charCodeAt(i); h |= 0; }
+  return () => { h = (h * 1103515245 + 12345) & 0x7fffffff; return (h % 1000) / 1000; };
+}
+
+function ecoInitials(name: string) {
+  return (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+}
+
+function EcosystemGraph({
+  nodes: rawNodes, edges: rawEdges, width = 900, height = 620, selectedId, onSelect,
+  viewDuplasOnly, roleFilter, viewerCity, cityOnly, interactedOnly, viewerId,
+}: {
+  nodes: EcoNodeDatum[]; edges: EcoEdgeDatum[]; width?: number; height?: number;
+  selectedId: string | null; onSelect: (id: string | null) => void;
+  viewDuplasOnly: boolean; roleFilter: 'all' | 'mentor' | 'mentee'; viewerCity: string;
+  cityOnly: boolean; interactedOnly: boolean; viewerId: string;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const simRef = useRef<Simulation<EcoNodeDatum, undefined> | null>(null);
+  const nodesRef = useRef<EcoNodeDatum[]>([]);
+  const [, setTick] = useState(0);
+  const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
+  const [dragId, setDragId] = useState<string | null>(null);
+  const panningRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number; moved: boolean } | null>(null);
+
+  useEffect(() => {
+    const w0 = containerRef.current?.clientWidth || width;
+    const h0 = containerRef.current?.clientHeight || height;
+    const simNodes: EcoNodeDatum[] = rawNodes.map(n => {
+      const rand = seededRand(n.id);
+      return { ...n, x: w0 / 2 + (rand() - 0.5) * w0 * 0.6, y: h0 / 2 + (rand() - 0.5) * h0 * 0.6 };
+    });
+    const nodeById = new Map(simNodes.map(n => [n.id, n]));
+    const validEdges = rawEdges.filter(e => nodeById.has(e.source) && nodeById.has(e.target));
+    const simLinks = validEdges.map(e => ({ ...e, source: nodeById.get(e.source)!, target: nodeById.get(e.target)! }));
+    nodesRef.current = simNodes;
+
+    const sim = forceSimulation(simNodes)
+      .force('link', forceLink(simLinks as any).id((d: any) => d.id)
+        .distance((l: any) => l.type === 'MENTORSHIP' ? 95 : Math.max(110, 260 - (l.strength || 30) * 1.4))
+        .strength((l: any) => l.type === 'MENTORSHIP' ? 0.95 : 0.15))
+      .force('charge', forceManyBody().strength(-230).distanceMax(420))
+      .force('collide', forceCollide().radius((d: any) => (d.is_viewer ? 44 : d.is_my_dupla ? 38 : 32)))
+      .force('x', forceX(w0 / 2).strength(0.06))
+      .force('y', forceY(h0 / 2).strength(0.06))
+      .alpha(1).alphaDecay(0.025);
+
+    // Afinidad por ciudad: agrupa sin dibujar línea (sección 24 del instructivo)
+    sim.force('affinity', (alpha: number) => {
+      for (let i = 0; i < simNodes.length; i++) {
+        for (let j = i + 1; j < simNodes.length; j++) {
+          const a = simNodes[i], b = simNodes[j];
+          if (a.city && a.city === b.city) {
+            const dx = (b.x! - a.x!), dy = (b.y! - a.y!);
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            if (dist > 150) {
+              const f = 0.006 * alpha;
+              a.vx! += (dx / dist) * f; a.vy! += (dy / dist) * f;
+              b.vx! -= (dx / dist) * f; b.vy! -= (dy / dist) * f;
+            }
+          }
+        }
+      }
+    });
+
+    sim.on('tick', () => {
+      const w = containerRef.current?.clientWidth || width;
+      const h = containerRef.current?.clientHeight || height;
+      for (const n of simNodes) {
+        const r = n.is_viewer ? 46 : n.is_my_dupla ? 40 : 34;
+        n.x = Math.max(r, Math.min(w - r, n.x!));
+        n.y = Math.max(r, Math.min(h - r, n.y!));
+      }
+      setTick(t => t + 1);
+    });
+    simRef.current = sim;
+    return () => { sim.stop(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawNodes, rawEdges, width, height]);
+
+  const highlightIds = useMemo(() => {
+    if (!selectedId) return null;
+    const s = new Set<string>([selectedId]);
+    rawEdges.forEach(e => { if (e.source === selectedId) s.add(e.target); if (e.target === selectedId) s.add(e.source); });
+    return s;
+  }, [selectedId, rawEdges]);
+
+  const interactedSet = useMemo(() => {
+    const s = new Set<string>();
+    rawEdges.forEach(e => { if (e.source === viewerId) s.add(e.target); if (e.target === viewerId) s.add(e.source); });
+    return s;
+  }, [rawEdges, viewerId]);
+
+  const passesFilter = useCallback((n: EcoNodeDatum) => {
+    if (n.is_viewer) return true;
+    if (roleFilter !== 'all' && n.role !== roleFilter) return false;
+    if (cityOnly && n.city !== viewerCity) return false;
+    if (interactedOnly && !interactedSet.has(n.id)) return false;
+    return true;
+  }, [roleFilter, cityOnly, viewerCity, interactedOnly, interactedSet]);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const rect = containerRef.current!.getBoundingClientRect();
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    setTransform(t => {
+      const newK = Math.min(2.5, Math.max(0.4, t.k * (1 - e.deltaY * 0.001)));
+      const newX = cx - ((cx - t.x) / t.k) * newK;
+      const newY = cy - ((cy - t.y) / t.k) * newK;
+      return { x: newX, y: newY, k: newK };
+    });
+  };
+
+  const zoomBy = (factor: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const cx = rect ? rect.width / 2 : width / 2, cy = rect ? rect.height / 2 : height / 2;
+    setTransform(t => {
+      const newK = Math.min(2.5, Math.max(0.4, t.k * factor));
+      const newX = cx - ((cx - t.x) / t.k) * newK;
+      const newY = cy - ((cy - t.y) / t.k) * newK;
+      return { x: newX, y: newY, k: newK };
+    });
+  };
+
+  const handleBgPointerDown = (e: React.PointerEvent) => {
+    panningRef.current = { startX: e.clientX, startY: e.clientY, startTx: transform.x, startTy: transform.y, moved: false };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const handleBgPointerMove = (e: React.PointerEvent) => {
+    if (!panningRef.current) return;
+    const dx = e.clientX - panningRef.current.startX, dy = e.clientY - panningRef.current.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) panningRef.current.moved = true;
+    setTransform(t => ({ ...t, x: panningRef.current!.startTx + dx, y: panningRef.current!.startTy + dy }));
+  };
+  const handleBgPointerUp = () => {
+    if (panningRef.current && !panningRef.current.moved) onSelect(null);
+    panningRef.current = null;
+  };
+
+  const handleNodePointerDown = (nodeId: string) => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    const node = nodesRef.current.find(n => n.id === nodeId);
+    if (!node) return;
+    setDragId(nodeId);
+    simRef.current?.alphaTarget(0.25).restart();
+    node.fx = node.x; node.fy = node.y;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const handleNodePointerMove = (nodeId: string) => (e: React.PointerEvent) => {
+    if (dragId !== nodeId) return;
+    const rect = containerRef.current!.getBoundingClientRect();
+    const node = nodesRef.current.find(n => n.id === nodeId);
+    if (!node) return;
+    node.fx = (e.clientX - rect.left - transform.x) / transform.k;
+    node.fy = (e.clientY - rect.top - transform.y) / transform.k;
+    setTick(t => t + 1);
+  };
+  const handleNodePointerUp = (nodeId: string) => () => {
+    const node = nodesRef.current.find(n => n.id === nodeId);
+    if (node) { node.fx = null; node.fy = null; }
+    simRef.current?.alphaTarget(0);
+    setDragId(null);
+  };
+
+  return (
+    <div ref={containerRef} className="eco-canvas"
+      onWheel={handleWheel} onPointerDown={handleBgPointerDown} onPointerMove={handleBgPointerMove} onPointerUp={handleBgPointerUp}
+      style={{ width: '100%', height, cursor: panningRef.current ? 'grabbing' : 'grab' }}>
+      <div style={{ position: 'absolute', inset: 0, transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`, transformOrigin: '0 0' }}>
+        <svg style={{ position: 'absolute', left: 0, top: 0, width, height, overflow: 'visible', pointerEvents: 'none' }}>
+          {rawEdges.map((e, i) => {
+            if (viewDuplasOnly && e.type !== 'MENTORSHIP') return null;
+            const s = nodesRef.current.find(n => n.id === e.source), t = nodesRef.current.find(n => n.id === e.target);
+            if (!s || !t || s.x === undefined || t.x === undefined) return null;
+            const dimmed = highlightIds ? !(highlightIds.has(e.source) && highlightIds.has(e.target)) : false;
+            const isDupla = e.type === 'MENTORSHIP';
+            const dx = t.x! - s.x!, dy = t.y! - s.y!;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            const nx = -dy / len, ny = dx / len; // unit normal, perpendicular to the line
+            const midX = (s.x! + t.x!) / 2 + nx * 20, midY = (s.y! + t.y!) / 2 + ny * 20;
+            return (
+              <g key={i} opacity={dimmed ? 0.12 : 1}>
+                <line x1={s.x} y1={s.y} x2={t.x} y2={t.y}
+                  stroke={isDupla ? '#14b8a6' : '#cbd5e1'} strokeWidth={isDupla ? 5 : 1.5}
+                  strokeDasharray={isDupla ? undefined : '4 5'} strokeLinecap="round" />
+                {isDupla && (
+                  <>
+                    <rect x={midX - 17} y={midY - 10} width={34} height={20} rx={10} fill="#0f172a" />
+                    <text x={midX} y={midY + 4} textAnchor="middle" fontSize="10" fontWeight={700} fill="#fff">
+                      {e.sessions_completed}/{e.sessions_planned || e.sessions_completed}
+                    </text>
+                  </>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+        {nodesRef.current.map(node => {
+          const isSelected = selectedId === node.id;
+          const dimmed = (highlightIds && !highlightIds.has(node.id)) || !passesFilter(node);
+          const ringColor = node.role === 'mentor' ? '#22c55e' : '#3b82f6';
+          const size = node.is_viewer ? 84 : node.is_my_dupla ? 66 : 58;
+          return (
+            <div key={node.id}
+              onPointerDown={handleNodePointerDown(node.id)}
+              onPointerMove={handleNodePointerMove(node.id)}
+              onPointerUp={handleNodePointerUp(node.id)}
+              onClick={(e) => { e.stopPropagation(); onSelect(node.id); }}
+              style={{
+                position: 'absolute', left: node.x, top: node.y, transform: 'translate(-50%, -50%)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer',
+                opacity: dimmed ? 0.22 : 1, transition: 'opacity 0.25s', zIndex: node.is_viewer ? 6 : isSelected ? 5 : 3,
+                touchAction: 'none',
+              }}>
+              <div style={{
+                width: size, height: size, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                border: `${node.is_viewer ? 4 : 3}px solid ${node.is_viewer ? '#14b8a6' : ringColor}`,
+                background: node.avatar_url ? '#fff' : (node.role === 'mentor' ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#3b82f6,#2563eb)'),
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: isSelected ? `0 0 0 4px ${ringColor}33, 0 6px 18px rgba(15,23,42,0.25)` : '0 2px 8px rgba(15,23,42,0.12)',
+              }}>
+                {node.avatar_url ? (
+                  <img src={node.avatar_url} alt={node.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ color: '#fff', fontWeight: 800, fontSize: size > 70 ? '1.3rem' : '1rem' }}>{ecoInitials(node.full_name)}</span>
+                )}
+              </div>
+              <div style={{ marginTop: 6, textAlign: 'center', pointerEvents: 'none', maxWidth: 100 }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {node.is_viewer ? 'TÚ' : (node.full_name.split(' ')[0] || '—')}
+                </div>
+                <div style={{ fontSize: '0.62rem', fontWeight: 600, color: ringColor }}>
+                  {node.role === 'mentor' ? 'Mentor' : 'Mentee'}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="eco-zoom-controls">
+        <button onClick={() => zoomBy(0.85)} aria-label="Alejar">−</button>
+        <span>{Math.round(transform.k * 100)}%</span>
+        <button onClick={() => zoomBy(1.18)} aria-label="Acercar">+</button>
+        <button onClick={() => setTransform({ x: 0, y: 0, k: 1 })} aria-label="Restablecer zoom">⤢</button>
+      </div>
+    </div>
+  );
+}
 
 export default function ParticipantPortalPage() {
   const router = useRouter();
@@ -762,9 +1119,15 @@ export default function ParticipantPortalPage() {
   const [programParticipants, setProgramParticipants] = useState<any[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
-  const [ecosystemFilter, setEcosystemFilter] = useState<'all' | 'mentors' | 'mentees'>('all');
-  const [showEcosystemInsights, setShowEcosystemInsights] = useState(true);
-  const [selectedEcoPerson, setSelectedEcoPerson] = useState<any>(null);
+  const [ecosystemData, setEcosystemData] = useState<any>(null);
+  const [ecosystemLoading, setEcosystemLoading] = useState(false);
+  const [ecoSelectedId, setEcoSelectedId] = useState<string | null>(null);
+  const [ecoViewDuplasOnly, setEcoViewDuplasOnly] = useState(false);
+  const [ecoRoleFilter, setEcoRoleFilter] = useState<'all' | 'mentor' | 'mentee'>('all');
+  const [ecoCityOnly, setEcoCityOnly] = useState(false);
+  const [ecoInteractedOnly, setEcoInteractedOnly] = useState(false);
+  const [ecoViewMenuOpen, setEcoViewMenuOpen] = useState(false);
+  const [ecoFiltersOpen, setEcoFiltersOpen] = useState(false);
 
   // Profile editing state
   const [profileEditing, setProfileEditing] = useState(false);
@@ -1084,6 +1447,18 @@ export default function ParticipantPortalPage() {
       .catch(() => setNetworkPeople([]))
       .finally(() => setNetworkLoading(false));
   }, [activeNav, portalCode]);
+
+  // Fetch ecosystem graph (duplas + red social) when entering the ecosystem tab
+  useEffect(() => {
+    if (activeNav !== 'my-ecosystem' || !portalCode || !selectedProgram?.id) return;
+    if (ecosystemData && ecosystemData.program?.id === selectedProgram.id) return; // already loaded for this program
+    setEcosystemLoading(true);
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/ecosystem?program_id=${selectedProgram.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setEcosystemData(data))
+      .catch(() => setEcosystemData(null))
+      .finally(() => setEcosystemLoading(false));
+  }, [activeNav, portalCode, selectedProgram?.id]);
 
   // ── Chat: fetch programs list ──
   useEffect(() => {
@@ -1820,323 +2195,223 @@ export default function ParticipantPortalPage() {
           {/* ─── TAB: ECOSYSTEM ─── */}
           {detailTab === 'ecosystem' && (
             <>
-              <style>{`
-                @keyframes ecoOrbit{0%{transform:rotate(0deg) translateX(var(--eco-r)) rotate(0deg)}100%{transform:rotate(360deg) translateX(var(--eco-r)) rotate(-360deg)}}
-                @keyframes ecoPulse{0%,100%{box-shadow:0 0 20px var(--eco-glow)}50%{box-shadow:0 0 36px var(--eco-glow),0 0 60px color-mix(in srgb,var(--eco-glow) 30%,transparent)}}
-                @keyframes ecoRing{0%{transform:translate(-50%,-50%) scale(1);opacity:0.25}100%{transform:translate(-50%,-50%) scale(1.6);opacity:0}}
-              `}</style>
-              {(() => {
-                const people = programParticipants.map((pt: any, i: number) => {
-                  const roleRaw = String(pt?.role || '').toLowerCase();
-                  const role = roleRaw === 'mentor' || roleRaw === 'instructor' ? 'mentor' : 'mentee';
-                  const u = pt.user || {};
-                  const fullName = u.full_name || [u.nombre || u.first_name, u.apellidos || u.last_name].filter(Boolean).join(' ').trim() || (u.email || pt.email || `Participante ${i + 1}`).split('@')[0];
-                  const email = u.email || pt.email || 'sin-email';
-                  const position = ROLE_LABELS[pt.role] || pt.role || (role === 'mentor' ? 'Mentor' : 'Mentee');
-                  const avatarUrl = u.avatar_url || '';
-                  const headline = u.headline || '';
-                  const influence = Math.min(96, Math.max(35, 45 + (i * 7) % 48));
-                  const isMe = String(u.id) === String(portalUser?.id);
-                  return { id: String(pt.id || i + 1), name: fullName, email, role, position, influence, status: pt.status || 'active', avatarUrl, headline, isMe };
-                });
-
-                // Current user = center
-                const me = people.find((p: any) => p.isMe) || {
-                  id: 'me', name: portalUser?.full_name || displayName, email: portalUser?.email || '',
-                  role: portalUser?.role || 'mentor', position: roleLabel, influence: 95,
-                  status: 'active', avatarUrl: portalUser?.avatar_url || '', headline: portalUser?.headline || '', isMe: true,
-                };
-                const others = people.filter((p: any) => !p.isMe);
-
-                const mentors = others.filter((p: any) => p.role === 'mentor');
-                const mentees = others.filter((p: any) => p.role === 'mentee');
-                const filteredOthers = ecosystemFilter === 'all' ? others : others.filter((p: any) => p.role === (ecosystemFilter === 'mentors' ? 'mentor' : 'mentee'));
-
-                // Place surrounding nodes in a circle
-                const getNodePos = (idx: number, total: number) => {
-                  const angle = (idx / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2;
-                  const radius = 34;
-                  return { left: 50 + Math.cos(angle) * radius, top: 50 + Math.sin(angle) * radius };
-                };
-
-                const meInitials = (me.name || 'U').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+              {ecosystemLoading && !ecosystemData && <InlineSpinner minH={500} />}
+              {!ecosystemLoading && !ecosystemData && (
+                <div className="empty-state">No se pudo cargar el ecosistema de este programa.</div>
+              )}
+              {ecosystemData && (() => {
+                const nodes: EcoNodeDatum[] = ecosystemData.nodes || [];
+                const edges: EcoEdgeDatum[] = ecosystemData.edges || [];
+                const challenges = ecosystemData.challenges || [];
+                const stats = ecosystemData.stats || {};
+                const viewer = nodes.find(n => n.is_viewer);
+                const selectedNode = ecoSelectedId ? nodes.find(n => n.id === ecoSelectedId) : null;
+                const selectedEdge = selectedNode ? edges.find(e => (e.source === selectedNode.id && e.target === (viewer?.id || '')) || (e.target === selectedNode.id && e.source === (viewer?.id || ''))) : null;
+                const activeFilterCount = [ecoRoleFilter !== 'all', ecoCityOnly, ecoInteractedOnly].filter(Boolean).length;
 
                 return (
-                  <div style={{ background: 'linear-gradient(135deg,#0b1020,#121a33 48%,#1a1145)', borderRadius: 18, border: '1px solid rgba(255,255,255,0.09)', overflow: 'hidden' }}>
-                    <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                  <div className="eco-wrap">
+                    {/* Header row: title + stat cards + view/filter controls */}
+                    <div className="eco-header-row">
                       <div>
-                        <div style={{ color: '#fff', fontWeight: 800, fontSize: '1rem' }}>Mi Red de Influencia</div>
-                        <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.76rem', marginTop: 2 }}>{me.name} · {mp.name}</div>
+                        <h1 className="dash-title" style={{ marginBottom: 2 }}>Mi Ecosistema de Influencia</h1>
+                        <p className="dash-subtitle">{ecosystemData.program?.name} · {nodes.length} participantes</p>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        {([
-                          { id: 'all', label: 'Todos' },
-                          { id: 'mentors', label: 'Mentores' },
-                          { id: 'mentees', label: 'Mentees' },
-                        ] as const).map(f => (
-                          <button key={f.id} onClick={() => setEcosystemFilter(f.id)} style={{ border: 'none', borderRadius: 8, padding: '7px 10px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', background: ecosystemFilter === f.id ? '#06b6d4' : 'rgba(255,255,255,0.14)', color: '#fff' }}>
-                            {f.label}
+                      <div className="eco-stat-cards">
+                        <div className="eco-stat-card">
+                          <div className="eco-stat-label">Sesiones completadas</div>
+                          <div className="eco-stat-value">{stats.sessions_completed || 0} / {stats.sessions_planned || 0}</div>
+                          <div className="eco-stat-bar"><div style={{ width: `${stats.sessions_planned ? Math.min(100, (stats.sessions_completed / stats.sessions_planned) * 100) : 0}%` }} /></div>
+                        </div>
+                        <div className="eco-stat-card">
+                          <div className="eco-stat-label">Duplas activas</div>
+                          <div className="eco-stat-value">{stats.duplas_active || 0} / {stats.duplas_total || 0}</div>
+                          <div className="eco-stat-icon">👥</div>
+                        </div>
+                        <div className="eco-stat-card">
+                          <div className="eco-stat-label">Desafíos activos</div>
+                          <div className="eco-stat-value">{stats.challenges_completed || 0} / {stats.challenges_total || 0}</div>
+                          <div className="eco-stat-icon">🏆</div>
+                        </div>
+                      </div>
+                      <div className="eco-header-actions">
+                        <div style={{ position: 'relative' }}>
+                          <button className="eco-dropdown-btn" onClick={() => { setEcoViewMenuOpen(v => !v); setEcoFiltersOpen(false); }}>
+                            👁 Ver duplas {ecoViewDuplasOnly && <span className="eco-dot" />} ▾
                           </button>
-                        ))}
-                        <button onClick={() => setShowEcosystemInsights(v => !v)} style={{ border: '1px solid rgba(255,255,255,0.22)', borderRadius: 8, padding: '7px 10px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', background: showEcosystemInsights ? 'rgba(6,182,212,0.2)' : 'rgba(255,255,255,0.12)', color: '#fff' }}>
-                          Insights
-                        </button>
+                          {ecoViewMenuOpen && (
+                            <div className="eco-dropdown-panel">
+                              <label className="eco-toggle-row">
+                                <input type="checkbox" checked={ecoViewDuplasOnly} onChange={e => setEcoViewDuplasOnly(e.target.checked)} />
+                                Mostrar solo duplas (ocultar red social)
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ position: 'relative' }}>
+                          <button className="eco-dropdown-btn" onClick={() => { setEcoFiltersOpen(v => !v); setEcoViewMenuOpen(false); }}>
+                            ⚟ Filtros {activeFilterCount > 0 && <span className="eco-badge-count">{activeFilterCount}</span>} ▾
+                          </button>
+                          {ecoFiltersOpen && (
+                            <div className="eco-dropdown-panel">
+                              {(['all', 'mentor', 'mentee'] as const).map(r => (
+                                <label key={r} className="eco-toggle-row">
+                                  <input type="radio" name="eco-role" checked={ecoRoleFilter === r} onChange={() => setEcoRoleFilter(r)} />
+                                  {r === 'all' ? 'Todos' : r === 'mentor' ? 'Mentores' : 'Mentees'}
+                                </label>
+                              ))}
+                              <div className="eco-dropdown-sep" />
+                              <label className="eco-toggle-row">
+                                <input type="checkbox" checked={ecoCityOnly} onChange={e => setEcoCityOnly(e.target.checked)} />
+                                Mi ciudad ({viewer?.city || '—'})
+                              </label>
+                              <label className="eco-toggle-row">
+                                <input type="checkbox" checked={ecoInteractedOnly} onChange={e => setEcoInteractedOnly(e.target.checked)} />
+                                Con quienes he interactuado
+                              </label>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: showEcosystemInsights ? '1fr 320px' : '1fr', minHeight: 560 }}>
-                      <div style={{ position: 'relative', padding: 16, minHeight: 560 }}>
-                        {/* Orbit rings */}
-                        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: '42%', aspectRatio: '1 / 1', borderRadius: '999px', border: '1px dashed rgba(6,182,212,0.2)' }} />
-                        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: '70%', aspectRatio: '1 / 1', borderRadius: '999px', border: '1px dashed rgba(96,165,250,0.15)' }} />
-
-                        {/* Animated pulse ring behind center */}
-                        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 100, height: 100, borderRadius: 999, border: '2px solid rgba(6,182,212,0.3)', animation: 'ecoRing 3s ease-out infinite' }} />
-
-                        {/* Connection lines from center to each node */}
-                        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-                          <defs>
-                            <linearGradient id="eco-line-mentor" x1="0%" y1="0%" x2="100%" y2="0%">
-                              <stop offset="0%" stopColor="rgba(6,182,212,0.6)" />
-                              <stop offset="100%" stopColor="rgba(6,182,212,0.15)" />
-                            </linearGradient>
-                            <linearGradient id="eco-line-mentee" x1="0%" y1="0%" x2="100%" y2="0%">
-                              <stop offset="0%" stopColor="rgba(96,165,250,0.6)" />
-                              <stop offset="100%" stopColor="rgba(96,165,250,0.15)" />
-                            </linearGradient>
-                          </defs>
-                          {filteredOthers.map((person: any, idx: number) => {
-                            const pos = getNodePos(idx, filteredOthers.length);
-                            return (
-                              <line
-                                key={person.id}
-                                x1="50%" y1="50%"
-                                x2={`${pos.left}%`} y2={`${pos.top}%`}
-                                stroke={person.role === 'mentor' ? 'url(#eco-line-mentor)' : 'url(#eco-line-mentee)'}
-                                strokeWidth="1.5"
-                                strokeDasharray="4 4"
-                                opacity="0.7"
-                              />
-                            );
-                          })}
-                        </svg>
-
-                        {/* CENTER NODE: current user */}
-                        <div style={{
-                          position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
-                          width: 96, height: 96, borderRadius: 999, zIndex: 10,
-                          background: me.avatarUrl ? 'transparent' : 'linear-gradient(135deg, #0891b2, #06b6d4)',
-                          boxShadow: '0 0 28px rgba(6,182,212,0.5), 0 0 60px rgba(6,182,212,0.2)',
-                          border: '3px solid rgba(6,182,212,0.7)',
-                          overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer',
-                        }} onClick={() => setSelectedEcoPerson(selectedEcoPerson?.isMe ? null : me)}>
-                          {me.avatarUrl ? (
-                            <img src={me.avatarUrl} alt={me.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <span style={{ color: '#fff', fontWeight: 900, fontSize: '1.5rem' }}>{meInitials}</span>
-                          )}
+                    {/* Main 3-column layout */}
+                    <div className="eco-main-grid">
+                      {/* Left column */}
+                      <div className="eco-left-col">
+                        <div className="eco-panel">
+                          <div className="eco-panel-title">Leyenda</div>
+                          <div className="eco-legend-item"><span className="eco-legend-dot" style={{ border: '2px solid #14b8a6', background: '#fff' }} /> Tú</div>
+                          <div className="eco-legend-item"><span className="eco-legend-dot" style={{ background: '#3b82f6' }} /> Mentee</div>
+                          <div className="eco-legend-item"><span className="eco-legend-dot" style={{ background: '#22c55e' }} /> Mentor</div>
+                          <div className="eco-legend-item"><span className="eco-legend-line" style={{ background: '#14b8a6', height: 4 }} /> Dupla (mentoría)</div>
+                          <div className="eco-legend-item"><span className="eco-legend-line eco-legend-line-dashed" /> Vínculo social</div>
                         </div>
-                        {/* Center label below */}
-                        <div style={{
-                          position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, 56px)',
-                          textAlign: 'center', zIndex: 10, pointerEvents: 'none',
-                        }}>
-                          <div style={{ color: '#fff', fontWeight: 800, fontSize: '0.78rem', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
-                            {(me.name || 'Yo').split(' ')[0]}
-                          </div>
-                          <div style={{ color: 'rgba(6,182,212,0.9)', fontWeight: 700, fontSize: '0.62rem', letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>
-                            {me.position}
-                          </div>
-                        </div>
-
-                        {/* Surrounding people nodes */}
-                        {filteredOthers.map((person: any, idx: number) => {
-                          const pos = getNodePos(idx, filteredOthers.length);
-                          const isSelected = selectedEcoPerson?.id === person.id;
-                          const nodeColor = person.role === 'mentor' ? '#06b6d4' : '#60A5FA';
-                          const nodeSize = person.role === 'mentor' ? 66 : 56;
-                          const personInitials = (person.name || '?').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
-                          return (
-                            <div key={person.id} style={{ position: 'absolute', left: `${pos.left}%`, top: `${pos.top}%`, transform: 'translate(-50%, -50%)', zIndex: isSelected ? 8 : 5 }}>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedEcoPerson(isSelected ? null : person)}
-                                style={{
-                                  width: nodeSize, height: nodeSize, borderRadius: 999,
-                                  border: isSelected ? '3px solid #fff' : `2px solid ${nodeColor}`,
-                                  background: person.avatarUrl ? '#111827' : 'rgba(17,24,39,0.92)',
-                                  overflow: 'hidden', cursor: 'pointer', padding: 0,
-                                  boxShadow: `0 0 18px ${nodeColor}55`,
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  // @ts-ignore
-                                  '--eco-glow': nodeColor, animation: `ecoPulse ${4 + (idx % 3)}s ease-in-out infinite`,
-                                }}
-                                title={`${person.name} (${person.position})`}
-                              >
-                                {person.avatarUrl ? (
-                                  <img src={person.avatarUrl} alt={person.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 999 }} />
-                                ) : (
-                                  <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.72rem' }}>{personInitials}</span>
-                                )}
-                              </button>
-                              <div style={{ textAlign: 'center', marginTop: 4, pointerEvents: 'none' }}>
-                                <div style={{ color: '#fff', fontWeight: 700, fontSize: '0.62rem', textShadow: '0 1px 6px rgba(0,0,0,0.7)', whiteSpace: 'nowrap' }}>
-                                  {person.name.split(' ')[0]}
-                                </div>
-                                <div style={{ color: nodeColor, fontWeight: 600, fontSize: '0.56rem', opacity: 0.9 }}>
-                                  {person.role === 'mentor' ? 'Mentor' : 'Mentee'}
-                                </div>
-                              </div>
+                        <div className="eco-panel">
+                          <div className="eco-panel-title">Ciudades</div>
+                          {(stats.cities || []).length === 0 && <div className="eco-empty-hint">Sin datos de ciudad aún.</div>}
+                          {(stats.cities || []).map((c: any) => (
+                            <div key={c.city} className="eco-city-row">
+                              <span>📍 {c.city}</span><span className="eco-city-count">{c.count}</span>
                             </div>
-                          );
-                        })}
-
-                        {/* Legend */}
-                        <div style={{ position: 'absolute', left: 16, bottom: 16, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: '10px 14px', color: '#fff', fontSize: '0.72rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}><span style={{ width: 10, height: 10, borderRadius: 999, background: '#06b6d4', display: 'inline-block' }} />Mentores ({mentors.length})</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 999, background: '#60A5FA', display: 'inline-block' }} />Mentees ({mentees.length})</div>
+                          ))}
                         </div>
-
-                        {/* Stats */}
-                        <div style={{ position: 'absolute', right: 16, bottom: 16, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: '10px 14px', color: '#fff', fontSize: '0.72rem' }}>
-                          <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{others.length + 1}</div>
-                          <div style={{ opacity: 0.8 }}>nodos</div>
-                          <div style={{ fontWeight: 800, fontSize: '1.1rem', marginTop: 4 }}>{filteredOthers.length}</div>
-                          <div style={{ opacity: 0.8 }}>conexiones</div>
+                        <div className="eco-panel">
+                          <div className="eco-panel-title">Desafíos activos</div>
+                          <div className="eco-panel-sub">{stats.challenges_completed || 0} / {stats.challenges_total || 0} completados</div>
+                          {challenges.map((c: any) => (
+                            <div key={c.id} className="eco-challenge-row">
+                              <div className={`eco-challenge-check ${c.completed ? 'done' : ''}`}>{c.completed ? '✓' : ''}</div>
+                              <div style={{ flex: 1 }}>
+                                <div className="eco-challenge-label">{c.label}</div>
+                                <div className="eco-mini-bar"><div style={{ width: `${Math.min(100, (c.progress / c.target) * 100)}%` }} /></div>
+                              </div>
+                              <div className="eco-challenge-frac">{c.progress}/{c.target}</div>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
-                      {/* Insights panel */}
-                      {showEcosystemInsights && (
-                        <aside style={{ borderLeft: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.28)', padding: 16, color: '#fff' }}>
-                          {selectedEcoPerson ? (
-                            <>
-                              <button onClick={() => setSelectedEcoPerson(null)} style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: '0.72rem', marginBottom: 10 }}>
-                                ← Volver
-                              </button>
-                              <div style={{ border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, padding: 12, background: 'rgba(255,255,255,0.06)' }}>
-                                {/* Profile photo in insights */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                  <div style={{
-                                    width: 52, height: 52, borderRadius: 999, overflow: 'hidden', flexShrink: 0,
-                                    background: selectedEcoPerson.avatarUrl ? '#111' : 'linear-gradient(135deg,#0891b2,#06b6d4)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    border: `2px solid ${selectedEcoPerson.role === 'mentor' ? '#06b6d4' : '#60A5FA'}`,
-                                  }}>
-                                    {selectedEcoPerson.avatarUrl ? (
-                                      <img src={selectedEcoPerson.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    ) : (
-                                      <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.82rem' }}>
-                                        {(selectedEcoPerson.name || '?').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div>
-                                    <div style={{ fontSize: '1rem', fontWeight: 800 }}>{selectedEcoPerson.name}</div>
-                                    <div style={{ fontSize: '0.72rem', opacity: 0.75
+                      {/* Center: graph */}
+                      <div className="eco-graph-col">
+                        <EcosystemGraph
+                          nodes={nodes} edges={edges} height={620}
+                          selectedId={ecoSelectedId} onSelect={setEcoSelectedId}
+                          viewDuplasOnly={ecoViewDuplasOnly} roleFilter={ecoRoleFilter}
+                          viewerCity={viewer?.city || ''} cityOnly={ecoCityOnly} interactedOnly={ecoInteractedOnly}
+                          viewerId={ecosystemData.viewer_id}
+                        />
+                      </div>
 
- }}>{selectedEcoPerson.email}</div>
-                                    {selectedEcoPerson.headline && (
-                                      <div style={{ fontSize: '0.72rem', color: '#06b6d4', marginTop: 2 }}>{selectedEcoPerson.headline}</div>
-                                    )}
-                                  </div>
+                      {/* Right column: selected participant OR hint */}
+                      <div className="eco-right-col">
+                        {selectedNode ? (
+                          <div className="eco-panel eco-detail-panel">
+                            <button className="eco-detail-close" onClick={() => setEcoSelectedId(null)}>×</button>
+                            <div className="eco-detail-header">
+                              <div className="eco-detail-avatar" style={{ borderColor: selectedNode.role === 'mentor' ? '#22c55e' : '#3b82f6' }}>
+                                {selectedNode.avatar_url ? <img src={selectedNode.avatar_url} alt="" /> : <span>{ecoInitials(selectedNode.full_name)}</span>}
+                              </div>
+                              <div>
+                                <div className="eco-detail-name">{selectedNode.full_name || 'Participante'}</div>
+                                <div className="eco-detail-role" style={{ color: selectedNode.role === 'mentor' ? '#22c55e' : '#3b82f6' }}>
+                                  {selectedNode.role === 'mentor' ? 'Mentor' : 'Mentee'}
                                 </div>
-                                <div style={{ fontSize: '0.75rem' }}>{selectedEcoPerson.position}</div>
-                                <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                                  <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: 8 }}>
-                                    <div style={{ fontSize: '0.66rem', opacity: 0.7 }}>Influencia</div>
-                                    <div style={{ fontWeight: 800 }}>{selectedEcoPerson.influence}%</div>
-                                  </div>
-                                  <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: 8 }}>
-                                    <div style={{ fontSize: '0.66rem', opacity: 0.7 }}>Rol</div>
-                                    <div style={{ fontWeight: 800 }}>{selectedEcoPerson.isMe ? 'Tú' : (selectedEcoPerson.role === 'mentor' ? 'Mentor' : 'Mentee')}</div>
-                                  </div>
-                                </div>
-                                {selectedEcoPerson.isMe && (
-                                  <div style={{ marginTop: 12, background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', borderRadius: 8, padding: 10, fontSize: '0.72rem' }}>
-                                    Estás al centro de tu red de influencia. Conectas con {others.length} persona{others.length !== 1 ? 's' : ''} en este programa.
-                                  </div>
+                                {selectedNode.city && <div className="eco-detail-city">📍 {selectedNode.city}</div>}
+                              </div>
+                            </div>
+                            {!selectedNode.profile_complete ? (
+                              <div className="eco-incomplete-note">Esta persona aún no ha completado sus datos de perfil.</div>
+                            ) : (
+                              <div className="eco-detail-fields">
+                                {selectedNode.area && <div><span>Área</span><span>{selectedNode.area}</span></div>}
+                                {selectedNode.career && <div><span>Carrera</span><span>{selectedNode.career}</span></div>}
+                                {selectedNode.position && <div><span>Cargo</span><span>{selectedNode.position}</span></div>}
+                                {selectedNode.organization && <div><span>Organización</span><span>{selectedNode.organization}</span></div>}
+                              </div>
+                            )}
+                            {selectedEdge && selectedEdge.type === 'MENTORSHIP' && (
+                              <div className="eco-detail-sessions">
+                                <span>Sesiones completadas</span>
+                                <span>{selectedEdge.sessions_completed} / {selectedEdge.sessions_planned || selectedEdge.sessions_completed}</span>
+                                <div className="eco-mini-bar"><div style={{ width: `${selectedEdge.sessions_planned ? Math.min(100, (selectedEdge.sessions_completed / selectedEdge.sessions_planned) * 100) : 0}%` }} /></div>
+                              </div>
+                            )}
+                            {!selectedNode.is_viewer && (
+                              <>
+                                <button className="eco-btn-primary" onClick={() => navigate('my-chat')}>💬 Enviar mensaje</button>
+                                {selectedNode.is_my_dupla && (
+                                  <button className="eco-btn-secondary" onClick={() => navigate(isMentee ? 'my-mentor' : 'my-sessions')}>Ir a mi espacio de mentoría</button>
                                 )}
-                              </div>
-                            </>
-                          ) : (
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="eco-panel">
+                            <div className="eco-panel-title">Insights</div>
+                            {(stats.insights || []).map((ins: string, i: number) => (
+                              <div key={i} className="eco-insight-row">💡 {ins}</div>
+                            ))}
+                            <div className="eco-empty-hint" style={{ marginTop: 10 }}>Haz clic en una persona del grafo para ver su ficha.</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom stats bar */}
+                    <div className="eco-bottom-bar">
+                      <div className="eco-bottom-section">
+                        <div className="eco-panel-title">Tu red en números</div>
+                        <div className="eco-bottom-numbers">
+                          <div><strong>{stats.direct_connections || 0}</strong><span>Conexiones directas</span></div>
+                          <div><strong>{stats.mentors_connected || 0}</strong><span>Mentores conectados</span></div>
+                          <div><strong>{stats.mentees_connected || 0}</strong><span>Mentees conectados</span></div>
+                          <div><strong>{stats.cities_connected || 0}</strong><span>Ciudades conectadas</span></div>
+                        </div>
+                      </div>
+                      <div className="eco-bottom-section">
+                        <div className="eco-panel-title">Nivel de conexión</div>
+                        {(() => {
+                          const lv = stats.connection_levels || { strong: 0, medium: 0, weak: 0, none: 0 };
+                          const total = Math.max(1, lv.strong + lv.medium + lv.weak + lv.none);
+                          return (
                             <>
-                              <div style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 4 }}>Insights</div>
-                              <div style={{ fontSize: '0.74rem', opacity: 0.75, marginBottom: 12 }}>Tu ecosistema de influencia</div>
-
-                              {/* Mini profile card */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, padding: 10, background: 'rgba(255,255,255,0.06)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)' }}>
-                                <div style={{
-                                  width: 38, height: 38, borderRadius: 999, overflow: 'hidden', flexShrink: 0,
-                                  background: me.avatarUrl ? '#111' : 'linear-gradient(135deg,#0891b2,#06b6d4)',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  border: '2px solid #06b6d4',
-                                }}>
-                                  {me.avatarUrl ? (
-                                    <img src={me.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                  ) : (
-                                    <span style={{ color: '#fff', fontWeight: 800, fontSize: '0.7rem' }}>{meInitials}</span>
-                                  )}
-                                </div>
-                                <div>
-                                  <div style={{ fontWeight: 800, fontSize: '0.82rem' }}>{me.name}</div>
-                                  <div style={{ fontSize: '0.66rem', opacity: 0.7 }}>{me.position} · {companyName || 'Inspiratoria'}</div>
-                                </div>
-                              </div>
-
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                <div style={{ border: '1px solid rgba(16,185,129,0.35)', background: 'rgba(16,185,129,0.14)', borderRadius: 10, padding: 10 }}>
-                                  <div style={{ fontSize: '0.72rem', fontWeight: 700 }}>Tu Red</div>
-                                  <div style={{ fontSize: '0.74rem', marginTop: 4, opacity: 0.9 }}>
-                                    Conectas con {mentors.length} mentor{mentors.length !== 1 ? 'es' : ''} y {mentees.length} mentee{mentees.length !== 1 ? 's' : ''} en este programa.
-                                  </div>
-                                </div>
-                                <div style={{ border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.14)', borderRadius: 10, padding: 10 }}>
-                                  <div style={{ fontSize: '0.72rem', fontWeight: 700 }}>Atención</div>
-                                  <div style={{ fontSize: '0.74rem', marginTop: 4, opacity: 0.9 }}>
-                                    {others.length === 0 ? 'Aún no hay otros participantes en tu red.' : 'Mantener balance mentor/mentee para escalar tu impacto.'}
-                                  </div>
-                                </div>
-                                <div style={{ border: '1px solid rgba(59,130,246,0.35)', background: 'rgba(59,130,246,0.14)', borderRadius: 10, padding: 10 }}>
-                                  <div style={{ fontSize: '0.72rem', fontWeight: 700 }}>Oportunidad</div>
-                                  <div style={{ fontSize: '0.74rem', marginTop: 4, opacity: 0.9 }}>Profundizar conexiones con perfiles complementarios a tu experiencia.</div>
-                                </div>
-                              </div>
-
-                              {/* People list */}
-                              {others.length > 0 && (
-                                <div style={{ marginTop: 14 }}>
-                                  <div style={{ fontSize: '0.72rem', fontWeight: 700, marginBottom: 8 }}>Personas en tu red</div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
-                                    {others.map((p: any) => (
-                                      <button key={p.id} onClick={() => setSelectedEcoPerson(p)} style={{
-                                        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, cursor: 'pointer', width: '100%', textAlign: 'left',
-                                      }}>
-                                        <div style={{
-                                          width: 28, height: 28, borderRadius: 999, overflow: 'hidden', flexShrink: 0,
-                                          background: p.avatarUrl ? '#111' : (p.role === 'mentor' ? '#0891b2' : '#3b82f6'),
-                                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        }}>
-                                          {p.avatarUrl ? (
-                                            <img src={p.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                          ) : (
-                                            <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.56rem' }}>{(p.name || '?').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}</span>
-                                          )}
-                                        </div>
-                                        <div>
-                                          <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.72rem' }}>{p.name}</div>
-                                          <div style={{ color: p.role === 'mentor' ? '#06b6d4' : '#60A5FA', fontSize: '0.6rem' }}>{p.position}</div>
-                                        </div>
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
+                              <div className="eco-level-row"><span>Fuerte</span><strong>{lv.strong}</strong></div>
+                              <div className="eco-level-track"><div style={{ width: `${(lv.strong / total) * 100}%`, background: '#14b8a6' }} /></div>
+                              <div className="eco-level-row"><span>Media</span><strong>{lv.medium}</strong></div>
+                              <div className="eco-level-track"><div style={{ width: `${(lv.medium / total) * 100}%`, background: '#94a3b8' }} /></div>
+                              <div className="eco-level-row"><span>Débil</span><strong>{lv.weak}</strong></div>
+                              <div className="eco-level-track"><div style={{ width: `${(lv.weak / total) * 100}%`, background: '#cbd5e1' }} /></div>
                             </>
-                          )}
-                        </aside>
-                      )}
+                          );
+                        })()}
+                      </div>
+                      <div className="eco-bottom-section">
+                        <div className="eco-panel-title">Insights</div>
+                        {(stats.insights || []).map((ins: string, i: number) => (
+                          <div key={i} className="eco-insight-row">💡 {ins}</div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 );

@@ -5561,3 +5561,214 @@ async def get_influence_network(portal_code: str):
         return {"network": network}
 
     return await sync_to_async(_resolve)()
+
+
+# ── Ecosystem graph (force-directed mentor/mentee network) ────────────
+def _session_counts(program_id, mentor_id, mentee_id):
+    """Sesiones completadas / planificadas (no canceladas) entre un mentor y un mentee."""
+    from programs.models import MentoringSession
+    qs = MentoringSession.objects.filter(program_id=program_id, mentor_id=mentor_id, mentee_id=mentee_id)
+    completed = qs.filter(status="completed").count()
+    planned = qs.exclude(status="cancelled").count()
+    return completed, max(planned, completed)
+
+
+def _dupla_status(completed: int, planned: int) -> str:
+    if completed <= 0:
+        return "sin_iniciar"
+    if planned <= 0 or completed >= planned:
+        return "completada"
+    ratio = completed / planned
+    return "avanzada" if ratio >= 0.5 else "en_proceso"
+
+
+@router.get("/portal/{portal_code}/ecosystem")
+async def get_ecosystem_graph(portal_code: str, program_id: Optional[str] = None):
+    """
+    Grafo del ecosistema de vínculos (duplas mentor-mentee + red social) para un programa.
+    Nodos = participantes activos del programa. Edges = Vinculation (capa estructural
+    de mentoría) — la afinidad por ciudad/área NO genera una línea (solo posiciona).
+    """
+    def _resolve():
+        from programs.models import ProgramParticipant, Vinculation, ProgramChatMessage
+
+        viewer = _get_portal_user(portal_code)
+
+        pp_qs = ProgramParticipant.objects.filter(user=viewer, deleted_at__isnull=True).select_related("program")
+        if program_id:
+            pp_qs = pp_qs.filter(program_id=program_id)
+        viewer_pp = pp_qs.order_by("-created_at").first()
+        if not viewer_pp:
+            return None
+        program = viewer_pp.program
+
+        participants = list(
+            ProgramParticipant.objects.filter(program=program, deleted_at__isnull=True)
+            .exclude(status__in=["deleted", "suspended"])
+            .select_related("user")
+        )
+        pp_by_user_id = {p.user_id: p for p in participants}
+        pp_ids = [p.id for p in participants]
+
+        vincs = list(
+            Vinculation.objects.filter(
+                program=program, status="active", participant1_id__in=pp_ids, participant2_id__in=pp_ids,
+            ).select_related("participant1__user", "participant2__user")
+        )
+
+        def is_complete(u):
+            if getattr(u, "role", "") == "mentee":
+                return (getattr(u, "mentee_profile_step", 0) or 0) >= 6
+            return (getattr(u, "mentor_profile_step", 0) or 0) >= 6
+
+        # How many active vinculations touch each user (to distinguish "dupla" from "extra" link)
+        vinc_count_by_user = {}
+        for v in vincs:
+            for pp in (v.participant1, v.participant2):
+                vinc_count_by_user[pp.user_id] = vinc_count_by_user.get(pp.user_id, 0) + 1
+
+        # Viewer's primary dupla partner (first mentoria vinculation touching viewer)
+        viewer_dupla_partner_id = None
+        for v in vincs:
+            if v.type != "mentoria":
+                continue
+            if v.participant1.user_id == viewer.id:
+                viewer_dupla_partner_id = v.participant2.user_id
+                break
+            if v.participant2.user_id == viewer.id:
+                viewer_dupla_partner_id = v.participant1.user_id
+                break
+
+        nodes = []
+        for p in participants:
+            u = p.user
+            is_mentor = p.role == "mentor"
+            nodes.append({
+                "id": str(u.id),
+                "full_name": u.full_name or "",
+                "role": p.role,
+                "avatar_url": getattr(u, "avatar_url", "") or "",
+                "city": getattr(u, "residence_city", "") or "",
+                "area": (getattr(u, "department", "") if is_mentor else getattr(u, "area_or_function", "")) or "",
+                "position": getattr(u, "position", "") or "",
+                "organization": getattr(u, "department", "") or "",
+                "career": getattr(u, "career", "") or "",
+                "profile_complete": is_complete(u),
+                "is_viewer": u.id == viewer.id,
+                "is_my_dupla": u.id == viewer_dupla_partner_id,
+                "extra_links": max(0, vinc_count_by_user.get(u.id, 0) - (1 if u.id == viewer.id or u.id == viewer_dupla_partner_id else 0)),
+            })
+
+        edges = []
+        sessions_completed_total = 0
+        sessions_planned_total = 0
+        duplas_active = 0
+        for v in vincs:
+            u1, u2 = v.participant1.user, v.participant2.user
+            if v.type == "mentoria":
+                mentor_u, mentee_u = (u1, u2) if v.participant1.role == "mentor" else (u2, u1)
+                completed, planned = _session_counts(program.id, mentor_u.id, mentee_u.id)
+                sessions_completed_total += completed
+                sessions_planned_total += planned
+                duplas_active += 1
+                # Mentoring (40%) = 100 for the dupla itself (regla especial sección 9)
+                mentoring = 100.0
+                interaction = min(100.0, (completed / planned * 100.0)) if planned else 0.0
+                same_city = bool(mentor_u.residence_city) and mentor_u.residence_city == mentee_u.residence_city
+                same_area = bool(getattr(mentor_u, "department", "")) and getattr(mentor_u, "department", "") == getattr(mentee_u, "area_or_function", "")
+                context = 100.0 if (same_city and same_area) else 70.0 if same_city else 50.0 if same_area else 0.0
+                role_score = 0.0  # mentor↔mentee sin dupla = 0, pero la dupla siempre prevalece (ver abajo)
+                proximity = 0.40 * mentoring + 0.25 * interaction + 0.20 * context + 0.15 * role_score
+                edges.append({
+                    "source": str(mentor_u.id), "target": str(mentee_u.id), "type": "MENTORSHIP",
+                    "strength": round(max(proximity, 85.0), 1),  # la dupla nunca cae bajo el umbral "fuerte"
+                    "sessions_completed": completed, "sessions_planned": planned,
+                    "status": _dupla_status(completed, planned),
+                })
+            else:
+                same_role = v.participant1.role == v.participant2.role
+                same_city = bool(u1.residence_city) and u1.residence_city == u2.residence_city
+                proximity = 0.40 * 80.0 + 0.25 * 0.0 + 0.20 * (70.0 if same_city else 0.0) + 0.15 * (100.0 if same_role else 0.0)
+                edges.append({
+                    "source": str(u1.id), "target": str(u2.id), "type": "OTHER",
+                    "strength": round(proximity, 1), "sessions_completed": 0, "sessions_planned": 0,
+                    "status": v.type,
+                })
+
+        # ── Networking challenges (derivados de datos reales, sin tracking manual) ──
+        viewer_role = viewer_pp.role
+        viewer_vinc_partners = []
+        for v in vincs:
+            if v.participant1.user_id == viewer.id:
+                viewer_vinc_partners.append(v.participant2.user)
+            elif v.participant2.user_id == viewer.id:
+                viewer_vinc_partners.append(v.participant1.user)
+        other_city_partners = [p for p in viewer_vinc_partners if p.residence_city and p.residence_city != viewer.residence_city]
+        other_area_partners = {p.id for p in viewer_vinc_partners if (getattr(p, "area_or_function", "") or getattr(p, "department", "")) not in ("", (getattr(viewer, "area_or_function", "") or getattr(viewer, "department", "")))}
+        diff_role_partners = {p.id for p in viewer_vinc_partners if p.role != viewer_role}
+        group_messages_sent = ProgramChatMessage.objects.filter(program=program, sender=viewer).count()
+
+        challenges = [
+            {"id": "other_city", "label": "Conecta con alguien de otra ciudad", "progress": min(1, len(other_city_partners)), "target": 1},
+            {"id": "other_area", "label": "Conoce 3 participantes de otra área", "progress": min(3, len(other_area_partners)), "target": 3},
+            {"id": "diff_role", "label": f"Vincúlate con un {'mentee' if viewer_role == 'mentor' else 'mentor'} distinto al tuyo", "progress": min(1, len(diff_role_partners)), "target": 1},
+            {"id": "extra_links", "label": "Conversa con 2 personas fuera de tu dupla", "progress": min(2, max(0, len(viewer_vinc_partners) - 1)), "target": 2},
+            {"id": "group_chat", "label": "Participa en un espacio grupal", "progress": min(1, group_messages_sent), "target": 1},
+        ]
+        for c in challenges:
+            c["completed"] = c["progress"] >= c["target"]
+
+        # ── Stats ──
+        cities: dict = {}
+        for n in nodes:
+            if n["city"]:
+                cities[n["city"]] = cities.get(n["city"], 0) + 1
+        cities_list = [{"city": c, "count": n} for c, n in sorted(cities.items(), key=lambda x: -x[1])]
+
+        direct_partner_ids = {p.id for p in viewer_vinc_partners}
+        mentors_connected = sum(1 for p in viewer_vinc_partners if p.role == "mentor")
+        mentees_connected = sum(1 for p in viewer_vinc_partners if p.role == "mentee")
+        cities_connected = len({p.residence_city for p in viewer_vinc_partners if p.residence_city})
+
+        strong = sum(1 for e in edges if e["sessions_completed"] >= 5)
+        medium = sum(1 for e in edges if 2 <= e["sessions_completed"] < 5)
+        weak = sum(1 for e in edges if 1 <= e["sessions_completed"] < 2)
+        none_ = sum(1 for e in edges if e["sessions_completed"] < 1)
+
+        recent_cutoff = timezone.now() - timedelta(days=7)
+        recent_msgs = ProgramChatMessage.objects.filter(program=program, sender=viewer, created_at__gte=recent_cutoff).count()
+        insights = []
+        if cities_list:
+            insights.append(f"Tienes más conexiones en {cities_list[0]['city']}.")
+        if recent_msgs:
+            insights.append(f"Has enviado {recent_msgs} mensaje{'s' if recent_msgs != 1 else ''} en los últimos 7 días.")
+        if not insights:
+            insights.append("Aún no tienes actividad reciente en tu ecosistema.")
+
+        return {
+            "program": {"id": str(program.id), "name": program.name},
+            "viewer_id": str(viewer.id),
+            "nodes": nodes,
+            "edges": edges,
+            "challenges": challenges,
+            "stats": {
+                "sessions_completed": sessions_completed_total,
+                "sessions_planned": sessions_planned_total,
+                "duplas_active": duplas_active,
+                "duplas_total": max(duplas_active, len([1 for p in participants if p.role == "mentor"])),
+                "challenges_completed": sum(1 for c in challenges if c["completed"]),
+                "challenges_total": len(challenges),
+                "cities": cities_list,
+                "direct_connections": len(direct_partner_ids),
+                "mentors_connected": mentors_connected,
+                "mentees_connected": mentees_connected,
+                "cities_connected": cities_connected,
+                "connection_levels": {"strong": strong, "medium": medium, "weak": weak, "none": none_},
+                "insights": insights,
+            },
+        }
+
+    result = await sync_to_async(_resolve)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="No participas en ningún programa activo")
+    return result
