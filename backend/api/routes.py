@@ -364,7 +364,7 @@ def team_chat_history(limit: int = 50, authorization: Optional[str] = Header(Non
         {
             "id": str(m.id),
             "sender_id": str(m.sender_id),
-            "sender_name": m.sender.full_name or m.sender.email,
+            "sender_name": m.sender.display_name,
             "sender_email": m.sender.email,
             "content": m.content,
             "created_at": m.created_at.isoformat(),
@@ -2114,7 +2114,7 @@ def get_user_notifications(user_id: str, unread_only: bool = False, authorizatio
             "id": n.id,
             "recipient_id": str(n.recipient_id),
             "sender_id": str(n.sender_id) if n.sender_id else None,
-            "sender_name": (n.sender.full_name or n.sender.email) if n.sender else None,
+            "sender_name": n.sender.display_name if n.sender else None,
             "notification_type": n.notification_type,
             "title": n.title,
             "message": n.message,

@@ -3527,7 +3527,7 @@ async def get_chat_programs(portal_code: str):
                 "participant_count": ProgramParticipant.objects.filter(program=p, deleted_at__isnull=True).count(),
                 "last_message": {
                     "content": last_msg.content[:80] if last_msg else None,
-                    "sender_name": last_msg.sender.full_name or last_msg.sender.email.split("@")[0] if last_msg else None,
+                    "sender_name": last_msg.sender.display_name if last_msg else None,
                     "created_at": last_msg.created_at.isoformat() if last_msg else None,
                 } if last_msg else None,
                 "unread_count": unread,
@@ -3576,7 +3576,7 @@ async def get_chat_messages(portal_code: str, program_id: str, before: Optional[
                 {
                     "id": str(m.id),
                     "sender_id": str(m.sender.id),
-                    "sender_name": m.sender.full_name or m.sender.email.split("@")[0],
+                    "sender_name": m.sender.display_name,
                     "sender_avatar": getattr(m.sender, "avatar_url", "") or "",
                     "sender_role": "",
                     "content": m.content,
@@ -3621,7 +3621,7 @@ async def send_chat_message(portal_code: str, program_id: str, payload: ChatMess
         return {
             "id": str(msg.id),
             "sender_id": str(user.id),
-            "sender_name": user.full_name or user.email.split("@")[0],
+            "sender_name": user.display_name,
             "sender_avatar": getattr(user, "avatar_url", "") or "",
             "content": msg.content,
             "attachments": msg.attachments,
@@ -3682,7 +3682,7 @@ async def poll_chat(portal_code: str, program_id: str, after: Optional[str] = No
                 {
                     "id": str(m.id),
                     "sender_id": str(m.sender.id),
-                    "sender_name": m.sender.full_name or m.sender.email.split("@")[0],
+                    "sender_name": m.sender.display_name,
                     "sender_avatar": getattr(m.sender, "avatar_url", "") or "",
                     "content": m.content,
                     "attachments": m.attachments or [],

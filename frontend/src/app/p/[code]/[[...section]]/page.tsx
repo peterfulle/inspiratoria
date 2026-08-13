@@ -721,21 +721,26 @@ const styles = `
     position: relative; overflow: hidden; border-radius: 16px; border: 1px solid #eef0f2;
     background-color: #fbfbfc;
     background-image:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cg stroke='%23dbe3ea' stroke-width='1' fill='none' opacity='0.7'%3E%3Cline x1='15' y1='25' x2='70' y2='55'/%3E%3Cline x1='70' y1='55' x2='130' y2='30'/%3E%3Cline x1='50' y1='120' x2='110' y2='150'/%3E%3Cline x1='110' y1='150' x2='170' y2='115'/%3E%3Cline x1='20' y1='160' x2='50' y2='120'/%3E%3Cline x1='130' y1='30' x2='175' y2='70'/%3E%3C/g%3E%3Cg fill='%23c9d4de'%3E%3Ccircle cx='15' cy='25' r='2.2'/%3E%3Ccircle cx='70' cy='55' r='2.2'/%3E%3Ccircle cx='130' cy='30' r='2.2'/%3E%3Ccircle cx='50' cy='120' r='2.2'/%3E%3Ccircle cx='110' cy='150' r='2.2'/%3E%3Ccircle cx='170' cy='115' r='2.2'/%3E%3Ccircle cx='20' cy='160' r='2.2'/%3E%3Ccircle cx='175' cy='70' r='2.2'/%3E%3C/g%3E%3C/svg%3E"),
-      radial-gradient(circle at 12% 18%, rgba(20,184,166,0.10), transparent 42%),
+      radial-gradient(circle at 12% 18%, rgba(8,145,178,0.10), transparent 42%),
       radial-gradient(circle at 88% 12%, rgba(59,130,246,0.09), transparent 42%),
-      radial-gradient(circle at 30% 88%, rgba(139,92,246,0.07), transparent 40%),
+      radial-gradient(circle at 30% 88%, rgba(8,145,178,0.07), transparent 40%),
       radial-gradient(circle at 92% 82%, rgba(34,197,94,0.08), transparent 42%);
-    background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
-    background-size: 200px 200px, auto, auto, auto, auto;
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
+  }
+  .eco-canvas::before {
+    content: ''; position: absolute; inset: -100px; pointer-events: none; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cg stroke='%23dbe3ea' stroke-width='1' fill='none' opacity='0.7'%3E%3Cline x1='15' y1='25' x2='70' y2='55'/%3E%3Cline x1='70' y1='55' x2='130' y2='30'/%3E%3Cline x1='50' y1='120' x2='110' y2='150'/%3E%3Cline x1='110' y1='150' x2='170' y2='115'/%3E%3Cline x1='20' y1='160' x2='50' y2='120'/%3E%3Cline x1='130' y1='30' x2='175' y2='70'/%3E%3C/g%3E%3Cg fill='%23c9d4de'%3E%3Ccircle cx='15' cy='25' r='2.2'/%3E%3Ccircle cx='70' cy='55' r='2.2'/%3E%3Ccircle cx='130' cy='30' r='2.2'/%3E%3Ccircle cx='50' cy='120' r='2.2'/%3E%3Ccircle cx='110' cy='150' r='2.2'/%3E%3Ccircle cx='170' cy='115' r='2.2'/%3E%3Ccircle cx='20' cy='160' r='2.2'/%3E%3Ccircle cx='175' cy='70' r='2.2'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: repeat; background-size: 200px 200px;
+    animation: ecoDriftBg 38s linear infinite;
   }
   /* Vida ambiental del grafo — sutil, no debe distraer (sección 21 del instructivo) */
-  @keyframes ecoBreathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+  @keyframes ecoDriftBg { 0% { transform: translate(0, 0); } 100% { transform: translate(-200px, -200px); } }
+  @keyframes ecoBreathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
   @keyframes ecoPulseRing { 0% { transform: scale(0.85); opacity: 0.55; } 100% { transform: scale(1.9); opacity: 0; } }
   @keyframes ecoGlowPulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.75; } }
   .eco-node-breathe { animation: ecoBreathe 5s ease-in-out infinite; }
   .eco-pulse-ring { position: absolute; inset: -8px; border-radius: 50%; border: 2px solid #14b8a6; animation: ecoPulseRing 2.6s cubic-bezier(0.4,0,0.2,1) infinite; pointer-events: none; }
-  .eco-zoom-controls { position: absolute; left: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px 10px; box-shadow: 0 4px 14px rgba(15,23,42,0.08); font-size: 0.75rem; color: #374151; font-weight: 600; }
+  .eco-zoom-controls { position: absolute; left: 16px; bottom: 16px; z-index: 2; display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px 10px; box-shadow: 0 4px 14px rgba(15,23,42,0.08); font-size: 0.75rem; color: #374151; font-weight: 600; }
   .eco-zoom-controls button { border: none; background: #f3f4f6; width: 22px; height: 22px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; color: #374151; display: flex; align-items: center; justify-content: center; }
   .eco-zoom-controls button:hover { background: #e5e7eb; }
 
@@ -755,7 +760,7 @@ const styles = `
   .eco-detail-fields span:last-child { color: #111827; font-weight: 600; text-align: right; }
   .eco-detail-sessions { margin-bottom: 14px; font-size: 0.76rem; color: #374151; display: flex; flex-direction: column; gap: 6px; }
   .eco-detail-sessions span:nth-child(2) { font-weight: 700; color: #111827; }
-  .eco-btn-primary { width: 100%; padding: 11px; border-radius: 12px; border: none; background: linear-gradient(135deg,#8b5cf6,#7c3aed); color: #fff; font-weight: 700; font-size: 0.82rem; cursor: pointer; margin-bottom: 8px; transition: transform 0.15s; display: flex; align-items: center; justify-content: center; gap: 7px; }
+  .eco-btn-primary { width: 100%; padding: 11px; border-radius: 12px; border: none; background: linear-gradient(135deg,#0891b2,#06b6d4); color: #fff; font-weight: 700; font-size: 0.82rem; cursor: pointer; margin-bottom: 8px; transition: transform 0.15s; display: flex; align-items: center; justify-content: center; gap: 7px; }
   .eco-btn-primary:hover { transform: translateY(-1px); }
   .eco-btn-secondary { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; color: #374151; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
   .eco-btn-secondary:hover { background: #f9fafb; }
@@ -907,13 +912,13 @@ function EcosystemGraph({
 
     const sim = forceSimulation(simNodes)
       .force('link', forceLink(simLinks as any).id((d: any) => d.id)
-        .distance((l: any) => l.type === 'MENTORSHIP' ? 95 : Math.max(110, 260 - (l.strength || 30) * 1.4))
+        .distance((l: any) => l.type === 'MENTORSHIP' ? 190 : Math.max(190, 320 - (l.strength || 30) * 1.4))
         .strength((l: any) => l.type === 'MENTORSHIP' ? 0.95 : 0.15))
-      .force('charge', forceManyBody().strength(-230).distanceMax(420))
-      .force('collide', forceCollide().radius((d: any) => (d.is_viewer ? 50 : d.is_my_dupla ? 44 : 38)))
-      .force('x', forceX(w0 / 2).strength(0.06))
-      .force('y', forceY(h0 / 2).strength(0.06))
-      .alpha(1).alphaDecay(0.025);
+      .force('charge', forceManyBody().strength(-480).distanceMax(650))
+      .force('collide', forceCollide().radius((d: any) => (d.is_viewer ? 68 : d.is_my_dupla ? 58 : 50)).strength(0.9))
+      .force('x', forceX(w0 / 2).strength(0.035))
+      .force('y', forceY(h0 / 2).strength(0.035))
+      .alpha(1).alphaDecay(0.02);
 
     // Afinidad por ciudad: agrupa sin dibujar línea (sección 24 del instructivo)
     sim.force('affinity', (alpha: number) => {
@@ -937,7 +942,7 @@ function EcosystemGraph({
       const w = containerRef.current?.clientWidth || width;
       const h = containerRef.current?.clientHeight || height;
       for (const n of simNodes) {
-        const r = n.is_viewer ? 52 : n.is_my_dupla ? 46 : 40;
+        const r = n.is_viewer ? 68 : n.is_my_dupla ? 58 : 50;
         n.x = Math.max(r, Math.min(w - r, n.x!));
         n.y = Math.max(r, Math.min(h - r, n.y!));
       }
@@ -1036,7 +1041,7 @@ function EcosystemGraph({
     <div ref={containerRef} className="eco-canvas"
       onWheel={handleWheel} onPointerDown={handleBgPointerDown} onPointerMove={handleBgPointerMove} onPointerUp={handleBgPointerUp}
       style={{ width: '100%', height: '100%', cursor: panningRef.current ? 'grabbing' : 'grab' }}>
-      <div style={{ position: 'absolute', inset: 0, transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`, transformOrigin: '0 0' }}>
+      <div style={{ position: 'absolute', inset: 0, zIndex: 1, transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`, transformOrigin: '0 0' }}>
         <svg style={{ position: 'absolute', left: 0, top: 0, width: dims.w, height: dims.h, overflow: 'visible', pointerEvents: 'none' }}>
           {rawEdges.map((e, i) => {
             if (viewDuplasOnly && e.type !== 'MENTORSHIP') return null;
@@ -1073,7 +1078,7 @@ function EcosystemGraph({
           const isSelected = selectedId === node.id;
           const dimmed = (highlightIds && !highlightIds.has(node.id)) || !passesFilter(node);
           const ringColor = node.role === 'mentor' ? '#22c55e' : '#3b82f6';
-          const size = node.is_viewer ? 84 : node.is_my_dupla ? 66 : 58;
+          const size = node.is_viewer ? 68 : node.is_my_dupla ? 54 : 46;
           return (
             <div key={node.id}
               onPointerDown={handleNodePointerDown(node.id)}
@@ -1107,8 +1112,8 @@ function EcosystemGraph({
                 {node.has_sent_message && !node.is_viewer && (
                   <div title="Ha enviado mensajes" style={{
                     position: 'absolute', top: -3, right: -3, width: 20, height: 20, borderRadius: '50%',
-                    background: '#8b5cf6', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 2px 6px rgba(139,92,246,0.5)',
+                    background: '#0891b2', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 2px 6px rgba(8,145,178,0.5)',
                   }}>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
                   </div>

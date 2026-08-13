@@ -138,7 +138,7 @@ def _team_chat_history_sync(limit=50):
         {
             "id": str(m.id),
             "sender_id": str(m.sender_id),
-            "sender_name": m.sender.full_name or m.sender.email,
+            "sender_name": m.sender.display_name,
             "sender_email": m.sender.email,
             "content": m.content,
             "created_at": m.created_at.isoformat(),
