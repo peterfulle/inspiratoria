@@ -160,6 +160,8 @@ const styles = `
   .dash-header { margin-bottom: 20px; }
   .dash-title { font-size: 1.25rem; font-weight: 700; color: #111827; margin: 0 0 4px; letter-spacing: -0.02em; }
   .dash-subtitle { font-size: 0.82rem; color: #6b7280; margin: 0; }
+  .dash-banner-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .dash-banner-svg svg { width: 100%; height: 100%; }
 
   /* Page header — mismo look que el dashboard en todas las sub-páginas, sin banner de color */
   .pd-page-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
@@ -827,6 +829,26 @@ function seededRand(seed: string) {
   return () => { h = (h * 1103515245 + 12345) & 0x7fffffff; return (h % 1000) / 1000; };
 }
 
+// Convierte un username/email tipo "juan.reinoso.pardo" en "Juan Reinoso Pardo" para
+// nunca mostrar un identificador técnico como si fuera el nombre de una persona.
+function humanizeName(raw?: string | null): string {
+  if (!raw) return '';
+  return raw
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function bestName(person?: { full_name?: string; username?: string; email?: string } | null, fallback = 'Participante'): string {
+  if (!person) return fallback;
+  if (person.full_name && person.full_name.trim()) return person.full_name.trim();
+  const fromUsername = humanizeName(person.username);
+  if (fromUsername) return fromUsername;
+  const fromEmail = humanizeName(person.email?.split('@')[0]);
+  return fromEmail || fallback;
+}
+
 function ecoInitials(name: string) {
   return (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
 }
@@ -1274,9 +1296,8 @@ export default function ParticipantPortalPage() {
   // Derived
   const activeProgram = selectedProgram || myPrograms[0] || null;
   const roleLabel = ROLE_LABELS[portalUser?.role] || 'Participante';
-  const displayName = portalUser?.full_name && portalUser.full_name !== '' 
-    ? portalUser.full_name.split(' ')[0] 
-    : (portalUser?.email?.split('@')[0] || 'Participante');
+  const fullDisplayName = bestName(portalUser);
+  const displayName = fullDisplayName.split(' ')[0];
   const companyName = myPrograms[0]?.company_name || '';
   const totalSessions = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.sessions || 0), 0) || 0;
   const totalResources = programTemplate?.modules?.reduce((a: number, m: any) => a + (m.resources?.length || 0), 0) || 0;
@@ -1700,29 +1721,38 @@ export default function ParticipantPortalPage() {
           <div style={{ display: 'grid', gridTemplateColumns: myPrograms.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16, marginBottom: 24 }}>
             {myPrograms.map(mp => {
               const gradient = THEME_GRADIENTS[mp.theme] || THEME_GRADIENTS.leadership;
+              const hasBanner = !!(mp.banner_image || mp.banner_svg);
               return (
                 <div key={mp.id} onClick={() => { setSelectedProgram(mp); navigate('my-program'); }}
-                  style={{ background: gradient, borderRadius: 16, padding: '28px 28px 20px', cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', transition: 'all 0.2s', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'relative', overflow: 'hidden' }}>
+                  style={{ background: hasBanner ? '#111827' : gradient, borderRadius: 16, padding: '28px 28px 20px', cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', transition: 'all 0.2s', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'relative', overflow: 'hidden' }}>
+                  {mp.banner_image ? (
+                    <img src={mp.banner_image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : mp.banner_svg ? (
+                    <div className="dash-banner-svg" dangerouslySetInnerHTML={{ __html: mp.banner_svg }} />
+                  ) : null}
+                  {hasBanner && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />}
                   <div style={{ position: 'absolute', top: 0, right: 0, width: 120, height: 120, background: 'rgba(255,255,255,0.06)', borderRadius: '0 0 0 120px' }} />
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22d3ee', display: 'inline-block' }} />
-                    {roleLabel}
-                  </div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8, lineHeight: 1.3 }}>{mp.name}</div>
-                  <div style={{ fontSize: '0.82rem', opacity: 0.8, marginBottom: 16, lineHeight: 1.5 }}>{mp.description?.slice(0, 120)}{(mp.description?.length || 0) > 120 ? '...' : ''}</div>
-                  <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem', opacity: 0.75 }}>
-                    <span>{programTemplate?.modules?.length || mp.modules?.length || 0} módulos</span>
-                    <span>{programDetail?.activities?.length || mp.activities?.length || 0} actividades</span>
-                    <span>{programParticipants.length || mp.total_participants || 0} participantes</span>
-                  </div>
-                  {mp.vinculation && (
-                    <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(255,255,255,0.12)', borderRadius: 10, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      Mentoría con <strong>{mp.vinculation.partner_name}</strong>
+                  <div style={{ position: 'relative', zIndex: 1 }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22d3ee', display: 'inline-block' }} />
+                      {roleLabel}
                     </div>
-                  )}
-                  <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem', fontWeight: 600, opacity: 0.9 }}>
-                    <span>Ver programa</span>
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8, lineHeight: 1.3 }}>{mp.name}</div>
+                    <div style={{ fontSize: '0.82rem', opacity: 0.8, marginBottom: 16, lineHeight: 1.5 }}>{mp.description?.slice(0, 120)}{(mp.description?.length || 0) > 120 ? '...' : ''}</div>
+                    <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem', opacity: 0.75 }}>
+                      <span>{programTemplate?.modules?.length || mp.modules?.length || 0} módulos</span>
+                      <span>{programDetail?.activities?.length || mp.activities?.length || 0} actividades</span>
+                      <span>{programParticipants.length || mp.total_participants || 0} participantes</span>
+                    </div>
+                    {mp.vinculation && (
+                      <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(255,255,255,0.12)', borderRadius: 10, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        Mentoría con <strong>{mp.vinculation.partner_name}</strong>
+                      </div>
+                    )}
+                    <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem', fontWeight: 600, opacity: 0.9 }}>
+                      <span>Ver programa</span>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                    </div>
                   </div>
                 </div>
               );
@@ -2961,7 +2991,7 @@ export default function ParticipantPortalPage() {
     setProfileForm(f => ({ ...f, skills: f.skills.filter(sk => sk !== skill) }));
   };
 
-  const initials = (portalUser?.full_name || portalUser?.email || 'U')
+  const initials = bestName(portalUser, 'U')
     .split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
   /* ── Mentor multi-step wizard helpers ── */
@@ -3480,7 +3510,7 @@ export default function ParticipantPortalPage() {
               </label>
               <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
             </div>
-            <div className="prof-avatar-name">{portalUser?.full_name || displayName}</div>
+            <div className="prof-avatar-name">{fullDisplayName}</div>
             <div className="prof-avatar-role">{roleLabel}</div>
             {portalUser?.presentation && (
               <div style={{ fontSize: '0.78rem', color: '#4b5563', marginBottom: 12, textAlign: 'center', lineHeight: 1.5 }}>{portalUser.presentation}</div>
@@ -3804,15 +3834,15 @@ export default function ParticipantPortalPage() {
         <div>
           <div className="dash-header" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button onClick={() => setSelectedMentee(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }}>← </button>
-            <div><h1 className="dash-title">Perfil de {m.full_name}</h1><p className="dash-subtitle">{m.program_name}</p></div>
+            <div><h1 className="dash-title">Perfil de {bestName(m)}</h1><p className="dash-subtitle">{m.program_name}</p></div>
           </div>
           <div style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
             <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 24 }}>
               <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', fontWeight: 700, color: '#0891b2', overflow: 'hidden', flexShrink: 0 }}>
-                {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (m.full_name || 'M').charAt(0).toUpperCase()}
+                {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : bestName(m, 'M').charAt(0).toUpperCase()}
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#111827' }}>{m.full_name}</div>
+                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#111827' }}>{bestName(m)}</div>
                 <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>{m.headline || m.position || ''}</div>
                 <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{m.department || ''}</div>
               </div>
@@ -3840,10 +3870,10 @@ export default function ParticipantPortalPage() {
             <div key={m.id} onClick={() => setSelectedMentee(m)} style={{ background: '#fff', borderRadius: 14, padding: 20, cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', transition: 'box-shadow 0.15s', border: '1px solid #f3f4f6' }}>
               <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
                 <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 700, color: '#0891b2', overflow: 'hidden', flexShrink: 0 }}>
-                  {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (m.full_name || 'M').charAt(0).toUpperCase()}
+                  {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : bestName(m, 'M').charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>{m.full_name}</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>{bestName(m)}</div>
                   <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>{m.position || 'Sin cargo'}</div>
                   <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{m.program_name}</div>
                 </div>
@@ -3953,7 +3983,7 @@ export default function ParticipantPortalPage() {
                   ) : myMentees.length > 0 ? (
                     <select value={sessionForm.mentee_id} onChange={e => { const mt = myMentees.find((m: any) => m.id === e.target.value); setSessionForm(f => ({ ...f, mentee_id: e.target.value, program_id: mt?.program_id || f.program_id })); }} style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: '0.85rem' }}>
                       <option value="">Seleccionar mentee...</option>
-                      {myMentees.map((m: any) => <option key={m.id} value={m.id}>{m.full_name || m.email} — {m.program_name}</option>)}
+                      {myMentees.map((m: any) => <option key={m.id} value={m.id}>{bestName(m)} — {m.program_name}</option>)}
                     </select>
                   ) : (
                     <div style={{ fontSize: '0.82rem', color: '#9ca3af', padding: 8, background: '#f9fafb', borderRadius: 10 }}>No hay mentees asignados en tus programas</div>
@@ -3981,7 +4011,7 @@ export default function ParticipantPortalPage() {
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 600, maxHeight: '90vh', overflow: 'auto' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 4 }}>Notas de la sesión</h3>
-              <p style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 16 }}>{showNotesModal.title} — {showNotesModal.mentee?.full_name}</p>
+              <p style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 16 }}>{showNotesModal.title} — {bestName(showNotesModal.mentee)}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div className="prof-field"><label>¿De qué se trató esta sesión?</label><textarea value={sessionNotesForm.session_notes} onChange={e => setSessionNotesForm(f => ({ ...f, session_notes: e.target.value }))} rows={4} placeholder="Describe los temas principales y lo que se conversó..." /></div>
                 <div className="prof-field"><label>Estado emocional del mentee (1-5)</label>
@@ -4026,7 +4056,7 @@ export default function ParticipantPortalPage() {
               {upcoming.map(s => (
                 <div key={s.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                    <div><div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>{s.title}</div><div style={{ fontSize: '0.78rem', color: '#6b7280' }}>con {s.mentee.full_name} • {s.program_name}</div></div>
+                    <div><div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>{s.title}</div><div style={{ fontSize: '0.78rem', color: '#6b7280' }}>con {bestName(s.mentee)} • {s.program_name}</div></div>
                     <span style={{ padding: '4px 10px', borderRadius: 8, background: '#e0f2fe', color: '#0891b2', fontSize: '0.72rem', fontWeight: 600 }}>Programada</span>
                   </div>
                   <div style={{ fontSize: '0.82rem', color: '#4b5563', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> {new Date(s.scheduled_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} • {s.duration_minutes} min</div>
@@ -4049,7 +4079,7 @@ export default function ParticipantPortalPage() {
               {completed.map(s => (
                 <div key={s.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', border: '1px solid #f3f4f6' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                    <div><div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{s.title}</div><div style={{ fontSize: '0.75rem', color: '#6b7280' }}>con {s.mentee.full_name} • {new Date(s.scheduled_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div></div>
+                    <div><div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{s.title}</div><div style={{ fontSize: '0.75rem', color: '#6b7280' }}>con {bestName(s.mentee)} • {new Date(s.scheduled_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div></div>
                     <span style={{ padding: '4px 10px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.72rem', fontWeight: 600 }}>Completada</span>
                   </div>
                   {s.session_notes && <div style={{ fontSize: '0.8rem', color: '#4b5563', marginTop: 6, lineHeight: 1.5, borderLeft: '3px solid #e5e7eb', paddingLeft: 12 }}>{s.session_notes.slice(0, 200)}{s.session_notes.length > 200 ? '...' : ''}</div>}
@@ -4086,10 +4116,10 @@ export default function ParticipantPortalPage() {
               <div key={p.id} style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6' }}>
                 <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 12 }}>
                   <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 700, color: '#0891b2', overflow: 'hidden', flexShrink: 0 }}>
-                    {p.avatar_url ? <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (p.full_name || 'U').charAt(0).toUpperCase()}
+                    {p.avatar_url ? <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : bestName(p, 'U').charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{p.full_name}</div>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{bestName(p)}</div>
                     <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>{p.position || p.headline || ''}</div>
                     <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
                       <span style={{ padding: '2px 8px', borderRadius: 8, background: p.role === 'mentor' ? '#ecfdf5' : p.role === 'mentee' ? '#e0f2fe' : '#f3f4f6', color: p.role === 'mentor' ? '#047857' : p.role === 'mentee' ? '#0891b2' : '#6b7280', fontSize: '0.68rem', fontWeight: 600 }}>{p.role}</span>
@@ -4701,23 +4731,32 @@ export default function ParticipantPortalPage() {
             <div style={{ display: 'grid', gridTemplateColumns: myPrograms.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16, marginBottom: 24 }}>
               {myPrograms.map(mp => {
                 const gradient = THEME_GRADIENTS[mp.theme] || THEME_GRADIENTS.leadership;
+                const hasBanner = !!(mp.banner_image || mp.banner_svg);
                 return (
                   <div key={mp.id} onClick={() => { setSelectedProgram(mp); navigate('my-program'); }}
-                    style={{ background: gradient, borderRadius: 16, padding: '28px 28px 20px', cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', transition: 'all 0.2s', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'relative', overflow: 'hidden' }}>
+                    style={{ background: hasBanner ? '#111827' : gradient, borderRadius: 16, padding: '28px 28px 20px', cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', transition: 'all 0.2s', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'relative', overflow: 'hidden' }}>
+                    {mp.banner_image ? (
+                      <img src={mp.banner_image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : mp.banner_svg ? (
+                      <div className="dash-banner-svg" dangerouslySetInnerHTML={{ __html: mp.banner_svg }} />
+                    ) : null}
+                    {hasBanner && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />}
                     <div style={{ position: 'absolute', top: 0, right: 0, width: 120, height: 120, background: 'rgba(255,255,255,0.06)', borderRadius: '0 0 0 120px' }} />
-                    <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22d3ee', display: 'inline-block' }} />
-                      Mentee
-                    </div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8, lineHeight: 1.3 }}>{mp.name}</div>
-                    <div style={{ fontSize: '0.82rem', opacity: 0.8, marginBottom: 16, lineHeight: 1.5 }}>{mp.description?.slice(0, 120)}{(mp.description?.length || 0) > 120 ? '...' : ''}</div>
-                    <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem', opacity: 0.75 }}>
-                      <span>{programTemplate?.modules?.length || mp.modules?.length || 0} módulos</span>
-                      <span>{programDetail?.activities?.length || mp.activities?.length || 0} actividades</span>
-                    </div>
-                    <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem', fontWeight: 600, opacity: 0.9 }}>
-                      <span>Ver programa</span>
-                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                    <div style={{ position: 'relative', zIndex: 1 }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22d3ee', display: 'inline-block' }} />
+                        Mentee
+                      </div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8, lineHeight: 1.3 }}>{mp.name}</div>
+                      <div style={{ fontSize: '0.82rem', opacity: 0.8, marginBottom: 16, lineHeight: 1.5 }}>{mp.description?.slice(0, 120)}{(mp.description?.length || 0) > 120 ? '...' : ''}</div>
+                      <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem', opacity: 0.75 }}>
+                        <span>{programTemplate?.modules?.length || mp.modules?.length || 0} módulos</span>
+                        <span>{programDetail?.activities?.length || mp.activities?.length || 0} actividades</span>
+                      </div>
+                      <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem', fontWeight: 600, opacity: 0.9 }}>
+                        <span>Ver programa</span>
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                      </div>
                     </div>
                   </div>
                 );
@@ -4735,10 +4774,10 @@ export default function ParticipantPortalPage() {
                 <div onClick={() => navigate('my-mentor')} style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6', cursor: 'pointer', transition: 'all 0.2s' }}>
                   <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                     <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #0891b2, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', fontWeight: 800, color: '#fff', flexShrink: 0, overflow: 'hidden' }}>
-                      {myMentor.avatar_url ? <img src={myMentor.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (myMentor.full_name || 'M').charAt(0).toUpperCase()}
+                      {myMentor.avatar_url ? <img src={myMentor.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : bestName(myMentor, 'M').charAt(0).toUpperCase()}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: '1rem', color: '#111827' }}>{myMentor.full_name}</div>
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: '#111827' }}>{bestName(myMentor, 'Mentor')}</div>
                       <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>{myMentor.headline || myMentor.position || ''}</div>
                       <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: 2 }}>{myMentor.program_name}</div>
                     </div>
@@ -4760,7 +4799,7 @@ export default function ParticipantPortalPage() {
                 </h2>
                 <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6' }}>
                   <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#111827', marginBottom: 6 }}>{upcoming[0].title}</div>
-                  <div style={{ fontSize: '0.82rem', color: '#6b7280', marginBottom: 4 }}>con {upcoming[0].mentor?.full_name}</div>
+                  <div style={{ fontSize: '0.82rem', color: '#6b7280', marginBottom: 4 }}>con {bestName(upcoming[0].mentor)}</div>
                   <div style={{ fontSize: '0.82rem', color: '#4b5563', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     {new Date(upcoming[0].scheduled_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} • {upcoming[0].duration_minutes} min
@@ -4827,7 +4866,7 @@ export default function ParticipantPortalPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>{s.title}</div>
-                      <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>con {s.mentor?.full_name} • {s.program_name}</div>
+                      <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>con {bestName(s.mentor)} • {s.program_name}</div>
                     </div>
                     <span style={{ padding: '4px 10px', borderRadius: 8, background: '#e0f2fe', color: '#0891b2', fontSize: '0.72rem', fontWeight: 600 }}>Programada</span>
                   </div>
@@ -4859,7 +4898,7 @@ export default function ParticipantPortalPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{s.title}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>con {s.mentor?.full_name} • {new Date(s.scheduled_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>con {bestName(s.mentor)} • {new Date(s.scheduled_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</div>
                     </div>
                     <span style={{ padding: '4px 10px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.72rem', fontWeight: 600 }}>Completada</span>
                   </div>
@@ -4919,10 +4958,10 @@ export default function ParticipantPortalPage() {
         <div style={{ background: '#fff', borderRadius: 18, padding: 28, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6', marginBottom: 24 }}>
           <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', marginBottom: 20 }}>
             <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #0891b2, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', fontWeight: 800, color: '#fff', flexShrink: 0, overflow: 'hidden' }}>
-              {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (m.full_name || 'M').charAt(0).toUpperCase()}
+              {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : bestName(m, 'M').charAt(0).toUpperCase()}
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: '1.2rem', color: '#111827', marginBottom: 4 }}>{m.full_name}</div>
+              <div style={{ fontWeight: 700, fontSize: '1.2rem', color: '#111827', marginBottom: 4 }}>{bestName(m)}</div>
               <div style={{ fontSize: '0.88rem', color: '#6b7280', marginBottom: 4 }}>{m.headline || m.position || ''}</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span style={{ padding: '3px 10px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.72rem', fontWeight: 600 }}>Mentor</span>
@@ -5045,7 +5084,7 @@ export default function ParticipantPortalPage() {
           boxShadow: '0 1px 0 rgba(255,255,255,0.08)',
         }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FFD902', flexShrink: 0 }} />
-          Vista previa desde administración — estás viendo el portal de <strong>{displayName}</strong> ({roleLabel}), solo lectura. No se registra como un acceso real de esta persona.
+          Vista previa desde administración — estás viendo el portal de <strong>{fullDisplayName}</strong> ({roleLabel}), solo lectura. No se registra como un acceso real de esta persona.
         </div>
       )}
       <div className="p-layout" style={isAdminPreview ? { paddingTop: 38 } : undefined}>
@@ -5122,7 +5161,7 @@ export default function ParticipantPortalPage() {
               </div>
               {sidebarExpanded && (
                 <div className="p-user-info" style={{ display: 'block' }}>
-                  <div className="p-user-name">{displayName}</div>
+                  <div className="p-user-name">{fullDisplayName}</div>
                   <div className="p-user-role">{roleLabel}</div>
                 </div>
               )}
@@ -5182,7 +5221,7 @@ export default function ParticipantPortalPage() {
             <span className="p-topbar-badge p-topbar-badge-role">{roleLabel}</span>
             <span className="p-topbar-badge p-topbar-badge-portal">Portal: {portalCode}</span>
             <div className="p-topbar-divider" />
-            <span className="p-topbar-user">{displayName}</span>
+            <span className="p-topbar-user">{fullDisplayName}</span>
             {portalUser?.id && <span className="p-topbar-id">ID: {portalUser.id}</span>}
             <span className="p-topbar-time">{currentTime}</span>
             <div className="p-topbar-divider" />

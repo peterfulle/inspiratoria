@@ -21,6 +21,10 @@ from .models import Program, ProgramParticipant, Vinculation, AuditLog
 router = APIRouter(prefix="/programs", tags=["Programs"])
 
 
+def _display_name(u) -> str:
+    return getattr(u, "display_name", None) or "Participante"
+
+
 PROGRAM_PARTICIPANT_ROLES = [
     "facilitator",
     "mentor",
@@ -606,7 +610,7 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
                 other = vinc.participant2 if vinc.participant1.user == user else vinc.participant1
                 vinculation_info = {
                     "type": vinc.type,
-                    "partner_name": other.user.get_full_name(),
+                    "partner_name": _display_name(other.user),
                     "partner_email": other.user.email,
                     "partner_role": other.role,
                 }
@@ -617,6 +621,8 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
                 "description": p.description,
                 "theme": p.theme,
                 "status": p.status,
+                "banner_svg": p.banner_svg or "",
+                "banner_image": p.banner_image or "",
                 "company_name": p.company.name if p.company else None,
                 "company_slug": p.company.slug if p.company else None,
                 "my_role": m.role,
@@ -700,7 +706,7 @@ async def list_participants(
                     "company": p.user.company.name if p.user.company else None,
                     "is_onboarded": p.user.is_onboarded,
                 },
-                "program_id": str(p.program.id),
+                "program_id": str(program.id),
                 "role": p.role,
                 "status": p.status,
                 "invitation_sent_at": p.invitation_sent_at,

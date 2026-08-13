@@ -437,6 +437,31 @@ class User(AbstractUser):
 
     def __str__(self) -> str:
         return f"{self.full_name} ({self.role})"
+
+    @property
+    def display_name(self) -> str:
+        """Nombre humano a mostrar: full_name -> mejor candidato entre first/last_name (Django)
+        y el username/email humanizado -> "Participante".
+
+        Algunas cuentas (creadas por admin, importadas en bulk) tienen first_name/last_name
+        poblados pero NO el campo full_name propio de este modelo, mientras que otras solo
+        tienen un username tipo "nombre.apellido.apellido2" — nunca mostrar un identificador
+        técnico como nombre si existe un nombre real. Entre los dos candidatos nos quedamos
+        con el que tenga más "palabras" (más completo), ya que cualquiera puede estar
+        incompleto o ser un placeholder genérico (ej. username="chile").
+        """
+        if self.full_name and self.full_name.strip():
+            return self.full_name.strip()
+
+        legacy_name = f"{self.first_name or ''} {self.last_name or ''}".strip()
+
+        raw = self.username or (self.email.split("@")[0] if self.email else "")
+        cleaned = raw.replace(".", " ").replace("_", " ").replace("-", " ")
+        humanized = " ".join(w.capitalize() for w in cleaned.split() if w)
+
+        if legacy_name and humanized:
+            return legacy_name if len(legacy_name.split()) >= len(humanized.split()) else humanized
+        return legacy_name or humanized or "Participante"
     
     @staticmethod
     def _generate_portal_code():

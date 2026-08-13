@@ -3171,8 +3171,9 @@ async def get_portal_data(portal_code: str):
         return {
             "user": {
                 "id": str(user.id),
+                "username": user.username,
                 "email": user.email,
-                "full_name": user.full_name,
+                "full_name": user.display_name,
                 "role": user.role,
                 "phone": getattr(user, 'phone', '') or "",
                 "position": getattr(user, 'position', '') or "",
@@ -4923,7 +4924,7 @@ async def get_my_mentor(portal_code: str):
             for v in vincs:
                 mu = v.participant1.user
                 mentor = {
-                    "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                    "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
                     "position": mu.position or "", "department": mu.department or "",
                     "avatar_url": getattr(mu, "avatar_url", "") or "",
                     "linkedin_url": getattr(mu, "linkedin_url", "") or "",
@@ -4944,7 +4945,7 @@ async def get_my_mentor(portal_code: str):
             for v in vincs2:
                 mu = v.participant2.user
                 mentor = {
-                    "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                    "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
                     "position": mu.position or "", "department": mu.department or "",
                     "avatar_url": getattr(mu, "avatar_url", "") or "",
                     "linkedin_url": getattr(mu, "linkedin_url", "") or "",
@@ -4969,7 +4970,7 @@ async def get_my_mentor(portal_code: str):
                 if mentor_pp:
                     mu = mentor_pp.user
                     mentor = {
-                        "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                        "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
                         "position": mu.position or "", "department": mu.department or "",
                         "avatar_url": getattr(mu, "avatar_url", "") or "",
                         "linkedin_url": getattr(mu, "linkedin_url", "") or "",
@@ -5014,7 +5015,7 @@ async def get_my_mentees(portal_code: str):
                 if mu.id not in seen_ids:
                     seen_ids.add(mu.id)
                     mentees.append({
-                        "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                        "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
                         "position": mu.position or "", "department": mu.department or "",
                         "avatar_url": getattr(mu, "avatar_url", "") or "",
                         "linkedin_url": getattr(mu, "linkedin_url", "") or "",
@@ -5032,7 +5033,7 @@ async def get_my_mentees(portal_code: str):
                 if mu.id not in seen_ids:
                     seen_ids.add(mu.id)
                     mentees.append({
-                        "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                        "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
                         "position": mu.position or "", "department": mu.department or "",
                         "avatar_url": getattr(mu, "avatar_url", "") or "",
                         "linkedin_url": getattr(mu, "linkedin_url", "") or "",
@@ -5053,7 +5054,7 @@ async def get_my_mentees(portal_code: str):
                 if mu.id not in seen_ids:
                     seen_ids.add(mu.id)
                     mentees.append({
-                        "id": str(mu.id), "full_name": mu.full_name or "", "email": mu.email,
+                        "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
                         "position": mu.position or "", "department": mu.department or "",
                         "avatar_url": getattr(mu, "avatar_url", "") or "",
                         "linkedin_url": getattr(mu, "linkedin_url", "") or "",
@@ -5103,8 +5104,8 @@ async def get_my_sessions(portal_code: str):
             "id": str(s.id), "title": s.title, "description": s.description,
             "scheduled_at": s.scheduled_at.isoformat(), "duration_minutes": s.duration_minutes,
             "status": s.status, "meeting_url": s.meeting_url or "",
-            "mentor": {"id": str(s.mentor.id), "full_name": s.mentor.full_name or "", "avatar_url": getattr(s.mentor, "avatar_url", "") or ""},
-            "mentee": {"id": str(s.mentee.id), "full_name": s.mentee.full_name or "", "avatar_url": getattr(s.mentee, "avatar_url", "") or ""},
+            "mentor": {"id": str(s.mentor.id), "username": s.mentor.username, "full_name": s.mentor.display_name, "avatar_url": getattr(s.mentor, "avatar_url", "") or ""},
+            "mentee": {"id": str(s.mentee.id), "username": s.mentee.username, "full_name": s.mentee.display_name, "avatar_url": getattr(s.mentee, "avatar_url", "") or ""},
             "program_name": s.program.name, "program_id": str(s.program.id),
             "session_notes": s.session_notes or "", "topics_covered": s.topics_covered or [],
             "mentee_mood": s.mentee_mood, "next_steps": s.next_steps or "",
@@ -5534,13 +5535,19 @@ async def get_influence_network(portal_code: str):
         user = _get_portal_user(portal_code)
         from programs.models import ProgramParticipant
 
-        my_program_ids = ProgramParticipant.objects.filter(
+        from programs.models import Program
+
+        my_program_ids = list(ProgramParticipant.objects.filter(
             user=user, deleted_at__isnull=True
-        ).values_list("program_id", flat=True)
+        ).values_list("program_id", flat=True))
+
+        # No select_related("program"): Program.design_snapshot puede pesar varios MB y
+        # select_related lo duplicaría por cada peer, multiplicando la transferencia de datos.
+        program_names = dict(Program.objects.filter(id__in=my_program_ids).only("id", "name").values_list("id", "name"))
 
         peers = ProgramParticipant.objects.filter(
-            program_id__in=list(my_program_ids), deleted_at__isnull=True,
-        ).exclude(user=user).select_related("user", "program")
+            program_id__in=my_program_ids, deleted_at__isnull=True,
+        ).exclude(user=user).select_related("user")
 
         seen = set()
         network = []
@@ -5550,13 +5557,13 @@ async def get_influence_network(portal_code: str):
                 continue
             seen.add(u.id)
             network.append({
-                "id": str(u.id), "full_name": u.full_name or "",
+                "id": str(u.id), "username": u.username, "full_name": u.display_name,
                 "position": u.position or "", "department": u.department or "",
                 "avatar_url": getattr(u, "avatar_url", "") or "",
                 "linkedin_url": getattr(u, "linkedin_url", "") or "",
                 "bio": getattr(u, "bio", "") or "",
                 "headline": getattr(u, "headline", "") or "",
-                "role": p.role, "program_name": p.program.name,
+                "role": p.role, "program_name": program_names.get(p.program_id, ""),
             })
         return {"network": network}
 
@@ -5590,17 +5597,18 @@ async def get_ecosystem_graph(portal_code: str, program_id: Optional[str] = None
     de mentoría) — la afinidad por ciudad/área NO genera una línea (solo posiciona).
     """
     def _resolve():
-        from programs.models import ProgramParticipant, Vinculation, ProgramChatMessage
+        from programs.models import ProgramParticipant, Vinculation, ProgramChatMessage, Program
 
         viewer = _get_portal_user(portal_code)
 
-        pp_qs = ProgramParticipant.objects.filter(user=viewer, deleted_at__isnull=True).select_related("program")
+        pp_qs = ProgramParticipant.objects.filter(user=viewer, deleted_at__isnull=True)
         if program_id:
             pp_qs = pp_qs.filter(program_id=program_id)
         viewer_pp = pp_qs.order_by("-created_at").first()
         if not viewer_pp:
             return None
-        program = viewer_pp.program
+        # .only(): Program.design_snapshot puede pesar varios MB, no lo necesitamos aquí.
+        program = Program.objects.only("id", "name").get(id=viewer_pp.program_id)
 
         participants = list(
             ProgramParticipant.objects.filter(program=program, deleted_at__isnull=True)
@@ -5645,8 +5653,7 @@ async def get_ecosystem_graph(portal_code: str, program_id: Optional[str] = None
         )
 
         def display_name(u):
-            # Igual que el fallback del chat: username o el prefijo del email antes que un texto genérico.
-            return u.full_name or u.username or (u.email.split("@")[0] if u.email else "") or "Participante"
+            return u.display_name
 
         nodes = []
         for p in participants:
