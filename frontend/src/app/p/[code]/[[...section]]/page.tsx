@@ -726,6 +726,12 @@ const styles = `
     background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
     background-size: 200px 200px, auto, auto, auto, auto;
   }
+  /* Vida ambiental del grafo — sutil, no debe distraer (sección 21 del instructivo) */
+  @keyframes ecoBreathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+  @keyframes ecoPulseRing { 0% { transform: scale(0.85); opacity: 0.55; } 100% { transform: scale(1.9); opacity: 0; } }
+  @keyframes ecoGlowPulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.75; } }
+  .eco-node-breathe { animation: ecoBreathe 5s ease-in-out infinite; }
+  .eco-pulse-ring { position: absolute; inset: -8px; border-radius: 50%; border: 2px solid #14b8a6; animation: ecoPulseRing 2.6s cubic-bezier(0.4,0,0.2,1) infinite; pointer-events: none; }
   .eco-zoom-controls { position: absolute; left: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px 10px; box-shadow: 0 4px 14px rgba(15,23,42,0.08); font-size: 0.75rem; color: #374151; font-weight: 600; }
   .eco-zoom-controls button { border: none; background: #f3f4f6; width: 22px; height: 22px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; color: #374151; display: flex; align-items: center; justify-content: center; }
   .eco-zoom-controls button:hover { background: #e5e7eb; }
@@ -1023,6 +1029,10 @@ function EcosystemGraph({
             const midX = (s.x! + t.x!) / 2 + nx * 20, midY = (s.y! + t.y!) / 2 + ny * 20;
             return (
               <g key={i} opacity={dimmed ? 0.12 : 1}>
+                {isDupla && (
+                  <line x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#14b8a6" strokeWidth={11} strokeLinecap="round"
+                    style={{ animation: 'ecoGlowPulse 2.8s ease-in-out infinite', animationDelay: `${(i % 5) * 0.3}s` }} />
+                )}
                 <line x1={s.x} y1={s.y} x2={t.x} y2={t.y}
                   stroke={isDupla ? '#14b8a6' : '#cbd5e1'} strokeWidth={isDupla ? 5 : 1.5}
                   strokeDasharray={isDupla ? undefined : '4 5'} strokeLinecap="round" />
@@ -1056,18 +1066,22 @@ function EcosystemGraph({
                 touchAction: 'none',
               }}>
               <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-                <div style={{
-                  width: size, height: size, borderRadius: '50%', overflow: 'hidden',
-                  border: `${node.is_viewer ? 4 : 3}px solid ${node.is_viewer ? '#14b8a6' : ringColor}`,
-                  background: node.avatar_url ? '#fff' : (node.role === 'mentor' ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#3b82f6,#2563eb)'),
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: isSelected ? `0 0 0 4px ${ringColor}33, 0 6px 18px rgba(15,23,42,0.25)` : '0 2px 8px rgba(15,23,42,0.12)',
-                }}>
-                  {node.avatar_url ? (
-                    <img src={node.avatar_url} alt={node.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span style={{ color: '#fff', fontWeight: 800, fontSize: size > 70 ? '1.3rem' : '1rem' }}>{ecoInitials(node.full_name)}</span>
-                  )}
+                {node.is_viewer && !dimmed && <div className="eco-pulse-ring" />}
+                {(node.is_viewer || node.is_my_dupla) && !dimmed && <div className="eco-pulse-ring" style={{ animationDelay: '1.3s' }} />}
+                <div className="eco-node-breathe" style={{ animationDelay: `${(seededRand(node.id)() * 3).toFixed(2)}s`, width: size, height: size }}>
+                  <div style={{
+                    width: size, height: size, borderRadius: '50%', overflow: 'hidden',
+                    border: `${node.is_viewer ? 4 : 3}px solid ${node.is_viewer ? '#14b8a6' : ringColor}`,
+                    background: node.avatar_url ? '#fff' : (node.role === 'mentor' ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#3b82f6,#2563eb)'),
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: isSelected ? `0 0 0 4px ${ringColor}33, 0 6px 18px rgba(15,23,42,0.25)` : '0 2px 8px rgba(15,23,42,0.12)',
+                  }}>
+                    {node.avatar_url ? (
+                      <img src={node.avatar_url} alt={node.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ color: '#fff', fontWeight: 800, fontSize: size > 70 ? '1.3rem' : '1rem' }}>{ecoInitials(node.full_name)}</span>
+                    )}
+                  </div>
                 </div>
                 {node.has_sent_message && !node.is_viewer && (
                   <div title="Ha enviado mensajes" style={{
@@ -2411,7 +2425,8 @@ export default function ParticipantPortalPage() {
                             )}
                             {!selectedNode.is_viewer && (
                               <>
-                                <button className="eco-btn-primary" onClick={() => navigate('my-chat')}><EcoIcons.message /> Enviar mensaje</button>
+                                <button className="eco-btn-primary" onClick={() => navigate('my-chat')}><EcoIcons.message /> Ir al chat del programa</button>
+                                <div className="eco-empty-hint" style={{ marginTop: -4, marginBottom: 10, textAlign: 'center' }}>El chat es grupal — todo el programa participa ahí.</div>
                                 {selectedNode.is_my_dupla && (
                                   <button className="eco-btn-secondary" onClick={() => navigate(isMentee ? 'my-mentor' : 'my-sessions')}>Ir a mi espacio de mentoría</button>
                                 )}

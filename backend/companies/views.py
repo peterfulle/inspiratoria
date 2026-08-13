@@ -5644,13 +5644,17 @@ async def get_ecosystem_graph(portal_code: str, program_id: Optional[str] = None
             .values_list("sender_id", flat=True).distinct()
         )
 
+        def display_name(u):
+            # Igual que el fallback del chat: username o el prefijo del email antes que un texto genérico.
+            return u.full_name or u.username or (u.email.split("@")[0] if u.email else "") or "Participante"
+
         nodes = []
         for p in participants:
             u = p.user
             is_mentor = p.role == "mentor"
             nodes.append({
                 "id": str(u.id),
-                "full_name": u.full_name or "",
+                "full_name": display_name(u),
                 "role": p.role,
                 "avatar_url": getattr(u, "avatar_url", "") or "",
                 "city": getattr(u, "residence_city", "") or "",
