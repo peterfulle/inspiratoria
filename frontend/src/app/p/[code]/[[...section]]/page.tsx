@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { apiFetch } from "@/lib/api";
 import { forceSimulation, forceLink, forceManyBody, forceCollide, forceX, forceY, type Simulation } from 'd3-force';
+import ProgramPreviewView from '@/app/dashboard/programs/preview/ProgramPreviewView';
 
 // ============================================================================
 // CONSTANTS
@@ -779,7 +780,6 @@ const styles = `
 // ============================================================================
 const navIcons: Record<string, JSX.Element> = {
   home: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
-  program: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>,
   modules: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>,
   activities: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
   participants: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
@@ -790,7 +790,6 @@ const navIcons: Record<string, JSX.Element> = {
   chat: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
   support: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
   logout: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
-  progress: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
 };
 
 // ============================================================================
@@ -1164,8 +1163,6 @@ export default function ParticipantPortalPage() {
   // Map URL slug → internal section key
   const SECTION_SLUGS: Record<string, string> = {
     '': 'dashboard',
-    'programa': 'my-program',
-    'progreso': 'my-progress',
     'modulos': 'my-modules',
     'actividades': 'my-activities',
     'participantes': 'my-participants',
@@ -1203,6 +1200,8 @@ export default function ParticipantPortalPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [programTemplate, setProgramTemplate] = useState<any>(null);
   const [programParticipants, setProgramParticipants] = useState<any[]>([]);
+  const [modulesTemplate, setModulesTemplate] = useState<any>(null);
+  const [modulesTemplateLoading, setModulesTemplateLoading] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [ecosystemData, setEcosystemData] = useState<any>(null);
@@ -1330,8 +1329,6 @@ export default function ParticipantPortalPage() {
   const navItems = [
     { section: 'Mi Espacio', items: [
       { id: 'dashboard', label: 'Inicio', icon: 'home' },
-      { id: 'my-program', label: 'Mi Programa', icon: 'program', count: myPrograms.length },
-      { id: 'my-progress', label: 'Progreso', icon: 'progress' },
       { id: 'my-modules', label: 'Módulos', icon: 'modules', count: programTemplate?.modules?.length || 0 },
       { id: 'my-activities', label: 'Actividades', icon: 'activities' },
       { id: 'my-participants', label: 'Participantes', icon: 'participants', count: programParticipants.length || 0 },
@@ -1545,6 +1542,19 @@ export default function ParticipantPortalPage() {
       .finally(() => setEcosystemLoading(false));
   }, [activeNav, portalCode, selectedProgram?.id]);
 
+  // Fetch the full program template (con archivos) cuando se entra a Módulos —
+  // misma llamada que usa Studio, siempre en vivo, para replicar esa vista exacta.
+  useEffect(() => {
+    if (activeNav !== 'my-modules' || !selectedProgram?.template_slug) return;
+    if (modulesTemplate && modulesTemplate.slug === selectedProgram.template_slug) return; // ya cargado
+    setModulesTemplateLoading(true);
+    apiFetch(`${API_URL}/api/program-templates?include_files=true`)
+      .then(r => r.ok ? r.json() : [])
+      .then(all => setModulesTemplate((Array.isArray(all) ? all : []).find((t: any) => t.slug === selectedProgram.template_slug) || null))
+      .catch(() => setModulesTemplate(null))
+      .finally(() => setModulesTemplateLoading(false));
+  }, [activeNav, selectedProgram?.template_slug]);
+
   // ── Chat: fetch programs list ──
   useEffect(() => {
     if (activeNav !== 'my-chat') {
@@ -1723,7 +1733,7 @@ export default function ParticipantPortalPage() {
               const gradient = THEME_GRADIENTS[mp.theme] || THEME_GRADIENTS.leadership;
               const hasBanner = !!(mp.banner_image || mp.banner_svg);
               return (
-                <div key={mp.id} onClick={() => { setSelectedProgram(mp); navigate('my-program'); }}
+                <div key={mp.id} onClick={() => { setSelectedProgram(mp); navigate('my-modules'); }}
                   style={{ background: hasBanner ? '#111827' : gradient, borderRadius: 16, padding: '28px 28px 20px', cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', transition: 'all 0.2s', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'relative', overflow: 'hidden' }}>
                   {mp.banner_image ? (
                     <img src={mp.banner_image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1774,6 +1784,8 @@ export default function ParticipantPortalPage() {
               </div>
             ))}
           </div>
+
+          {renderProgressSection()}
         </>
       )}
     </>
@@ -1785,35 +1797,6 @@ export default function ParticipantPortalPage() {
     if (!mp) return <div className="empty-state">Selecciona un programa</div>;
 
     const activities = programDetail?.activities || mp.activities || [];
-    const modulesCount = programTemplate?.modules?.length || 0;
-
-    // Cronograma sync helpers — match scheduled activities (by name + module_id) so the
-    // Módulos tab reflects the dates set in Studio › Cronograma.
-    const norm = (s: any) => (s || '').toString().trim().toLowerCase();
-    const fmtSchedDate = (d: any) => {
-      if (!d) return null;
-      try {
-        const dt = new Date(d);
-        if (isNaN(dt.getTime())) return null;
-        return dt.toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-      } catch { return null; }
-    };
-    const findScheduled = (act: any, modId?: any) => {
-      const target = norm(act?.name || act?.title);
-      if (!target) return null;
-      return activities.find((sa: any) => {
-        if (!sa?.start_date) return false;
-        if (norm(sa.name || sa.title) !== target) return false;
-        if (modId && sa.module_id && String(sa.module_id) !== String(modId)) return false;
-        return true;
-      }) || null;
-    };
-    // Activities scheduled in Studio that don't belong to any template module
-    const moduleActivityKeys = new Set<string>();
-    (programTemplate?.modules || []).forEach((mod: any) => {
-      (mod.activities || []).forEach((a: any) => moduleActivityKeys.add(norm(a.name || a.title)));
-    });
-    const orphanActivities = activities.filter((sa: any) => sa?.start_date && !moduleActivityKeys.has(norm(sa.name || sa.title)));
 
     const getStatusBadge = (st: string) => (
       <span className={`badge ${st === 'active' || st === 'running' ? 'badge-active' : st === 'completed' ? 'badge-completed' : 'badge-draft'}`}>
@@ -1821,12 +1804,8 @@ export default function ParticipantPortalPage() {
       </span>
     );
 
-    const pageTitle = detailTab === 'overview'
-      ? mp.name
-      : ({ modules: 'Módulos', participants: 'Participantes', activities: 'Actividades', milestones: 'Hitos', ecosystem: 'Ecosistema' } as Record<string, string>)[detailTab];
-    const pageSubtitle = detailTab === 'overview'
-      ? (mp.description || `${roleLabel} · Mi rol en este programa`)
-      : `${roleLabel} · ${programTemplate?.duration || mp.name}`;
+    const pageTitle = ({ participants: 'Participantes', activities: 'Actividades', milestones: 'Hitos', ecosystem: 'Ecosistema' } as Record<string, string>)[detailTab];
+    const pageSubtitle = `${roleLabel} · ${programTemplate?.duration || mp.name}`;
 
     return (
       <div className={`pd-wrapper${detailTab === 'ecosystem' ? ' pd-wrapper-eco' : ''}`}>
@@ -1840,305 +1819,7 @@ export default function ParticipantPortalPage() {
                 <h1 className="dash-title">{pageTitle}</h1>
                 <p className="dash-subtitle">{pageSubtitle}</p>
               </div>
-              {detailTab === 'overview' && (
-                <div className="pd-page-pills">
-                  <span className="pd-pill-lite">{LABELS.theme[mp.theme] || mp.theme}</span>
-                  <span className="pd-pill-lite">{LABELS.status[mp.status] || mp.status}</span>
-                  {programTemplate?.tags?.map((tag: string, i: number) => (
-                    <span key={i} className="pd-pill-lite">#{tag}</span>
-                  ))}
-                </div>
-              )}
             </div>
-          )}
-
-          {/* ─── TAB: OVERVIEW ─── */}
-          {detailTab === 'overview' && (
-            <>
-              <div className="pd-stats">
-                {[
-                  { label: 'Participantes', value: programParticipants.length, sub: programParticipants.length > 0 ? 'Inscritos' : 'Sin inscripciones', color: '#0891b2' },
-                  { label: 'Actividades', value: activities.length, sub: `${activities.filter((a: any) => a.status === 'completed').length} completadas`, color: '#059669' },
-                  { label: 'Módulos', value: modulesCount, sub: `${totalSessions} sesiones, ${totalResources} recursos`, color: '#2563eb' },
-                  { label: 'Hitos', value: programTemplate?.milestones?.length || 0, sub: programTemplate?.milestones?.length ? 'Definidos' : 'Sin hitos', color: '#f59e0b' },
-                ].map((s, i) => (
-                  <div key={i} className="pd-stat">
-                    <div className="pd-stat-accent" style={{ background: s.color }} />
-                    <div className="pd-stat-label">{s.label}</div>
-                    <div className="pd-stat-val">{s.value}</div>
-                    <div className="pd-stat-sub">{s.sub}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Program info */}
-              <div className="pd-section">
-                <div className="pd-section-head">
-                  <div className="pd-section-title">Información del Programa</div>
-                </div>
-                <div className="pd-info-grid">
-                  <div className="pd-info-item"><div className="pd-info-label">Nombre</div><div className="pd-info-val">{mp.name}</div></div>
-                  <div className="pd-info-item"><div className="pd-info-label">Tema</div><div className="pd-info-val">{LABELS.theme[mp.theme] || mp.theme}</div></div>
-                  <div className="pd-info-item"><div className="pd-info-label">Estado</div><div className="pd-info-val">{LABELS.status[mp.status] || mp.status}</div></div>
-                  <div className="pd-info-item"><div className="pd-info-label">Mi rol</div><div className="pd-info-val">{roleLabel}</div></div>
-                  <div className="pd-info-item"><div className="pd-info-label">Empresa</div><div className="pd-info-val">{mp.company_name || companyName}</div></div>
-                  <div className="pd-info-item"><div className="pd-info-label">Inscripción</div><div className="pd-info-val">{mp.joined_at ? new Date(mp.joined_at).toLocaleDateString('es-CL') : '—'}</div></div>
-                  {programTemplate?.duration && <div className="pd-info-item"><div className="pd-info-label">Duración</div><div className="pd-info-val">{programTemplate.duration}</div></div>}
-                  {programTemplate?.category && <div className="pd-info-item"><div className="pd-info-label">Categoría</div><div className="pd-info-val">{programTemplate.category}</div></div>}
-                  {mp.description && <div className="pd-info-item" style={{ gridColumn: '1 / -1' }}><div className="pd-info-label">Descripción</div><div className="pd-info-val" style={{ fontWeight: 400 }}>{mp.description}</div></div>}
-                </div>
-              </div>
-
-              {/* Tags */}
-              {programTemplate?.tags?.length > 0 && (
-                <div className="pd-section">
-                  <div className="pd-section-head">
-                    <div className="pd-section-title">Etiquetas</div>
-                    <div className="pd-section-count">{programTemplate.tags.length}</div>
-                  </div>
-                  <div className="pd-section-body">
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {programTemplate.tags.map((tag: string, i: number) => (
-                        <span key={i} className="pd-tag">#{tag}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Requirements */}
-              {programTemplate?.mentorRequirements && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-                  <div className="pd-req">
-                    <div className="pd-req-head">Requisitos Mentor</div>
-                    <div className="pd-req-row"><span className="pd-req-label">Máx. mentees</span><span className="pd-req-val">{programTemplate.mentorRequirements.maxMentees || '—'}</span></div>
-                    <div className="pd-req-row"><span className="pd-req-label">Experiencia mínima</span><span className="pd-req-val">{programTemplate.mentorRequirements.minExperienceYears ? `${programTemplate.mentorRequirements.minExperienceYears} años` : '—'}</span></div>
-                    <div className="pd-req-row"><span className="pd-req-label">Nivel requerido</span><span className="pd-req-val">{programTemplate.mentorRequirements.requiredLevel || '—'}</span></div>
-                    <div className="pd-req-row"><span className="pd-req-label">Requiere perfil</span><span className="pd-req-val">{programTemplate.mentorRequirements.requireProfile ? 'Sí' : 'No'}</span></div>
-                    <div className="pd-req-row"><span className="pd-req-label">Requiere LinkedIn</span><span className="pd-req-val">{programTemplate.mentorRequirements.requireLinkedIn ? 'Sí' : 'No'}</span></div>
-                  </div>
-                  <div className="pd-req">
-                    <div className="pd-req-head">Requisitos Mentee</div>
-                    <div className="pd-req-row"><span className="pd-req-label">Puede elegir mentor</span><span className="pd-req-val">{programTemplate.menteeRequirements?.canSelectMentor ? 'Sí' : 'No'}</span></div>
-                    <div className="pd-req-row"><span className="pd-req-label">Máx. mentores</span><span className="pd-req-val">{programTemplate.menteeRequirements?.maxMentors || '—'}</span></div>
-                    <div className="pd-req-row"><span className="pd-req-label">Objetivos requeridos</span><span className="pd-req-val">{programTemplate.menteeRequirements?.requiredGoals ? 'Sí' : 'No'}</span></div>
-                  </div>
-                </div>
-              )}
-
-              {/* Activities summary */}
-              {activities.length > 0 && (
-                <div className="pd-section">
-                  <div className="pd-section-head">
-                    <div className="pd-section-title">Actividades</div>
-                    <div className="pd-section-count">{activities.length}</div>
-                  </div>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table className="data-table">
-                      <thead>
-                        <tr><th>Nombre</th><th>Tipo</th><th>Categoría</th><th>Modalidad</th><th>Obligatoria</th><th>Estado</th></tr>
-                      </thead>
-                      <tbody>
-                        {activities.map((a: any, i: number) => (
-                          <tr key={i}>
-                            <td style={{ fontWeight: 600 }}>{a.name}</td>
-                            <td>{LABELS.actType[a.activity_type || a.type] || a.activity_type || a.type || '—'}</td>
-                            <td>{LABELS.actCategory[a.category] || a.category || '—'}</td>
-                            <td>{LABELS.modality[a.modality] || a.modality || '—'}</td>
-                            <td>{a.is_mandatory ? 'Sí' : 'No'}</td>
-                            <td>{getStatusBadge(a.status)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Vinculation */}
-              {mp.vinculation && (
-                <div className="pd-section">
-                  <div className="pd-section-head"><div className="pd-section-title">Mi Vinculación</div></div>
-                  <div className="pd-section-body">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg, #0891b2, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '1.1rem' }}>
-                        {mp.vinculation.partner_name?.charAt(0)?.toUpperCase() || '?'}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111827' }}>{mp.vinculation.partner_name}</div>
-                        <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>{ROLE_LABELS[mp.vinculation.partner_role] || mp.vinculation.partner_role}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{mp.vinculation.partner_email}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ─── TAB: MODULES ─── */}
-          {detailTab === 'modules' && (
-            <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 18 }}>
-                <div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827' }}>Módulos del Programa</div>
-                  <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 2 }}>
-                    {modulesCount} módulos — {totalSessions} sesiones — {totalResources} recursos
-                  </div>
-                </div>
-                {modulesCount > 0 && (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button style={{ fontSize: '0.72rem', padding: '5px 12px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', cursor: 'pointer' }} onClick={() => {
-                      const allKeys = programTemplate.modules.map((m: any, i: number) => m.id || `mod-${i}`);
-                      setExpandedModules(new Set(allKeys));
-                    }}>Expandir todo</button>
-                    <button style={{ fontSize: '0.72rem', padding: '5px 12px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', cursor: 'pointer' }} onClick={() => setExpandedModules(new Set())}>Colapsar</button>
-                  </div>
-                )}
-              </div>
-
-              {!programTemplate || !programTemplate.modules?.length ? (
-                <div className="pd-section" style={{ textAlign: 'center', padding: '48px 20px' }}>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#374151', marginBottom: 6 }}>Sin módulos</div>
-                  <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Este programa no tiene módulos configurados</div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {programTemplate.modules.map((mod: any, idx: number) => {
-                    const modKey = mod.id || `mod-${idx}`;
-                    const isExpanded = expandedModules.has(modKey);
-                    return (
-                      <div key={modKey} className="pd-mod">
-                        <div className="pd-mod-head" onClick={() => {
-                          setExpandedModules(prev => {
-                            const next = new Set(prev);
-                            if (next.has(modKey)) next.delete(modKey); else next.add(modKey);
-                            return next;
-                          });
-                        }}>
-                          <div className="pd-mod-num">{idx + 1}</div>
-                          <div className="pd-mod-info">
-                            <div className="pd-mod-name">{mod.name}</div>
-                            <div className="pd-mod-meta">
-                              {mod.duration && <span>{mod.duration}</span>}
-                              <span>{mod.sessions || 0} sesiones</span>
-                              <span>{mod.resources?.length || 0} recursos</span>
-                              {mod.activities?.length > 0 && <span>{mod.activities.length} actividades</span>}
-                            </div>
-                          </div>
-                          <div className="pd-mod-toggle">{isExpanded ? '▲' : '▼'}</div>
-                        </div>
-
-                        {isExpanded && (
-                          <div className="pd-mod-body">
-                            {mod.description && <p style={{ fontSize: '0.85rem', color: '#4b5563', lineHeight: 1.7, margin: '0 0 18px' }}>{mod.description}</p>}
-
-                            {mod.objectives?.length > 0 && (
-                              <div style={{ marginBottom: 18 }}>
-                                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 8 }}>Objetivos</div>
-                                <ul style={{ margin: 0, paddingLeft: 20, fontSize: '0.82rem', color: '#4b5563', listStyle: 'disc', lineHeight: 1.8 }}>
-                                  {mod.objectives.map((obj: string, oi: number) => (
-                                    <li key={oi}>{obj}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
-                            {mod.resources?.length > 0 && (
-                              <div style={{ marginBottom: 18 }}>
-                                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 8 }}>Recursos ({mod.resources.length})</div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                  {mod.resources.map((res: any, ri: number) => (
-                                    <div key={ri} className="pd-res">
-                                      <span className="pd-res-type" style={{
-                                        background: res.type === 'pdf' ? '#fef2f2' : res.type === 'video' ? '#eff6ff' : res.type === 'template' ? '#fffbeb' : '#f3f4f6',
-                                        color: res.type === 'pdf' ? '#dc2626' : res.type === 'video' ? '#2563eb' : res.type === 'template' ? '#d97706' : '#6b7280',
-                                      }}>{res.type || 'doc'}</span>
-                                      <span className="pd-res-name">{res.name}</span>
-                                      {res.size && <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{res.size}</span>}
-                                      {(res.url || res.dataUrl) && (
-                                        <a href={res.url || res.dataUrl} target="_blank" rel="noopener noreferrer" className="pd-res-link">Abrir</a>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {mod.activities?.length > 0 && (
-                              <div>
-                                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 8 }}>Actividades del módulo ({mod.activities.length})</div>
-                                <table className="data-table" style={{ fontSize: '0.78rem' }}>
-                                  <thead><tr><th>Nombre</th><th>Tipo</th><th>Modalidad</th><th>Fecha programada</th></tr></thead>
-                                  <tbody>
-                                    {mod.activities.map((act: any, ai: number) => {
-                                      const sched = findScheduled(act, mod.id);
-                                      const dateStr = sched ? fmtSchedDate(sched.start_date) : null;
-                                      return (
-                                        <tr key={ai}>
-                                          <td style={{ fontWeight: 600 }}>{act.name || act.title || `Actividad ${ai + 1}`}</td>
-                                          <td>{act.type || sched?.type || '—'}</td>
-                                          <td>{act.modality || sched?.modality || '—'}</td>
-                                          <td>{dateStr ? (
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#0891b2', fontWeight: 600 }}>
-                                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                                              {dateStr}
-                                            </span>
-                                          ) : (
-                                            <span style={{ fontSize: '0.72rem', color: '#9ca3af', fontStyle: 'italic' }}>Sin agendar</span>
-                                          )}</td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Activities scheduled outside of any module (custom activities added in Cronograma) */}
-              {orphanActivities.length > 0 && (
-                <div className="pd-mod" style={{ marginTop: 16, borderColor: '#fde68a', background: '#fffbeb' }}>
-                  <div className="pd-mod-head" style={{ background: 'linear-gradient(135deg, #fef3c7, #fde68a)', cursor: 'default' }}>
-                    <div className="pd-mod-num" style={{ background: '#f59e0b', color: '#fff' }}>+</div>
-                    <div className="pd-mod-info">
-                      <div className="pd-mod-name">Actividades adicionales del cronograma</div>
-                      <div className="pd-mod-meta">
-                        <span>{orphanActivities.length} actividad{orphanActivities.length !== 1 ? 'es' : ''} programada{orphanActivities.length !== 1 ? 's' : ''} fuera de los módulos</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="pd-mod-body">
-                    <table className="data-table" style={{ fontSize: '0.78rem' }}>
-                      <thead><tr><th>Nombre</th><th>Modalidad</th><th>Fecha programada</th></tr></thead>
-                      <tbody>
-                        {orphanActivities.map((sa: any, i: number) => {
-                          const dateStr = fmtSchedDate(sa.start_date);
-                          return (
-                            <tr key={i}>
-                              <td style={{ fontWeight: 600 }}>{sa.name || sa.title || `Actividad ${i + 1}`}</td>
-                              <td>{sa.modality || '—'}</td>
-                              <td>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#0891b2', fontWeight: 600 }}>
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                                  {dateStr || '—'}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </>
           )}
 
           {/* ─── TAB: PARTICIPANTS ─── */}
@@ -2522,12 +2203,29 @@ export default function ParticipantPortalPage() {
   };
 
   // ══════════════════════════════════════════════════════════════════════════
+  // RENDER: MÓDULOS — misma vista que Studio (Vista General / Módulos / Configuración)
+  // ══════════════════════════════════════════════════════════════════════════
+  const renderModulesPreview = () => {
+    if (!selectedProgram) return <div className="empty-state">Selecciona un programa</div>;
+    if (!selectedProgram.template_slug) return <div className="empty-state">Este programa no tiene una plantilla de módulos configurada</div>;
+    if (modulesTemplateLoading || !modulesTemplate || modulesTemplate.slug !== selectedProgram.template_slug) return <InlineSpinner minH={400} />;
+    return (
+      <ProgramPreviewView
+        template={modulesTemplate}
+        showAssignedPrograms={false}
+        onBack={() => navigate('dashboard')}
+        backLabel="Inicio"
+      />
+    );
+  };
+
+  // ══════════════════════════════════════════════════════════════════════════
   // RENDER: PROGRESS
   // ══════════════════════════════════════════════════════════════════════════
-  const renderProgress = () => {
-    if (loadingDetail) return <InlineSpinner minH={400} />;
+  const renderProgressSection = () => {
+    if (loadingDetail) return <InlineSpinner minH={200} />;
     const mp = activeProgram;
-    if (!mp) return <div className="empty-state">Selecciona un programa para ver el progreso</div>;
+    if (!mp) return null;
 
     const modules = programTemplate?.modules || [];
     const milestones = programTemplate?.milestones || [];
@@ -2605,14 +2303,11 @@ export default function ParticipantPortalPage() {
     const nextMilestone = milestones.find((ms: any) => (ms.week || 0) >= currentWeek);
 
     return (
-      <>
-        {/* Encabezado de página — mismo estilo que Inicio, sin banner de color */}
-        <div className="pd-page-header">
-          <div>
-            <h1 className="dash-title">Progreso</h1>
-            <p className="dash-subtitle">{mp.name} · Semana {currentWeek} de {totalWeeks} · {roleLabel}</p>
-          </div>
-        </div>
+      <div style={{ marginTop: 24 }}>
+        <h2 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+          Progreso · Semana {currentWeek} de {totalWeeks}
+        </h2>
 
         {/* Overall progress bar */}
         <div className="prg-overall">
@@ -2837,7 +2532,7 @@ export default function ParticipantPortalPage() {
             </div>
           </div>
         </div>
-      </>
+      </div>
     );
   };
 
@@ -4733,7 +4428,7 @@ export default function ParticipantPortalPage() {
                 const gradient = THEME_GRADIENTS[mp.theme] || THEME_GRADIENTS.leadership;
                 const hasBanner = !!(mp.banner_image || mp.banner_svg);
                 return (
-                  <div key={mp.id} onClick={() => { setSelectedProgram(mp); navigate('my-program'); }}
+                  <div key={mp.id} onClick={() => { setSelectedProgram(mp); navigate('my-modules'); }}
                     style={{ background: hasBanner ? '#111827' : gradient, borderRadius: 16, padding: '28px 28px 20px', cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', transition: 'all 0.2s', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'relative', overflow: 'hidden' }}>
                     {mp.banner_image ? (
                       <img src={mp.banner_image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -4832,6 +4527,8 @@ export default function ParticipantPortalPage() {
                 </div>
               ))}
             </div>
+
+            {renderProgressSection()}
           </>
         )}
       </>
@@ -5048,9 +4745,7 @@ export default function ParticipantPortalPage() {
   const renderContent = () => {
     switch (activeNav) {
       case 'dashboard': return isMentee ? renderMenteeDashboard() : renderDashboard();
-      case 'my-program': return renderMyProgram();
-      case 'my-progress': return renderProgress();
-      case 'my-modules': return renderMyProgram();
+      case 'my-modules': return renderModulesPreview();
       case 'my-activities': return renderMyProgram();
       case 'my-participants': return renderMyProgram();
       case 'my-milestones': return renderMyProgram();

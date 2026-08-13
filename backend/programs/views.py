@@ -547,6 +547,13 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
         ).select_related('program', 'program__company'))
         program_ids = [m.program_id for m in memberships]
 
+        # .values_list() en vez de select_related("template"): trae solo id+slug,
+        # no el JOIN completo de ProgramTemplate (que tiene modules/design con
+        # archivos base64 pesados — mismo tipo de bug que design_snapshot).
+        template_slug_by_program = dict(
+            Program.objects.filter(id__in=program_ids).values_list('id', 'template__slug')
+        )
+
         # Todo lo que sigue eran consultas por-programa (y por-actividad, en el
         # caso de módulos) dentro del for — un N+1 clásico. Se traen todas de
         # una sola vez y se agrupan en Python para evitar decenas de round-trips
@@ -623,6 +630,7 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
                 "status": p.status,
                 "banner_svg": p.banner_svg or "",
                 "banner_image": p.banner_image or "",
+                "template_slug": template_slug_by_program.get(p.id),
                 "company_name": p.company.name if p.company else None,
                 "company_slug": p.company.slug if p.company else None,
                 "my_role": m.role,
