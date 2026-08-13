@@ -691,6 +691,26 @@ class ProgramChatMessage(models.Model):
         return f"{self.sender.email}: {self.content[:50]}"
 
 
+class DirectMessage(models.Model):
+    """Mensaje privado 1:1 entre dos participantes del portal (ej. desde el grafo de ecosistema)."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_direct_messages")
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="received_direct_messages")
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["sender", "recipient", "created_at"]),
+            models.Index(fields=["recipient", "sender", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.sender.email} -> {self.recipient.email}: {self.content[:50]}"
+
+
 class ProgramTemplate(models.Model):
     """
     Plantillas de programa compartidas entre todos los usuarios.

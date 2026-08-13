@@ -3738,7 +3738,7 @@ async def get_chat_participants(portal_code: str, program_id: str):
             "participants": [
                 {
                     "id": str(pp.user.id),
-                    "name": pp.user.full_name or pp.user.email.split("@")[0],
+                    "name": pp.user.display_name,
                     "avatar": getattr(pp.user, "avatar_url", "") or "",
                     "role": pp.role,
                     "is_me": pp.user.id == user.id,
@@ -3760,6 +3760,198 @@ async def get_chat_participants(portal_code: str, program_id: str):
         raise HTTPException(status_code=404, detail="Portal no encontrado")
     if result == "forbidden":
         raise HTTPException(status_code=403, detail="No tienes acceso")
+    return result
+
+
+def _share_active_program(user_a, user_b) -> bool:
+    """Autorización básica para DMs: solo entre personas que comparten al menos un programa activo."""
+    from programs.models import ProgramParticipant
+    program_ids_a = set(ProgramParticipant.objects.filter(user=user_a, deleted_at__isnull=True).values_list("program_id", flat=True))
+    if not program_ids_a:
+        return False
+    return ProgramParticipant.objects.filter(user=user_b, program_id__in=program_ids_a, deleted_at__isnull=True).exists()
+
+
+@router.get("/portal/{portal_code}/dm/{other_user_id}/messages")
+async def get_dm_messages(portal_code: str, other_user_id: str):
+    """Historial de mensajes privados entre el usuario del portal y otra persona. Marca como leídos."""
+    from programs.models import DirectMessage
+    from django.db.models import Q
+
+    def _fetch():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+        try:
+            other = User.objects.get(id=other_user_id)
+        except User.DoesNotExist:
+            return "not_found"
+        if not _share_active_program(user, other):
+            return "forbidden"
+
+        msgs = list(
+            DirectMessage.objects.filter(
+                Q(sender=user, recipient=other) | Q(sender=other, recipient=user)
+            ).select_related("sender").order_by("created_at")[:200]
+        )
+        DirectMessage.objects.filter(sender=other, recipient=user, read_at__isnull=True).update(read_at=timezone.now())
+
+        return {
+            "other": {"id": str(other.id), "name": other.display_name, "avatar_url": getattr(other, "avatar_url", "") or ""},
+            "messages": [
+                {
+                    "id": str(m.id),
+                    "sender_id": str(m.sender_id),
+                    "content": m.content,
+                    "created_at": m.created_at.isoformat(),
+                    "read_at": m.read_at.isoformat() if m.read_at else None,
+                }
+                for m in msgs
+            ],
+        }
+
+    result = await sync_to_async(_fetch)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    if result == "not_found":
+        raise HTTPException(status_code=404, detail="Destinatario no encontrado")
+    if result == "forbidden":
+        raise HTTPException(status_code=403, detail="Solo puedes escribir a personas de tu programa")
+    return result
+
+
+@router.post("/portal/{portal_code}/dm/{other_user_id}/messages")
+async def send_dm_message(portal_code: str, other_user_id: str, payload: ChatMessageRequest):
+    """Enviar un mensaje privado."""
+    from programs.models import DirectMessage
+    from django.db.models import Q
+
+    def _send():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+        try:
+            other = User.objects.get(id=other_user_id)
+        except User.DoesNotExist:
+            return "not_found"
+        if not _share_active_program(user, other):
+            return "forbidden"
+        if not payload.content.strip():
+            return "empty"
+
+        msg = DirectMessage.objects.create(sender=user, recipient=other, content=payload.content.strip())
+        return {
+            "id": str(msg.id),
+            "sender_id": str(user.id),
+            "content": msg.content,
+            "created_at": msg.created_at.isoformat(),
+            "read_at": None,
+        }
+
+    result = await sync_to_async(_send)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    if result == "not_found":
+        raise HTTPException(status_code=404, detail="Destinatario no encontrado")
+    if result == "forbidden":
+        raise HTTPException(status_code=403, detail="Solo puedes escribir a personas de tu programa")
+    if result == "empty":
+        raise HTTPException(status_code=400, detail="Mensaje vacío")
+    return result
+
+
+@router.get("/portal/{portal_code}/dm/{other_user_id}/poll")
+async def poll_dm(portal_code: str, other_user_id: str, after: Optional[str] = None):
+    """Long-poll: nuevos mensajes privados desde 'after', y los marca como leídos."""
+    from programs.models import DirectMessage
+    from django.db.models import Q
+
+    def _poll():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+        try:
+            other = User.objects.get(id=other_user_id)
+        except User.DoesNotExist:
+            return "not_found"
+        if not _share_active_program(user, other):
+            return "forbidden"
+
+        qs = DirectMessage.objects.filter(
+            Q(sender=user, recipient=other) | Q(sender=other, recipient=user)
+        ).order_by("created_at")
+        if after:
+            from django.utils.dateparse import parse_datetime
+            dt = parse_datetime(after)
+            if dt:
+                qs = qs.filter(created_at__gt=dt)
+        msgs = list(qs[:100])
+        DirectMessage.objects.filter(sender=other, recipient=user, read_at__isnull=True).update(read_at=timezone.now())
+
+        return {
+            "messages": [
+                {
+                    "id": str(m.id),
+                    "sender_id": str(m.sender_id),
+                    "content": m.content,
+                    "created_at": m.created_at.isoformat(),
+                    "read_at": m.read_at.isoformat() if m.read_at else None,
+                }
+                for m in msgs
+            ],
+        }
+
+    result = await sync_to_async(_poll)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
+    if result == "not_found":
+        raise HTTPException(status_code=404, detail="Destinatario no encontrado")
+    if result == "forbidden":
+        raise HTTPException(status_code=403, detail="Solo puedes escribir a personas de tu programa")
+    return result
+
+
+@router.get("/portal/{portal_code}/dm/conversations")
+async def get_dm_conversations(portal_code: str):
+    """Lista de conversaciones privadas del usuario, con último mensaje y no-leídos."""
+    from programs.models import DirectMessage
+    from django.db.models import Q
+
+    def _fetch():
+        try:
+            user = User.objects.get(portal_code=portal_code)
+        except User.DoesNotExist:
+            return None
+
+        msgs = list(
+            DirectMessage.objects.filter(Q(sender=user) | Q(recipient=user))
+            .select_related("sender", "recipient").order_by("-created_at")[:500]
+        )
+        by_other: dict = {}
+        for m in msgs:
+            other = m.recipient if m.sender_id == user.id else m.sender
+            if other.id not in by_other:
+                by_other[other.id] = {"other": other, "last_message": m, "unread": 0}
+            if m.recipient_id == user.id and m.read_at is None:
+                by_other[other.id]["unread"] += 1
+
+        return {
+            "conversations": [
+                {
+                    "other": {"id": str(v["other"].id), "name": v["other"].display_name, "avatar_url": getattr(v["other"], "avatar_url", "") or ""},
+                    "last_message": {"content": v["last_message"].content[:80], "created_at": v["last_message"].created_at.isoformat(), "is_mine": v["last_message"].sender_id == user.id},
+                    "unread_count": v["unread"],
+                }
+                for v in by_other.values()
+            ]
+        }
+
+    result = await sync_to_async(_fetch)()
+    if result is None:
+        raise HTTPException(status_code=404, detail="Portal no encontrado")
     return result
 
 

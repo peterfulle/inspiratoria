@@ -778,6 +778,31 @@ const styles = `
   .eco-level-row { display: flex; justify-content: space-between; font-size: 0.76rem; color: #374151; margin-bottom: 3px; }
   .eco-level-track { height: 5px; border-radius: 5px; background: #f3f4f6; overflow: hidden; margin-bottom: 8px; }
   .eco-level-track div { height: 100%; border-radius: 5px; }
+
+  /* Mensajes privados (DM) */
+  .dm-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .dm-card { background: #fff; border-radius: 18px; width: 100%; max-width: 460px; height: 620px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,0.25); }
+  .dm-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid #eef0f2; flex-shrink: 0; }
+  .dm-head-avi { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg,#0891b2,#06b6d4); color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+  .dm-head-avi img { width: 100%; height: 100%; object-fit: cover; }
+  .dm-head-name { font-size: 0.88rem; font-weight: 700; color: #111827; }
+  .dm-head-sub { font-size: 0.68rem; color: #9ca3af; }
+  .dm-close { margin-left: auto; width: 28px; height: 28px; border-radius: 50%; border: none; background: #f3f4f6; color: #6b7280; cursor: pointer; font-size: 1rem; flex-shrink: 0; }
+  .dm-close:hover { background: #fef2f2; color: #dc2626; }
+  .dm-messages { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .dm-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #9ca3af; gap: 6px; padding: 20px; }
+  .dm-bubble-row { display: flex; }
+  .dm-bubble-row.mine { justify-content: flex-end; }
+  .dm-bubble { max-width: 78%; padding: 9px 13px; border-radius: 14px; font-size: 0.82rem; line-height: 1.4; word-break: break-word; }
+  .dm-bubble-row:not(.mine) .dm-bubble { background: #f3f4f6; color: #111827; border-bottom-left-radius: 4px; }
+  .dm-bubble-row.mine .dm-bubble { background: linear-gradient(135deg,#0891b2,#06b6d4); color: #fff; border-bottom-right-radius: 4px; }
+  .dm-time { font-size: 0.62rem; color: #9ca3af; margin-top: 3px; }
+  .dm-bubble-row.mine .dm-time { text-align: right; }
+  .dm-input-row { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid #eef0f2; flex-shrink: 0; }
+  .dm-input-row input { flex: 1; border: 1px solid #e5e7eb; border-radius: 20px; padding: 9px 16px; font-size: 0.82rem; outline: none; }
+  .dm-input-row input:focus { border-color: #0891b2; }
+  .dm-send-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: linear-gradient(135deg,#0891b2,#06b6d4); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .dm-send-btn:disabled { background: #d1d5db; cursor: not-allowed; }
 `;
 
 // ============================================================================
@@ -855,6 +880,16 @@ function bestName(person?: { full_name?: string; username?: string; email?: stri
 
 function ecoInitials(name: string) {
   return (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+}
+
+function formatChatTime(iso: string) {
+  const d = new Date(iso);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  if (isToday) return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return 'Ayer ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 }
 
 // Iconos SVG (mismo estilo trazo que navIcons) para el tab Ecosistema — sin emojis.
@@ -1055,17 +1090,13 @@ function EcosystemGraph({
             const midX = (s.x! + t.x!) / 2 + nx * 20, midY = (s.y! + t.y!) / 2 + ny * 20;
             return (
               <g key={i} opacity={dimmed ? 0.12 : 1}>
-                {isDupla && (
-                  <line x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#14b8a6" strokeWidth={11} strokeLinecap="round"
-                    style={{ animation: 'ecoGlowPulse 2.8s ease-in-out infinite', animationDelay: `${(i % 5) * 0.3}s` }} />
-                )}
                 <line x1={s.x} y1={s.y} x2={t.x} y2={t.y}
-                  stroke={isDupla ? '#14b8a6' : '#cbd5e1'} strokeWidth={isDupla ? 5 : 1.5}
+                  stroke={isDupla ? '#14b8a6' : '#cbd5e1'} strokeWidth={isDupla ? 2.5 : 1.5} opacity={isDupla ? 0.85 : 1}
                   strokeDasharray={isDupla ? undefined : '4 5'} strokeLinecap="round" />
                 {isDupla && (
                   <>
-                    <rect x={midX - 17} y={midY - 10} width={34} height={20} rx={10} fill="#0f172a" />
-                    <text x={midX} y={midY + 4} textAnchor="middle" fontSize="10" fontWeight={700} fill="#fff">
+                    <rect x={midX - 14} y={midY - 8} width={28} height={16} rx={8} fill="#0f172a" opacity={0.85} />
+                    <text x={midX} y={midY + 3.5} textAnchor="middle" fontSize="8.5" fontWeight={700} fill="#fff">
                       {e.sessions_completed}/{e.sessions_planned || e.sessions_completed}
                     </text>
                   </>
@@ -1296,6 +1327,76 @@ export default function ParticipantPortalPage() {
   const chatPollRef = useRef<any>(null);
   const chatTypingRef = useRef<any>(null);
   const chatFileRef = useRef<HTMLInputElement>(null);
+
+  // ── Private messages (DM) ──
+  const [dmTarget, setDmTarget] = useState<{ id: string; name: string; avatar_url?: string } | null>(null);
+  const [dmMessages, setDmMessages] = useState<any[]>([]);
+  const [dmLoading, setDmLoading] = useState(false);
+  const [dmInput, setDmInput] = useState('');
+  const [dmSending, setDmSending] = useState(false);
+  const dmMessagesRef = useRef<HTMLDivElement>(null);
+  const dmPollRef = useRef<any>(null);
+
+  const openDM = (person: { id: string; name?: string; full_name?: string; avatar_url?: string; avatar?: string }) => {
+    setDmTarget({ id: person.id, name: person.name || person.full_name || 'Participante', avatar_url: person.avatar_url || person.avatar });
+  };
+
+  useEffect(() => {
+    if (!dmTarget || !portalCode) return;
+    setDmLoading(true);
+    setDmMessages([]);
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/dm/${dmTarget.id}/messages`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setDmMessages(data.messages || []); })
+      .catch(() => {})
+      .finally(() => {
+        setDmLoading(false);
+        setTimeout(() => { dmMessagesRef.current?.scrollTo({ top: dmMessagesRef.current.scrollHeight }); }, 100);
+      });
+  }, [dmTarget?.id, portalCode]);
+
+  useEffect(() => {
+    if (!dmTarget || !portalCode) return;
+    const poll = () => {
+      const lastMsg = dmMessages[dmMessages.length - 1];
+      const after = lastMsg?.created_at || '';
+      apiFetch(`${API_URL}/api/companies/portal/${portalCode}/dm/${dmTarget.id}/poll${after ? `?after=${after}` : ''}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.messages?.length > 0) {
+            setDmMessages(prev => {
+              const ids = new Set(prev.map((m: any) => m.id));
+              const newMsgs = data.messages.filter((m: any) => !ids.has(m.id));
+              if (newMsgs.length === 0) return prev;
+              setTimeout(() => { dmMessagesRef.current?.scrollTo({ top: dmMessagesRef.current.scrollHeight, behavior: 'smooth' }); }, 50);
+              return [...prev, ...newMsgs];
+            });
+          }
+        })
+        .catch(() => {});
+    };
+    dmPollRef.current = setInterval(poll, 2500);
+    return () => { if (dmPollRef.current) clearInterval(dmPollRef.current); };
+  }, [dmTarget?.id, portalCode, dmMessages]);
+
+  const sendDM = () => {
+    if (!dmTarget || !dmInput.trim() || dmSending) return;
+    const content = dmInput.trim();
+    setDmSending(true);
+    setDmInput('');
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/dm/${dmTarget.id}/messages`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          setDmMessages(prev => [...prev, data]);
+          setTimeout(() => { dmMessagesRef.current?.scrollTo({ top: dmMessagesRef.current.scrollHeight, behavior: 'smooth' }); }, 50);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setDmSending(false));
+  };
 
   // Derived
   const activeProgram = selectedProgram || myPrograms[0] || null;
@@ -2141,8 +2242,8 @@ export default function ParticipantPortalPage() {
                             )}
                             {!selectedNode.is_viewer && (
                               <>
-                                <button className="eco-btn-primary" onClick={() => navigate('my-chat')}><EcoIcons.message /> Ir al chat del programa</button>
-                                <div className="eco-empty-hint" style={{ marginTop: -4, marginBottom: 10, textAlign: 'center' }}>El chat es grupal — todo el programa participa ahí.</div>
+                                <button className="eco-btn-primary" onClick={() => openDM(selectedNode)}><EcoIcons.message /> Enviar mensaje privado</button>
+                                <button className="eco-btn-secondary" onClick={() => navigate('my-chat')} style={{ marginBottom: 8 }}>Ir al chat del programa</button>
                                 {selectedNode.is_my_dupla && (
                                   <button className="eco-btn-secondary" onClick={() => navigate(isMentee ? 'my-mentor' : 'my-sessions')}>Ir a mi espacio de mentoría</button>
                                 )}
@@ -4068,16 +4169,6 @@ export default function ParticipantPortalPage() {
   // ══════════════════════════════════════════════════════════════════════════
   // RENDER CHAT — Gmail-style real-time messaging
   // ══════════════════════════════════════════════════════════════════════════
-  const formatChatTime = (iso: string) => {
-    const d = new Date(iso);
-    const now = new Date();
-    const isToday = d.toDateString() === now.toDateString();
-    if (isToday) return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-    const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
-    if (d.toDateString() === yesterday.toDateString()) return 'Ayer ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  };
-
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -4326,6 +4417,11 @@ export default function ParticipantPortalPage() {
               <div className="cht-profile-name">{chatProfileDetail.name}</div>
               {chatProfileDetail.headline && <div className="cht-profile-headline">{chatProfileDetail.headline}</div>}
               <span className="cht-profile-role-badge">{chatProfileDetail.role || 'Participante'}</span>
+              {!chatProfileDetail.is_me && (
+                <button className="eco-btn-primary" style={{ marginTop: 14 }} onClick={() => { openDM({ ...chatProfileDetail, avatar_url: avatarSrc(chatProfileDetail.avatar) }); setChatProfileDetail(null); }}>
+                  <EcoIcons.message /> Enviar mensaje privado
+                </button>
+              )}
             </div>
             <div className="cht-profile-body">
               {/* Program */}
@@ -4936,6 +5032,57 @@ export default function ParticipantPortalPage() {
           {renderContent()}
         </main>
       </div>
+
+      {/* Mensaje privado (DM) — overlay global, se puede abrir desde ecosistema o chat */}
+      {dmTarget && (
+        <div className="dm-overlay" onClick={() => setDmTarget(null)}>
+          <div className="dm-card" onClick={e => e.stopPropagation()}>
+            <div className="dm-head">
+              <div className="dm-head-avi">
+                {dmTarget.avatar_url ? <img src={dmTarget.avatar_url} alt="" /> : dmTarget.name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div className="dm-head-name">{dmTarget.name}</div>
+                <div className="dm-head-sub">Mensaje privado</div>
+              </div>
+              <button className="dm-close" onClick={() => setDmTarget(null)}>×</button>
+            </div>
+            <div className="dm-messages" ref={dmMessagesRef}>
+              {dmLoading ? (
+                <div className="dm-empty">Cargando...</div>
+              ) : dmMessages.length === 0 ? (
+                <div className="dm-empty">
+                  <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="#cbd5e1" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                  <span>Envíale el primer mensaje a {dmTarget.name.split(' ')[0]}.</span>
+                </div>
+              ) : (
+                dmMessages.map((m: any) => {
+                  const isMine = m.sender_id !== dmTarget.id;
+                  return (
+                    <div key={m.id} className={`dm-bubble-row${isMine ? ' mine' : ''}`}>
+                      <div>
+                        <div className="dm-bubble">{m.content}</div>
+                        <div className="dm-time">{formatChatTime(m.created_at)}</div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="dm-input-row">
+              <input
+                placeholder="Escribe un mensaje..."
+                value={dmInput}
+                onChange={e => setDmInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendDM(); } }}
+              />
+              <button className="dm-send-btn" onClick={sendDM} disabled={!dmInput.trim() || dmSending}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
