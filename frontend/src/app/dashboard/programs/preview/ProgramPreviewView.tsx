@@ -225,13 +225,27 @@ export default function ProgramPreviewView({
           </div>
         </header>
       ) : (
-        <div className="row jc-end no-print" style={{ padding: "14px 24px 0" }}>
+        <div className="row jc-end no-print" style={{ padding: "8px 24px 0" }}>
           <button onClick={print} className="btn-ghost">{I.printer}<span>Imprimir</span></button>
         </div>
       )}
 
       {/* HERO */}
-      <section className="hero" style={{ background: heroBg }}>
+      <section
+        className="hero"
+        style={
+          variant === "portal"
+            ? {
+                background: `linear-gradient(135deg, rgba(14,116,144,.92), rgba(8,145,178,.92)), url(/sqmentors/fondo1.jpeg)`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                margin: "4px 24px 0",
+                borderRadius: 20,
+                padding: "40px 32px 36px",
+              }
+            : { background: heroBg }
+        }
+      >
         <div className="hero-in">
           <div className="row gap12 ai-c mb20">
             <span className="cat-pill">{cat.label}</span>
