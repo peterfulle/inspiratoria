@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { apiFetch } from "@/lib/api";
+import GlobalEcosystemView from '@/app/studio/shared/GlobalEcosystemView';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 const ADMIN_ROLES = new Set(['superadmin', 'admin_root', 'inspiratoria_admin']);
@@ -159,7 +160,7 @@ export default function ProgramManagerConsole() {
   const [pms, setPms] = useState<PM[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes'>('resumen');
+  const [activeTab, setActiveTab] = useState<'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'ecosistema' | 'gobierno' | 'reportes'>('resumen');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   useEffect(() => {
@@ -177,7 +178,7 @@ export default function ProgramManagerConsole() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const tab = new URLSearchParams(window.location.search).get('tab');
-    const valid = ['resumen', 'info', 'cronograma', 'actividades', 'participantes', 'duplas', 'gobierno', 'reportes'];
+    const valid = ['resumen', 'info', 'cronograma', 'actividades', 'participantes', 'duplas', 'ecosistema', 'gobierno', 'reportes'];
     if (tab && valid.includes(tab)) setActiveTab(tab as typeof activeTab);
   }, []);
 
@@ -547,6 +548,7 @@ export default function ProgramManagerConsole() {
           {activeTab === 'actividades' && <TabActividades programId={programId} activities={program.activities} onChange={fetchProgram} showToast={showToast} />}
           {activeTab === 'participantes' && <TabParticipantes participants={participants} programId={programId} onChange={fetchProgram} showToast={showToast} />}
           {activeTab === 'duplas' && <TabDuplas programId={programId} participants={participants} showToast={showToast} />}
+          {activeTab === 'ecosistema' && <GlobalEcosystemView programId={programId} />}
           {activeTab === 'reportes' && <TabReportes program={program} participants={participants} assignedPM={assignedPM} showToast={showToast} />}
           {activeTab === 'gobierno' && <TabGobierno program={program} slug={slug} assignedPM={assignedPM} pms={pms} onTransition={transitionStatus} onAssignPM={assignPM} />}
         </div>
@@ -583,11 +585,11 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab, colla
   program: ProgramDetail;
   slug: string;
   activeTab: string;
-  onTab: (t: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes') => void;
+  onTab: (t: 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'ecosistema' | 'gobierno' | 'reportes') => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
 }) {
-  type TabId = 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'gobierno' | 'reportes';
+  type TabId = 'resumen' | 'info' | 'cronograma' | 'actividades' | 'participantes' | 'duplas' | 'ecosistema' | 'gobierno' | 'reportes';
   const NAV_GROUPS: { label: string | null; items: { id: TabId; label: string; icon: React.ReactNode }[] }[] = [
     { label: null, items: [{ id: 'resumen', label: 'Resumen', icon: <I.Sparkles /> }] },
     {
@@ -598,6 +600,7 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab, colla
         { id: 'actividades', label: 'Módulos', icon: <I.Module /> },
         { id: 'participantes', label: 'Participantes', icon: <I.Users /> },
         { id: 'duplas', label: 'Duplas', icon: <I.Bot /> },
+        { id: 'ecosistema', label: 'Ecosistema', icon: <I.Globe /> },
       ],
     },
     {

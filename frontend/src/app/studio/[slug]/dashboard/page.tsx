@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { apiFetch } from "@/lib/api";
+import GlobalEcosystemView from '@/app/studio/shared/GlobalEcosystemView';
 
 /**
  * Vista Corporativa — el dashboard de solo lectura que ve la propia empresa
@@ -339,7 +340,7 @@ function Workflow({ currentStatus }: { currentStatus: string }) {
 // ============================================================================
 // SIDEBAR (solo lectura — sin tabs de edición)
 // ============================================================================
-type CorpTab = 'resumen' | 'info' | 'actividades' | 'participantes' | 'duplas' | 'personas' | 'reportes' | 'admin';
+type CorpTab = 'resumen' | 'info' | 'actividades' | 'participantes' | 'duplas' | 'personas' | 'ecosistema' | 'reportes' | 'admin';
 
 function Sidebar({ currentUser, onLogout, company, program, activeTab, onTab, isPreview, slug }: {
   currentUser: CurrentUser | null; onLogout: () => void; company: CompanyProfile; program: ProgramDetail | null;
@@ -353,6 +354,7 @@ function Sidebar({ currentUser, onLogout, company, program, activeTab, onTab, is
     { id: 'participantes', label: 'Participantes', icon: <I.Users /> },
     { id: 'duplas', label: 'Duplas', icon: <I.Swap /> },
     { id: 'personas', label: 'Mentores y Mentees', icon: <I.FileText /> },
+    { id: 'ecosistema', label: 'Ecosistema', icon: <I.Globe /> },
     { id: 'reportes', label: 'Reportes', icon: <I.Chart /> },
     ...(canManageAdmins ? [{ id: 'admin' as CorpTab, label: 'Admin', icon: <I.Shield /> }] : []),
   ];
@@ -2080,6 +2082,7 @@ export default function CorpDashboardPage() {
           {activeTab === 'participantes' && <TabParticipantes participants={participants} />}
           {activeTab === 'duplas' && <TabDuplas programId={program.id} />}
           {activeTab === 'personas' && <TabPersonas program={program} participants={participants} company={company} />}
+          {activeTab === 'ecosistema' && <GlobalEcosystemView programId={program.id} />}
           {activeTab === 'reportes' && <TabReportes programId={program.id} />}
           {activeTab === 'admin' && <TabAdminCorp company={company} />}
         </div>

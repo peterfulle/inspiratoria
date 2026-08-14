@@ -574,8 +574,13 @@ class ProgramParticipant(models.Model):
     # Fechas de seguimiento
     invitation_sent_at = models.DateTimeField(auto_now_add=True)
     activated_at = models.DateTimeField(null=True, blank=True)
+    # Último acceso al chat grupal específicamente — se usa para el contador de
+    # mensajes no leídos, no ampliar su significado (ver last_portal_access_at).
     last_access_at = models.DateTimeField(null=True, blank=True)
-    
+    # Último acceso real al portal en general (cualquier página) — lo que se
+    # muestra como "Último acceso" en Reportes/Vista Corporativa.
+    last_portal_access_at = models.DateTimeField(null=True, blank=True)
+
     # Configuración adicional
     configuration = models.JSONField(default=dict, blank=True)
     notes = models.TextField(blank=True)

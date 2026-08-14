@@ -1234,6 +1234,12 @@ def program_ai_chat(program_id: str, payload: dict, authorization: Optional[str]
     return {"reply": reply}
 
 
+def _last_access(pp) -> "datetime | None":
+    """Más reciente entre el último acceso al chat grupal y al portal en general."""
+    candidates = [d for d in (pp.last_access_at, pp.last_portal_access_at) if d]
+    return max(candidates) if candidates else None
+
+
 def _compute_engagement_report(program) -> dict:
     from programs.models import ProgramParticipant, ActivityCompletion, ContentView, ParticipantAccessLog, Content
 
@@ -1268,13 +1274,13 @@ def _compute_engagement_report(program) -> dict:
 
         row = {
             "participant_id": str(pp.id),
-            "name": pp.user.full_name or pp.user.email,
+            "name": pp.user.display_name,
             "email": pp.user.email,
             "role": pp.role,
             "status": pp.status,
             "joined_at": pp.invitation_sent_at.isoformat() if pp.invitation_sent_at else None,
             "activated_at": pp.activated_at.isoformat() if pp.activated_at else None,
-            "last_access_at": pp.last_access_at.isoformat() if pp.last_access_at else None,
+            "last_access_at": (_la.isoformat() if (_la := _last_access(pp)) else None),
             "access_count": access_count,
             "sessions_attended": sessions_attended,
             "sessions_total": sessions_total,
@@ -1350,6 +1356,141 @@ def get_program_engagement_report(program_id: str, authorization: Optional[str] 
     return _compute_engagement_report(program)
 
 
+def _compute_ecosystem_global(program) -> dict:
+    """
+    Grafo del ecosistema COMPLETO de un programa (sin centrarse en un participante)
+    + ranking de mentores/mentes/duplas, para las vistas admin (Studio, Vista
+    Corporativa). Reutiliza el mismo modelo de datos que el ecosistema personal
+    del portal (backend/companies/views.py::get_ecosystem_graph).
+
+    Score de persona (0-100) = 50% señal de mentoría + 50% señal de plataforma:
+      - mentoring_score: promedio de (sesiones completadas / planificadas) en sus duplas.
+      - platform_score: 50% accesos al portal + 30% perfil completo + 20% participación en chat.
+    Score de dupla (0-100) = sesiones completadas / planificadas (o una base menor si
+    aún no hay sesiones planificadas pero sí completadas).
+    """
+    from programs.models import ProgramParticipant, Vinculation, ProgramChatMessage, ParticipantAccessLog
+    from companies.views import _session_counts, _dupla_status
+
+    participants = list(
+        ProgramParticipant.objects.filter(program=program, deleted_at__isnull=True)
+        .exclude(status__in=["deleted", "suspended"])
+        .select_related("user")
+    )
+    pp_ids = [p.id for p in participants]
+
+    vincs = list(
+        Vinculation.objects.filter(
+            program=program, status="active", participant1_id__in=pp_ids, participant2_id__in=pp_ids,
+        ).select_related("participant1__user", "participant2__user")
+    )
+
+    access_counts = dict(
+        ParticipantAccessLog.objects.filter(participant_id__in=pp_ids)
+        .values("participant_id").annotate(n=django_models.Count("id")).values_list("participant_id", "n")
+    )
+    message_senders = set(
+        ProgramChatMessage.objects.filter(program=program, sender_id__in=[p.user_id for p in participants])
+        .values_list("sender_id", flat=True).distinct()
+    )
+
+    def is_complete(u, role):
+        step = u.mentee_profile_step if role == "mentee" else u.mentor_profile_step
+        return (step or 0) >= 6
+
+    mentoring_scores_by_user: dict = {}
+    dupla_rows = []
+    for v in vincs:
+        if v.type != "mentoria":
+            continue
+        p1, p2 = v.participant1, v.participant2
+        mentor_pp, mentee_pp = (p1, p2) if p1.role == "mentor" else (p2, p1)
+        completed, planned = _session_counts(program.id, mentor_pp.user_id, mentee_pp.user_id)
+        ratio = min(100.0, completed / planned * 100.0) if planned else (min(100.0, completed * 20.0) if completed else 0.0)
+        mentoring_scores_by_user.setdefault(mentor_pp.user_id, []).append(ratio)
+        mentoring_scores_by_user.setdefault(mentee_pp.user_id, []).append(ratio)
+        dupla_rows.append({
+            "mentor_id": str(mentor_pp.user_id), "mentor_name": mentor_pp.user.display_name,
+            "mentee_id": str(mentee_pp.user_id), "mentee_name": mentee_pp.user.display_name,
+            "sessions_completed": completed, "sessions_planned": planned,
+            "status": _dupla_status(completed, planned),
+            "score": round(ratio, 1),
+        })
+
+    nodes = []
+    for p in participants:
+        u = p.user
+        access_count = access_counts.get(p.id, 0)
+        m_scores = mentoring_scores_by_user.get(u.id, [])
+        mentoring_score = round(sum(m_scores) / len(m_scores), 1) if m_scores else 0.0
+        profile_complete = is_complete(u, p.role)
+        access_score = min(100.0, access_count * 25.0)
+        profile_score = 100.0 if profile_complete else 0.0
+        chat_score = 100.0 if u.id in message_senders else 0.0
+        platform_score = round(0.5 * access_score + 0.3 * profile_score + 0.2 * chat_score, 1)
+        engagement_score = round(0.5 * mentoring_score + 0.5 * platform_score, 1)
+        nodes.append({
+            "id": str(u.id), "full_name": u.display_name, "role": p.role,
+            "avatar_url": getattr(u, "avatar_url", "") or "",
+            "city": getattr(u, "residence_city", "") or "",
+            "area": (getattr(u, "department", "") if p.role == "mentor" else getattr(u, "area_or_function", "")) or "",
+            "position": getattr(u, "position", "") or "",
+            "profile_complete": profile_complete,
+            "access_count": access_count,
+            "mentoring_score": mentoring_score,
+            "platform_score": platform_score,
+            "engagement_score": engagement_score,
+        })
+
+    edges = []
+    for v in vincs:
+        u1, u2 = v.participant1.user, v.participant2.user
+        if v.type == "mentoria":
+            mentor_pp, mentee_pp = (v.participant1, v.participant2) if v.participant1.role == "mentor" else (v.participant2, v.participant1)
+            completed, planned = _session_counts(program.id, mentor_pp.user_id, mentee_pp.user_id)
+            edges.append({
+                "source": str(mentor_pp.user_id), "target": str(mentee_pp.user_id), "type": "MENTORSHIP",
+                "sessions_completed": completed, "sessions_planned": planned,
+                "status": _dupla_status(completed, planned),
+            })
+        else:
+            edges.append({
+                "source": str(u1.id), "target": str(u2.id), "type": "OTHER",
+                "sessions_completed": 0, "sessions_planned": 0, "status": v.type,
+            })
+
+    mentors_ranked = sorted([n for n in nodes if n["role"] == "mentor"], key=lambda n: -n["engagement_score"])
+    mentees_ranked = sorted([n for n in nodes if n["role"] == "mentee"], key=lambda n: -n["engagement_score"])
+    duplas_ranked = sorted(dupla_rows, key=lambda d: -d["score"])
+
+    return {
+        "program": {"id": str(program.id), "name": program.name},
+        "nodes": nodes,
+        "edges": edges,
+        "rankings": {"mentors": mentors_ranked, "mentees": mentees_ranked, "duplas": duplas_ranked},
+    }
+
+
+@router.get("/programs/{program_id}/ecosystem-global")
+def get_ecosystem_global(program_id: str, authorization: Optional[str] = Header(None)):
+    """
+    Ecosistema completo del programa (todos los participantes, sin centrarse en
+    uno) + ranking de mejores mentores/mentes/duplas — para Studio y Vista
+    Corporativa (a diferencia del ecosistema personal del portal, que sí se
+    centra en el participante logueado).
+    """
+    from companies.auth_deps import get_current_user, require_company_access
+    import uuid
+
+    actor = get_current_user(authorization)
+    try:
+        program = Program.objects.get(id=uuid.UUID(program_id))
+    except Program.DoesNotExist as exc:
+        raise HTTPException(status_code=404, detail="Program not found") from exc
+    require_company_access(actor, program.company_id)
+    return _compute_ecosystem_global(program)
+
+
 @router.get("/programs/{program_id}/ai-insights")
 def get_program_ai_insights(program_id: str, authorization: Optional[str] = Header(None)):
     """
@@ -1418,7 +1559,7 @@ def get_participant_preview_portal(program_id: str, participant_id: str, authori
 
     return {
         "portal_code": pp.user.portal_code,
-        "name": pp.user.full_name or pp.user.email,
+        "name": pp.user.display_name,
         "role": pp.role,
     }
 
@@ -1481,12 +1622,12 @@ def get_participant_detail_report(program_id: str, participant_id: str, authoriz
     return {
         "participant": {
             "id": str(pp.id),
-            "name": pp.user.full_name or pp.user.email,
+            "name": pp.user.display_name,
             "email": pp.user.email,
             "role": pp.role,
             "status": pp.status,
             "joined_at": pp.invitation_sent_at.isoformat() if pp.invitation_sent_at else None,
-            "last_access_at": pp.last_access_at.isoformat() if pp.last_access_at else None,
+            "last_access_at": (_la.isoformat() if (_la := _last_access(pp)) else None),
         },
         "program": {"name": program.name, "company": program.company.name if program.company else None},
         "sessions": sessions,

@@ -3142,8 +3142,11 @@ async def login_with_otp(payload: LoginOTPRequest):
 
 
 @router.get("/portal/{portal_code}")
-async def get_portal_data(portal_code: str):
-    """Obtener datos de usuario y programa por portal_code (para ruta /p/{code})"""
+async def get_portal_data(portal_code: str, preview: Optional[str] = None):
+    """Obtener datos de usuario y programa por portal_code (para ruta /p/{code}).
+    `preview` (truthy) = un admin está viendo el portal de otra persona en modo
+    solo lectura — no debe contar como acceso real de esa persona (mismo
+    contrato que /chat/{program_id}/messages)."""
     def _resolve():
         from django.db import close_old_connections
         close_old_connections()
@@ -3159,7 +3162,7 @@ async def get_portal_data(portal_code: str):
             user=user, deleted_at__isnull=True
         ).order_by('-created_at')
         now = timezone.now()
-        for pp in pps:
+        for pp in (pps if not preview else []):
             # Primer acceso real al portal -> pasa de "pendiente" a "activo".
             # Antes solo un admin podía activar manualmente, así que alguien que
             # ya usaba la plataforma seguía apareciendo como "Pendiente" en Reportes.
@@ -3168,6 +3171,10 @@ async def get_portal_data(portal_code: str):
                 if not pp.activated_at:
                     pp.activated_at = now
                 pp.save(update_fields=['status', 'activated_at'])
+            # Último acceso general al portal (distinto del last_access_at del chat,
+            # que solo se toca al abrir el chat grupal — ver comentario en el modelo).
+            pp.last_portal_access_at = now
+            pp.save(update_fields=['last_portal_access_at'])
             # Un registro de acceso por hora aprox. (no uno por request) para que
             # "Accesos promedio" en Reportes refleje sesiones reales, no ruido.
             last_log = ParticipantAccessLog.objects.filter(participant=pp).order_by('-occurred_at').first()

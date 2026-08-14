@@ -3,8 +3,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { apiFetch } from "@/lib/api";
-import { forceSimulation, forceLink, forceManyBody, forceCollide, forceX, forceY, type Simulation } from 'd3-force';
 import ProgramPreviewView from '@/app/dashboard/programs/preview/ProgramPreviewView';
+import { EcosystemGraph, EcoIcons, ecoInitials, type EcoNodeDatum, type EcoEdgeDatum } from '@/app/studio/shared/EcosystemGraph';
 
 // ============================================================================
 // CONSTANTS
@@ -834,30 +834,6 @@ const InlineSpinner = ({ minH = 300 }: { minH?: number }) => (
   </div>
 );
 
-// ============================================================================
-// ECOSYSTEM FORCE-DIRECTED GRAPH
-// Modela el ecosistema de vínculos mentor-mentee según el instructivo del
-// algoritmo: la dupla es la relación estructural (línea gruesa + sesiones
-// visibles), el resto son vínculos sociales sutiles. La afinidad (misma
-// ciudad) NO dibuja línea — solo agrupa vía una fuerza adicional.
-// ============================================================================
-type EcoNodeDatum = {
-  id: string; full_name: string; role: string; avatar_url: string; city: string; area: string;
-  position: string; organization: string; career: string; profile_complete: boolean;
-  is_viewer: boolean; is_my_dupla: boolean; extra_links: number; has_sent_message?: boolean;
-  x?: number; y?: number; vx?: number; vy?: number; fx?: number | null; fy?: number | null;
-};
-type EcoEdgeDatum = {
-  source: string; target: string; type: string; strength: number;
-  sessions_completed: number; sessions_planned: number; status: string;
-};
-
-function seededRand(seed: string) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) { h = (h << 5) - h + seed.charCodeAt(i); h |= 0; }
-  return () => { h = (h * 1103515245 + 12345) & 0x7fffffff; return (h % 1000) / 1000; };
-}
-
 // Convierte un username/email tipo "juan.reinoso.pardo" en "Juan Reinoso Pardo" para
 // nunca mostrar un identificador técnico como si fuera el nombre de una persona.
 function humanizeName(raw?: string | null): string {
@@ -878,10 +854,6 @@ function bestName(person?: { full_name?: string; username?: string; email?: stri
   return fromEmail || fallback;
 }
 
-function ecoInitials(name: string) {
-  return (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
-}
-
 function formatChatTime(iso: string) {
   const d = new Date(iso);
   const now = new Date();
@@ -892,285 +864,6 @@ function formatChatTime(iso: string) {
   return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 }
 
-// Iconos SVG (mismo estilo trazo que navIcons) para el tab Ecosistema — sin emojis.
-const EcoIcons = {
-  eye: (p: { size?: number }) => <svg width={p.size || 15} height={p.size || 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
-  filter: (p: { size?: number }) => <svg width={p.size || 15} height={p.size || 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M8 12h8M11 18h2" /></svg>,
-  trophy: (p: { size?: number }) => <svg width={p.size || 18} height={p.size || 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5" /><path d="M8.21 13.89L7 21l5-3 5 3-1.21-7.11" /></svg>,
-  users: (p: { size?: number }) => <svg width={p.size || 18} height={p.size || 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
-  bulb: (p: { size?: number }) => <svg width={p.size || 15} height={p.size || 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M15.09 14c.3-.5.5-1.1.7-1.6.5-1.3 1.2-2.5 1.2-4.4 0-3.3-2.7-6-6-6S5 4.7 5 8c0 1.9.7 3.1 1.2 4.4.2.5.4 1.1.7 1.6" /></svg>,
-  pin: (p: { size?: number }) => <svg width={p.size || 13} height={p.size || 13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1118 0z" /><circle cx="12" cy="10" r="3" /></svg>,
-  message: (p: { size?: number }) => <svg width={p.size || 14} height={p.size || 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>,
-  expand: (p: { size?: number }) => <svg width={p.size || 13} height={p.size || 13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" /></svg>,
-  chevronDown: (p: { size?: number }) => <svg width={p.size || 11} height={p.size || 11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>,
-};
-
-function EcosystemGraph({
-  nodes: rawNodes, edges: rawEdges, width = 900, height = 620, selectedId, onSelect,
-  viewDuplasOnly, roleFilter, viewerCity, cityOnly, interactedOnly, viewerId,
-}: {
-  nodes: EcoNodeDatum[]; edges: EcoEdgeDatum[]; width?: number; height?: number;
-  selectedId: string | null; onSelect: (id: string | null) => void;
-  viewDuplasOnly: boolean; roleFilter: 'all' | 'mentor' | 'mentee'; viewerCity: string;
-  cityOnly: boolean; interactedOnly: boolean; viewerId: string;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const simRef = useRef<Simulation<EcoNodeDatum, undefined> | null>(null);
-  const nodesRef = useRef<EcoNodeDatum[]>([]);
-  const [, setTick] = useState(0);
-  const [dims, setDims] = useState({ w: width, h: height });
-  const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
-  const [dragId, setDragId] = useState<string | null>(null);
-  const panningRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number; moved: boolean } | null>(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const el = containerRef.current;
-    const update = () => setDims({ w: el.clientWidth || width, h: el.clientHeight || height });
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [width, height]);
-
-  useEffect(() => {
-    const w0 = containerRef.current?.clientWidth || width;
-    const h0 = containerRef.current?.clientHeight || height;
-    const simNodes: EcoNodeDatum[] = rawNodes.map(n => {
-      const rand = seededRand(n.id);
-      return { ...n, x: w0 / 2 + (rand() - 0.5) * w0 * 0.6, y: h0 / 2 + (rand() - 0.5) * h0 * 0.6 };
-    });
-    const nodeById = new Map(simNodes.map(n => [n.id, n]));
-    const validEdges = rawEdges.filter(e => nodeById.has(e.source) && nodeById.has(e.target));
-    const simLinks = validEdges.map(e => ({ ...e, source: nodeById.get(e.source)!, target: nodeById.get(e.target)! }));
-    nodesRef.current = simNodes;
-
-    const sim = forceSimulation(simNodes)
-      .force('link', forceLink(simLinks as any).id((d: any) => d.id)
-        .distance((l: any) => l.type === 'MENTORSHIP' ? 190 : Math.max(190, 320 - (l.strength || 30) * 1.4))
-        .strength((l: any) => l.type === 'MENTORSHIP' ? 0.95 : 0.15))
-      .force('charge', forceManyBody().strength(-480).distanceMax(650))
-      .force('collide', forceCollide().radius((d: any) => (d.is_viewer ? 68 : d.is_my_dupla ? 58 : 50)).strength(0.9))
-      .force('x', forceX(w0 / 2).strength(0.035))
-      .force('y', forceY(h0 / 2).strength(0.035))
-      .alpha(1).alphaDecay(0.02);
-
-    // Afinidad por ciudad: agrupa sin dibujar línea (sección 24 del instructivo)
-    sim.force('affinity', (alpha: number) => {
-      for (let i = 0; i < simNodes.length; i++) {
-        for (let j = i + 1; j < simNodes.length; j++) {
-          const a = simNodes[i], b = simNodes[j];
-          if (a.city && a.city === b.city) {
-            const dx = (b.x! - a.x!), dy = (b.y! - a.y!);
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            if (dist > 150) {
-              const f = 0.006 * alpha;
-              a.vx! += (dx / dist) * f; a.vy! += (dy / dist) * f;
-              b.vx! -= (dx / dist) * f; b.vy! -= (dy / dist) * f;
-            }
-          }
-        }
-      }
-    });
-
-    sim.on('tick', () => {
-      const w = containerRef.current?.clientWidth || width;
-      const h = containerRef.current?.clientHeight || height;
-      for (const n of simNodes) {
-        const r = n.is_viewer ? 68 : n.is_my_dupla ? 58 : 50;
-        n.x = Math.max(r, Math.min(w - r, n.x!));
-        n.y = Math.max(r, Math.min(h - r, n.y!));
-      }
-      setTick(t => t + 1);
-    });
-    simRef.current = sim;
-    return () => { sim.stop(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawNodes, rawEdges, width, height]);
-
-  const highlightIds = useMemo(() => {
-    if (!selectedId) return null;
-    const s = new Set<string>([selectedId]);
-    rawEdges.forEach(e => { if (e.source === selectedId) s.add(e.target); if (e.target === selectedId) s.add(e.source); });
-    return s;
-  }, [selectedId, rawEdges]);
-
-  const interactedSet = useMemo(() => {
-    const s = new Set<string>();
-    rawEdges.forEach(e => { if (e.source === viewerId) s.add(e.target); if (e.target === viewerId) s.add(e.source); });
-    return s;
-  }, [rawEdges, viewerId]);
-
-  const passesFilter = useCallback((n: EcoNodeDatum) => {
-    if (n.is_viewer) return true;
-    if (roleFilter !== 'all' && n.role !== roleFilter) return false;
-    if (cityOnly && n.city !== viewerCity) return false;
-    if (interactedOnly && !interactedSet.has(n.id)) return false;
-    return true;
-  }, [roleFilter, cityOnly, viewerCity, interactedOnly, interactedSet]);
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const rect = containerRef.current!.getBoundingClientRect();
-    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-    setTransform(t => {
-      const newK = Math.min(2.5, Math.max(0.4, t.k * (1 - e.deltaY * 0.001)));
-      const newX = cx - ((cx - t.x) / t.k) * newK;
-      const newY = cy - ((cy - t.y) / t.k) * newK;
-      return { x: newX, y: newY, k: newK };
-    });
-  };
-
-  const zoomBy = (factor: number) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    const cx = rect ? rect.width / 2 : width / 2, cy = rect ? rect.height / 2 : height / 2;
-    setTransform(t => {
-      const newK = Math.min(2.5, Math.max(0.4, t.k * factor));
-      const newX = cx - ((cx - t.x) / t.k) * newK;
-      const newY = cy - ((cy - t.y) / t.k) * newK;
-      return { x: newX, y: newY, k: newK };
-    });
-  };
-
-  const handleBgPointerDown = (e: React.PointerEvent) => {
-    panningRef.current = { startX: e.clientX, startY: e.clientY, startTx: transform.x, startTy: transform.y, moved: false };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-  const handleBgPointerMove = (e: React.PointerEvent) => {
-    if (!panningRef.current) return;
-    const dx = e.clientX - panningRef.current.startX, dy = e.clientY - panningRef.current.startY;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) panningRef.current.moved = true;
-    setTransform(t => ({ ...t, x: panningRef.current!.startTx + dx, y: panningRef.current!.startTy + dy }));
-  };
-  const handleBgPointerUp = () => {
-    if (panningRef.current && !panningRef.current.moved) onSelect(null);
-    panningRef.current = null;
-  };
-
-  const handleNodePointerDown = (nodeId: string) => (e: React.PointerEvent) => {
-    e.stopPropagation();
-    const node = nodesRef.current.find(n => n.id === nodeId);
-    if (!node) return;
-    setDragId(nodeId);
-    simRef.current?.alphaTarget(0.25).restart();
-    node.fx = node.x; node.fy = node.y;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-  const handleNodePointerMove = (nodeId: string) => (e: React.PointerEvent) => {
-    if (dragId !== nodeId) return;
-    const rect = containerRef.current!.getBoundingClientRect();
-    const node = nodesRef.current.find(n => n.id === nodeId);
-    if (!node) return;
-    node.fx = (e.clientX - rect.left - transform.x) / transform.k;
-    node.fy = (e.clientY - rect.top - transform.y) / transform.k;
-    setTick(t => t + 1);
-  };
-  const handleNodePointerUp = (nodeId: string) => () => {
-    const node = nodesRef.current.find(n => n.id === nodeId);
-    if (node) { node.fx = null; node.fy = null; }
-    simRef.current?.alphaTarget(0);
-    setDragId(null);
-  };
-
-  return (
-    <div ref={containerRef} className="eco-canvas"
-      onWheel={handleWheel} onPointerDown={handleBgPointerDown} onPointerMove={handleBgPointerMove} onPointerUp={handleBgPointerUp}
-      style={{ width: '100%', height: '100%', cursor: panningRef.current ? 'grabbing' : 'grab' }}>
-      <div style={{ position: 'absolute', inset: 0, zIndex: 1, transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`, transformOrigin: '0 0' }}>
-        <svg style={{ position: 'absolute', left: 0, top: 0, width: dims.w, height: dims.h, overflow: 'visible', pointerEvents: 'none' }}>
-          {rawEdges.map((e, i) => {
-            if (viewDuplasOnly && e.type !== 'MENTORSHIP') return null;
-            const s = nodesRef.current.find(n => n.id === e.source), t = nodesRef.current.find(n => n.id === e.target);
-            if (!s || !t || s.x === undefined || t.x === undefined) return null;
-            const dimmed = highlightIds ? !(highlightIds.has(e.source) && highlightIds.has(e.target)) : false;
-            const isDupla = e.type === 'MENTORSHIP';
-            const dx = t.x! - s.x!, dy = t.y! - s.y!;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1;
-            const nx = -dy / len, ny = dx / len; // unit normal, perpendicular to the line
-            const midX = (s.x! + t.x!) / 2 + nx * 20, midY = (s.y! + t.y!) / 2 + ny * 20;
-            return (
-              <g key={i} opacity={dimmed ? 0.12 : 1}>
-                <line x1={s.x} y1={s.y} x2={t.x} y2={t.y}
-                  stroke={isDupla ? '#14b8a6' : '#cbd5e1'} strokeWidth={isDupla ? 2.5 : 1.5} opacity={isDupla ? 0.85 : 1}
-                  strokeDasharray={isDupla ? undefined : '4 5'} strokeLinecap="round" />
-                {isDupla && (
-                  <>
-                    <rect x={midX - 14} y={midY - 8} width={28} height={16} rx={8} fill="#0f172a" opacity={0.85} />
-                    <text x={midX} y={midY + 3.5} textAnchor="middle" fontSize="8.5" fontWeight={700} fill="#fff">
-                      {e.sessions_completed}/{e.sessions_planned || e.sessions_completed}
-                    </text>
-                  </>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-        {nodesRef.current.map(node => {
-          const isSelected = selectedId === node.id;
-          const dimmed = (highlightIds && !highlightIds.has(node.id)) || !passesFilter(node);
-          const ringColor = node.role === 'mentor' ? '#22c55e' : '#3b82f6';
-          const size = node.is_viewer ? 68 : node.is_my_dupla ? 54 : 46;
-          return (
-            <div key={node.id}
-              onPointerDown={handleNodePointerDown(node.id)}
-              onPointerMove={handleNodePointerMove(node.id)}
-              onPointerUp={handleNodePointerUp(node.id)}
-              onClick={(e) => { e.stopPropagation(); onSelect(node.id); }}
-              style={{
-                position: 'absolute', left: node.x, top: node.y, transform: 'translate(-50%, -50%)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer',
-                opacity: dimmed ? 0.22 : 1, transition: 'opacity 0.25s', zIndex: node.is_viewer ? 6 : isSelected ? 5 : 3,
-                touchAction: 'none',
-              }}>
-              <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-                {node.is_viewer && !dimmed && <div className="eco-pulse-ring" />}
-                {(node.is_viewer || node.is_my_dupla) && !dimmed && <div className="eco-pulse-ring" style={{ animationDelay: '1.3s' }} />}
-                <div className="eco-node-breathe" style={{ animationDelay: `${(seededRand(node.id)() * 3).toFixed(2)}s`, width: size, height: size }}>
-                  <div style={{
-                    width: size, height: size, borderRadius: '50%', overflow: 'hidden',
-                    border: `${node.is_viewer ? 4 : 3}px solid ${node.is_viewer ? '#14b8a6' : ringColor}`,
-                    background: node.avatar_url ? '#fff' : (node.role === 'mentor' ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#3b82f6,#2563eb)'),
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: isSelected ? `0 0 0 4px ${ringColor}33, 0 6px 18px rgba(15,23,42,0.25)` : '0 2px 8px rgba(15,23,42,0.12)',
-                  }}>
-                    {node.avatar_url ? (
-                      <img src={node.avatar_url} alt={node.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ color: '#fff', fontWeight: 800, fontSize: size > 70 ? '1.3rem' : '1rem' }}>{ecoInitials(node.full_name)}</span>
-                    )}
-                  </div>
-                </div>
-                {node.has_sent_message && !node.is_viewer && (
-                  <div title="Ha enviado mensajes" style={{
-                    position: 'absolute', top: -3, right: -3, width: 20, height: 20, borderRadius: '50%',
-                    background: '#0891b2', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 2px 6px rgba(8,145,178,0.5)',
-                  }}>
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
-                  </div>
-                )}
-              </div>
-              <div style={{ marginTop: 6, textAlign: 'center', pointerEvents: 'none', maxWidth: 100 }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {node.is_viewer ? 'TÚ' : (node.full_name.split(' ')[0] || '—')}
-                </div>
-                <div style={{ fontSize: '0.62rem', fontWeight: 600, color: ringColor }}>
-                  {node.role === 'mentor' ? 'Mentor' : 'Mentee'}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="eco-zoom-controls">
-        <button onClick={() => zoomBy(0.85)} aria-label="Alejar">−</button>
-        <span>{Math.round(transform.k * 100)}%</span>
-        <button onClick={() => zoomBy(1.18)} aria-label="Acercar">+</button>
-        <button onClick={() => setTransform({ x: 0, y: 0, k: 1 })} aria-label="Restablecer zoom"><EcoIcons.expand /></button>
-      </div>
-    </div>
-  );
-}
 
 export default function ParticipantPortalPage() {
   const router = useRouter();
@@ -1460,8 +1153,14 @@ export default function ParticipantPortalPage() {
     const token = localStorage.getItem('auth_token');
     if (!token) { router.replace('/login/admin'); return; }
 
-    // Validate the portal code
-    apiFetch(`${API_URL}/api/companies/portal/${portalCode}`)
+    // Validate the portal code — en vista previa de admin (?preview=admin, o ya
+    // marcada en sessionStorage al navegar dentro del portal) no debe registrarse
+    // como un acceso real de la persona (activación, logs de acceso).
+    const isPreviewNow = typeof window !== 'undefined' && (
+      new URLSearchParams(window.location.search).get('preview') === 'admin' ||
+      sessionStorage.getItem(`admin_preview_${portalCode}`) === '1'
+    );
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}${isPreviewNow ? '?preview=1' : ''}`)
       .then(r => { if (!r.ok) throw new Error('not_found'); return r.json(); })
       .then(data => {
         setPortalUser(data.user);
