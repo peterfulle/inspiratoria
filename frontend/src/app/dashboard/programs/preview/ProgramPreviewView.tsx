@@ -100,7 +100,7 @@ export default function ProgramPreviewView({
   variant?: "studio" | "portal";
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [tab, setTab] = useState<"overview" | "modules" | "config">("overview");
+  const [tab, setTab] = useState<"overview" | "modules" | "milestones" | "config">("overview");
   const [viewPdf, setViewPdf] = useState<Resource | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [viewVideo, setViewVideo] = useState<Resource | null>(null);
@@ -312,6 +312,7 @@ export default function ProgramPreviewView({
           {([
             { k: "overview" as const, l: "Vista General", i: I.clipboard },
             { k: "modules" as const, l: "Módulos", i: I.book },
+            { k: "milestones" as const, l: "Hitos", i: I.trophy },
             { k: "config" as const, l: "Configuración", i: I.settings },
           ]).map(t => (
             <button key={t.k} onClick={() => setTab(t.k)} className={`tab-btn ${tab === t.k ? "on" : ""}`}>{t.i}<span>{t.l}</span></button>
@@ -325,25 +326,6 @@ export default function ProgramPreviewView({
         {/* OVERVIEW */}
         {tab === "overview" && (
           <div className="fade-in">
-            {/* Milestones */}
-            {template.milestones.length > 0 && (
-              <section className="sec">
-                <SectionHead icon={I.trophy} bg="#FFFBEB" color="#D97706" title="Hitos del Programa" count={template.milestones.length} />
-                <div className="timeline">
-                  {template.milestones.map((ms, i) => (
-                    <div key={ms.id} className="tl-item">
-                      <div className="tl-dot">{i + 1}</div>
-                      <div className="tl-card">
-                        <div className="row jc-sb ai-c mb8"><h3 className="f15 fw6 ink">{ms.name}</h3><span className="badge-n">Semana {ms.week}</span></div>
-                        <p className="sec-text mb10">{ms.description}</p>
-                        <div className="row gap6 ai-c muted f13">{I.pkg}<span>Entregable: {ms.deliverable}</span></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
             {/* Module Summary */}
             <section className="sec">
               <SectionHead icon={I.book} bg="#EFF6FF" color="#2563EB" title="Resumen de Módulos" count={template.modules.length} />
@@ -368,6 +350,31 @@ export default function ProgramPreviewView({
                 <div className="res-list">{template.modules.flatMap(m => m.resources).map(r => <ResRow key={r.id} r={r} onView={setViewPdf} onVideo={setViewVideo} />)}</div>
               )}
             </section>
+          </div>
+        )}
+
+        {/* MILESTONES */}
+        {tab === "milestones" && (
+          <div className="fade-in">
+            {template.milestones.length === 0 ? (
+              <div className="empty">Este programa no tiene hitos configurados</div>
+            ) : (
+              <section className="sec">
+                <SectionHead icon={I.trophy} bg="#FFFBEB" color="#D97706" title="Hitos del Programa" count={template.milestones.length} />
+                <div className="timeline">
+                  {template.milestones.map((ms, i) => (
+                    <div key={ms.id} className="tl-item">
+                      <div className="tl-dot">{i + 1}</div>
+                      <div className="tl-card">
+                        <div className="row jc-sb ai-c mb8"><h3 className="f15 fw6 ink">{ms.name}</h3><span className="badge-n">Semana {ms.week}</span></div>
+                        <p className="sec-text mb10">{ms.description}</p>
+                        <div className="row gap6 ai-c muted f13">{I.pkg}<span>Entregable: {ms.deliverable}</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
 

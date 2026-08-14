@@ -894,8 +894,6 @@ export default function ParticipantPortalPage() {
     '': 'dashboard',
     'modulos': 'my-modules',
     'actividades': 'my-activities',
-    'participantes': 'my-participants',
-    'hitos': 'my-milestones',
     'ecosistema': 'my-ecosystem',
     'perfil': 'my-profile',
     'insignias': 'my-badges',
@@ -903,7 +901,6 @@ export default function ParticipantPortalPage() {
     'mentees': 'my-mentees',
     'mi-mentor': 'my-mentor',
     'sesiones': 'my-sessions',
-    'red': 'my-network',
     'mis-actividades': 'my-portal-activities',
   };
   const NAV_TO_SLUG: Record<string, string> = Object.fromEntries(Object.entries(SECTION_SLUGS).map(([k, v]) => [v, k]));
@@ -942,6 +939,7 @@ export default function ParticipantPortalPage() {
   const [ecoInteractedOnly, setEcoInteractedOnly] = useState(false);
   const [ecoViewMenuOpen, setEcoViewMenuOpen] = useState(false);
   const [ecoFiltersOpen, setEcoFiltersOpen] = useState(false);
+  const [showNetworkModal, setShowNetworkModal] = useState(false);
 
   // Profile editing state
   const [profileEditing, setProfileEditing] = useState(false);
@@ -1109,20 +1107,18 @@ export default function ParticipantPortalPage() {
 
   // Derive detail tab from URL section
   const detailTab = (() => {
-    const map: Record<string, string> = { 'my-program': 'overview', 'my-progress': 'progress', 'my-modules': 'modules', 'my-activities': 'activities', 'my-participants': 'participants', 'my-milestones': 'milestones', 'my-ecosystem': 'ecosystem' };
-    return (map[activeNav] || 'overview') as 'overview' | 'modules' | 'participants' | 'activities' | 'milestones' | 'ecosystem';
+    const map: Record<string, string> = { 'my-program': 'overview', 'my-progress': 'progress', 'my-modules': 'modules', 'my-activities': 'activities', 'my-ecosystem': 'ecosystem' };
+    return (map[activeNav] || 'overview') as 'overview' | 'modules' | 'activities' | 'ecosystem';
   })();
 
   // Nav items — filtered by role
   const mentoriaItems = isMentee ? [
     { id: 'my-mentor', label: 'Mi Mentor', icon: 'participants' },
     { id: 'my-sessions', label: 'Sesiones', icon: 'milestones' },
-    { id: 'my-network', label: 'Mi Red', icon: 'ecosystem' },
     { id: 'my-portal-activities', label: 'Actividades', icon: 'activities' },
   ] : [
     { id: 'my-mentees', label: 'Mis Mentees', icon: 'participants' },
     { id: 'my-sessions', label: 'Sesiones', icon: 'milestones' },
-    { id: 'my-network', label: 'Mi Red', icon: 'ecosystem' },
     { id: 'my-portal-activities', label: 'Actividades', icon: 'activities' },
   ];
   const navItems = [
@@ -1130,8 +1126,6 @@ export default function ParticipantPortalPage() {
       { id: 'dashboard', label: 'Inicio', icon: 'home' },
       { id: 'my-modules', label: 'Módulos', icon: 'modules', count: programTemplate?.modules?.length || 0 },
       { id: 'my-activities', label: 'Actividades', icon: 'activities' },
-      { id: 'my-participants', label: 'Participantes', icon: 'participants', count: programParticipants.length || 0 },
-      { id: 'my-milestones', label: 'Hitos', icon: 'milestones', count: programTemplate?.milestones?.length || 0 },
       { id: 'my-ecosystem', label: 'Ecosistema', icon: 'ecosystem' },
     ]},
     { section: 'Mentoría', items: mentoriaItems },
@@ -1323,9 +1317,9 @@ export default function ParticipantPortalPage() {
       .finally(() => setActivitiesLoading(false));
   }, [activeNav, portalCode]);
 
-  // Fetch network when entering the network tab
+  // Fetch network (directorio de contactos) when opening the network modal from Ecosistema
   useEffect(() => {
-    if (activeNav !== 'my-network' || !portalCode) return;
+    if (!showNetworkModal || !portalCode) return;
     if (networkPeople.length > 0) return; // already loaded
     setNetworkLoading(true);
     apiFetch(`${API_URL}/api/companies/portal/${portalCode}/network`)
@@ -1333,7 +1327,7 @@ export default function ParticipantPortalPage() {
       .then(data => setNetworkPeople(data.network || []))
       .catch(() => setNetworkPeople([]))
       .finally(() => setNetworkLoading(false));
-  }, [activeNav, portalCode]);
+  }, [showNetworkModal, portalCode]);
 
   // Fetch ecosystem graph (duplas + red social) when entering the ecosystem tab
   useEffect(() => {
@@ -1609,7 +1603,7 @@ export default function ParticipantPortalPage() {
       </span>
     );
 
-    const pageTitle = ({ participants: 'Participantes', activities: 'Actividades', milestones: 'Hitos', ecosystem: 'Ecosistema' } as Record<string, string>)[detailTab];
+    const pageTitle = ({ activities: 'Actividades', ecosystem: 'Ecosistema' } as Record<string, string>)[detailTab];
     const pageSubtitle = `${roleLabel} · ${programTemplate?.duration || mp.name}`;
 
     return (
@@ -1625,47 +1619,6 @@ export default function ParticipantPortalPage() {
                 <p className="dash-subtitle">{pageSubtitle}</p>
               </div>
             </div>
-          )}
-
-          {/* ─── TAB: PARTICIPANTS ─── */}
-          {detailTab === 'participants' && (
-            <>
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Participantes del Programa</div>
-                <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 2 }}>{programParticipants.length} persona{programParticipants.length !== 1 ? 's' : ''} inscrita{programParticipants.length !== 1 ? 's' : ''}</div>
-              </div>
-
-              {programParticipants.length === 0 ? (
-                <div className="pd-section" style={{ textAlign: 'center', padding: '48px 20px' }}>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#374151', marginBottom: 6 }}>Sin participantes</div>
-                  <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Aún no hay participantes en este programa</div>
-                </div>
-              ) : (
-                <div className="pd-section">
-                  <div style={{ overflowX: 'auto' }}>
-                    <table className="data-table">
-                      <thead>
-                        <tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th></tr>
-                      </thead>
-                      <tbody>
-                        {programParticipants.map((pt: any, i: number) => {
-                          const u = pt.user || {};
-                          const name = u.full_name || [u.nombre || u.first_name, u.apellidos || u.last_name].filter(Boolean).join(' ').trim() || '—';
-                          return (
-                          <tr key={i}>
-                            <td style={{ fontWeight: 600 }}>{name}</td>
-                            <td>{u.email || pt.email || '—'}</td>
-                            <td>{ROLE_LABELS[pt.role] || pt.role}</td>
-                            <td><span className={`badge ${pt.status === 'active' ? 'badge-active' : 'badge-draft'}`}>{pt.status === 'active' ? 'Activo' : pt.status}</span></td>
-                          </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </>
           )}
 
           {/* ─── TAB: ACTIVITIES ─── */}
@@ -1733,47 +1686,6 @@ export default function ParticipantPortalPage() {
             </>
           )}
 
-          {/* ─── TAB: MILESTONES ─── */}
-          {detailTab === 'milestones' && (
-            <>
-              <div style={{ marginBottom: 18 }}>
-                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827' }}>Hitos del Programa</div>
-                <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 2 }}>
-                  {programTemplate?.milestones?.length || 0} hito{(programTemplate?.milestones?.length || 0) !== 1 ? 's' : ''} definido{(programTemplate?.milestones?.length || 0) !== 1 ? 's' : ''}
-                </div>
-              </div>
-
-              {!programTemplate || !programTemplate.milestones?.length ? (
-                <div className="pd-section" style={{ textAlign: 'center', padding: '48px 20px' }}>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#374151', marginBottom: 6 }}>Sin hitos</div>
-                  <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Este programa no tiene hitos configurados</div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {programTemplate.milestones.map((ms: any, idx: number) => (
-                    <div key={ms.id || idx} className="pd-ms">
-                      <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start' }}>
-                        <div className="pd-ms-week">
-                          <div className="pd-ms-wk-label">Semana</div>
-                          <div className="pd-ms-wk-num">{ms.week}</div>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div className="pd-ms-title">{ms.name}</div>
-                          {ms.description && <div className="pd-ms-desc">{ms.description}</div>}
-                          {ms.deliverable && (
-                            <div className="pd-ms-deliverable">
-                              <span style={{ fontWeight: 700 }}>Entregable:</span> {ms.deliverable}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
           {/* ─── TAB: ECOSYSTEM ─── */}
           {detailTab === 'ecosystem' && (
             <>
@@ -1815,6 +1727,11 @@ export default function ParticipantPortalPage() {
                           <div className="eco-stat-value">{stats.challenges_completed || 0} / {stats.challenges_total || 0}</div>
                           <div className="eco-stat-icon"><EcoIcons.trophy /></div>
                         </div>
+                        <button className="eco-stat-card" style={{ cursor: 'pointer', background: '#ecfeff', borderColor: '#a5f3fc' }} onClick={() => setShowNetworkModal(true)}>
+                          <div className="eco-stat-label" style={{ color: '#0e7490' }}>Ver directorio</div>
+                          <div className="eco-stat-value" style={{ color: '#0e7490', fontSize: '0.82rem' }}>Perfiles de contacto</div>
+                          <div className="eco-stat-icon"><EcoIcons.users /></div>
+                        </button>
                       </div>
                       <div className="eco-header-actions">
                         <div style={{ position: 'relative' }}>
@@ -3602,42 +3519,6 @@ export default function ParticipantPortalPage() {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // RENDER: MI RED DE INFLUENCIA
-  // ═══════════════════════════════════════════════════════════════
-  const renderNetwork = () => {
-    if (networkLoading) return <InlineSpinner />;
-    return (
-      <div>
-        <div className="dash-header"><h1 className="dash-title">Mi Red de Influencia</h1><p className="dash-subtitle">Perfiles express de las personas en tus programas</p></div>
-        {networkPeople.length === 0 ? (
-          <div className="empty-state">Aún no hay personas en tu red</div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-            {networkPeople.map((p: any) => (
-              <div key={p.id} style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6' }}>
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 700, color: '#0891b2', overflow: 'hidden', flexShrink: 0 }}>
-                    {p.avatar_url ? <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : bestName(p, 'U').charAt(0).toUpperCase()}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{bestName(p)}</div>
-                    <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>{p.position || p.headline || ''}</div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 8, background: p.role === 'mentor' ? '#ecfdf5' : p.role === 'mentee' ? '#e0f2fe' : '#f3f4f6', color: p.role === 'mentor' ? '#047857' : p.role === 'mentee' ? '#0891b2' : '#6b7280', fontSize: '0.68rem', fontWeight: 600 }}>{p.role}</span>
-                    </div>
-                  </div>
-                </div>
-                {p.bio && <p style={{ fontSize: '0.78rem', color: '#4b5563', lineHeight: 1.5, marginBottom: 10 }}>{p.bio.slice(0, 120)}{p.bio.length > 120 ? '...' : ''}</p>}
-                {p.linkedin_url && <a href={p.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.78rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> LinkedIn</a>}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // ═══════════════════════════════════════════════════════════════
   // RENDER: ACTIVIDADES CON COMPLETAR
   // ═══════════════════════════════════════════════════════════════
   const renderPortalActivities = () => {
@@ -4548,8 +4429,6 @@ export default function ParticipantPortalPage() {
       case 'dashboard': return isMentee ? renderMenteeDashboard() : renderDashboard();
       case 'my-modules': return renderModulesPreview();
       case 'my-activities': return renderMyProgram();
-      case 'my-participants': return renderMyProgram();
-      case 'my-milestones': return renderMyProgram();
       case 'my-ecosystem': return renderMyProgram();
       case 'my-profile': return renderProfile();
       case 'my-badges': return renderBadges();
@@ -4557,7 +4436,6 @@ export default function ParticipantPortalPage() {
       case 'my-mentees': return renderMentees();
       case 'my-mentor': return renderMyMentor();
       case 'my-sessions': return isMentee ? renderMenteeSessions() : renderSessions();
-      case 'my-network': return renderNetwork();
       case 'my-portal-activities': return renderPortalActivities();
       default: return isMentee ? renderMenteeDashboard() : renderDashboard();
     }
@@ -4779,6 +4657,49 @@ export default function ParticipantPortalPage() {
               <button className="dm-send-btn" onClick={sendDM} disabled={!dmInput.trim() || dmSending}>
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Directorio de contactos — perfiles express de las personas del programa (ex "Mi Red"), ahora accesible desde Ecosistema */}
+      {showNetworkModal && (
+        <div className="dm-overlay" onClick={() => setShowNetworkModal(false)}>
+          <div style={{ background: '#fff', borderRadius: 16, width: 'min(920px, 92vw)', maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: '1px solid #f3f4f6' }}>
+              <div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Directorio de contactos</div>
+                <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 2 }}>Perfiles express de las personas en tus programas</div>
+              </div>
+              <button onClick={() => setShowNetworkModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.4rem', color: '#9ca3af', cursor: 'pointer', lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ padding: 22, overflowY: 'auto' }}>
+              {networkLoading ? (
+                <InlineSpinner />
+              ) : networkPeople.length === 0 ? (
+                <div className="empty-state">Aún no hay personas en tu red</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+                  {networkPeople.map((p: any) => (
+                    <div key={p.id} style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6' }}>
+                      <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 12 }}>
+                        <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 700, color: '#0891b2', overflow: 'hidden', flexShrink: 0 }}>
+                          {p.avatar_url ? <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : bestName(p, 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827' }}>{bestName(p)}</div>
+                          <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>{p.position || p.headline || ''}</div>
+                          <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+                            <span style={{ padding: '2px 8px', borderRadius: 8, background: p.role === 'mentor' ? '#ecfdf5' : p.role === 'mentee' ? '#e0f2fe' : '#f3f4f6', color: p.role === 'mentor' ? '#047857' : p.role === 'mentee' ? '#0891b2' : '#6b7280', fontSize: '0.68rem', fontWeight: 600 }}>{p.role}</span>
+                          </div>
+                        </div>
+                      </div>
+                      {p.bio && <p style={{ fontSize: '0.78rem', color: '#4b5563', lineHeight: 1.5, marginBottom: 10 }}>{p.bio.slice(0, 120)}{p.bio.length > 120 ? '...' : ''}</p>}
+                      {p.linkedin_url && <a href={p.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.78rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> LinkedIn</a>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
