@@ -384,6 +384,18 @@ class ParticipantCreateRequest(BaseModel):
     vinculation_mentor_id: Optional[str] = None  # Si se vincula con un mentor al crear
 
 
+class BulkParticipantRow(BaseModel):
+    email: EmailStr
+    first_name: str = ""
+    last_name: str = ""
+
+
+class BulkParticipantRequest(BaseModel):
+    role: str = Field(..., pattern="^(facilitator|mentor|mentee|participant_cell)$")
+    send_invitation: bool = False
+    rows: List[BulkParticipantRow]
+
+
 class ParticipantResponse(BaseModel):
     id: str
     user: UserSearchResult
@@ -937,6 +949,91 @@ async def create_participant(program_id: str, payload: ParticipantCreateRequest,
     
     result = await sync_to_async(add_participant)()
     return result
+
+
+@router.post("/{program_id}/participants/bulk")
+async def bulk_create_participants(program_id: str, payload: BulkParticipantRequest, authorization: Optional[str] = Header(None)):
+    """
+    Carga masiva de participantes (desde una planilla CSV) — todos con el mismo
+    rol. Por cada fila: obtiene o crea el usuario por email, y lo agrega al
+    programa (o lo reactiva si estaba soft-deleted). No falla toda la carga
+    si una fila tiene error — reporta el detalle por fila para que el admin
+    revise. `send_invitation` en false por defecto: se agregan al programa
+    primero, el acceso se envía después (por fila, con "reenviar invitación").
+    """
+    from companies.auth_deps import get_current_user, require_program_access
+
+    actor = await sync_to_async(get_current_user)(authorization)
+    await sync_to_async(require_program_access)(actor, program_id)
+
+    def run():
+        try:
+            program = Program.objects.get(id=program_id)
+        except Program.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Programa no encontrado")
+
+        participant_role = normalize_participant_role(payload.role)
+        results = []
+        for row in payload.rows:
+            email = row.email.strip().lower()
+            try:
+                user = User.objects.filter(email=email).first()
+                if not user:
+                    base_username = email.split('@')[0]
+                    username = base_username
+                    counter = 1
+                    while User.objects.filter(username=username).exists():
+                        username = f"{base_username}{counter}"
+                        counter += 1
+                    user = User.objects.create(
+                        email=email,
+                        username=username,
+                        first_name=row.first_name.strip(),
+                        last_name=row.last_name.strip(),
+                        company=program.company,
+                        role=map_participant_role_to_user_role(participant_role),
+                        is_onboarded=False,
+                    )
+
+                already = ProgramParticipant.objects.filter(program=program, user=user, deleted_at__isnull=True).first()
+                if already:
+                    results.append({"email": email, "status": "ya_existia", "name": user.display_name})
+                    continue
+
+                existing_deleted = ProgramParticipant.objects.filter(program=program, user=user).exclude(deleted_at__isnull=True).first()
+                if existing_deleted:
+                    existing_deleted.role = participant_role
+                    existing_deleted.status = "active" if payload.send_invitation else "pending"
+                    existing_deleted.deleted_at = None
+                    existing_deleted.invitation_sent_at = datetime.now() if payload.send_invitation else None
+                    existing_deleted.save()
+                    participant = existing_deleted
+                else:
+                    participant = ProgramParticipant.objects.create(
+                        program=program,
+                        user=user,
+                        role=participant_role,
+                        status="active" if payload.send_invitation else "pending",
+                        invitation_sent_at=datetime.now() if payload.send_invitation else None,
+                    )
+
+                user_role = map_participant_role_to_user_role(participant_role)
+                if user.role != user_role:
+                    user.role = user_role
+                    user.save(update_fields=['role'])
+
+                prepare_user_secure_access(user, payload.send_invitation, program=program, role=participant_role)
+                results.append({"email": email, "status": "creado", "name": user.display_name})
+            except Exception as exc:
+                results.append({"email": email, "status": "error", "detail": str(exc)})
+
+        created = sum(1 for r in results if r["status"] == "creado")
+        _audit_sync(program, _actor(authorization), "participants_bulk_added", "participant", None, {
+            "role": participant_role, "count": created, "total_rows": len(payload.rows),
+        })
+        return {"results": results, "created": created, "total": len(payload.rows)}
+
+    return await sync_to_async(run)()
 
 
 @router.put("/{program_id}/participants/{participant_id}", response_model=ParticipantResponse)

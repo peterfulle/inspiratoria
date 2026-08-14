@@ -2158,6 +2158,7 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
   const [filter, setFilter] = useState<'all' | ParticipantRole>('all');
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
   const [enrollLink, setEnrollLink] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewingId, setPreviewingId] = useState<string | null>(null);
@@ -2297,6 +2298,9 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
                 </button>
               ))}
             </div>
+            <button onClick={() => setShowBulk(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:border-zinc-300 hover:bg-zinc-50 transition">
+              <I.Upload className="w-3.5 h-3.5" /> Carga masiva
+            </button>
             <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-[12px] font-semibold hover:bg-zinc-800 transition">
               <I.Plus className="w-3.5 h-3.5" /> Agregar
             </button>
@@ -2382,6 +2386,14 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
           onClose={() => setShowAdd(false)}
           onAdded={() => { setShowAdd(false); onChange(); }}
           showToast={showToast}
+        />
+      )}
+
+      {showBulk && (
+        <BulkUploadModal
+          programId={programId}
+          onClose={() => setShowBulk(false)}
+          onDone={() => { onChange(); }}
         />
       )}
     </div>
@@ -2725,6 +2737,242 @@ function MatchPreviewModal({ r, onClose }: { r: any; onClose: () => void }) {
         </div>
         <div className="overflow-y-auto">
           <MatchDetail r={r} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// CARGA MASIVA — planilla CSV de participantes, todos con el mismo rol
+// ============================================================================
+type BulkRow = { first_name: string; last_name: string; email: string; issue: string | null };
+
+function parseParticipantsCSV(text: string): BulkRow[] {
+  const splitLine = (line: string) => {
+    const out: string[] = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQuotes = !inQuotes; continue; }
+      if (c === ',' && !inQuotes) { out.push(cur); cur = ''; continue; }
+      cur += c;
+    }
+    out.push(cur);
+    return out.map(s => s.trim());
+  };
+
+  const lines = text.split(/\r\n|\n|\r/).map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length === 0) return [];
+
+  const headers = splitLine(lines[0]).map(h => h.toLowerCase());
+  const idxOf = (...names: string[]) => headers.findIndex(h => names.includes(h));
+  const iFirst = idxOf('nombre', 'nombres', 'first_name');
+  const iLast = idxOf('apellido', 'apellidos', 'last_name');
+  const iEmail = idxOf('email', 'correo', 'e-mail');
+
+  // Si no reconocemos encabezados, asumimos nombre,apellido,email en ese orden.
+  const hasHeaderRow = iFirst >= 0 || iLast >= 0 || iEmail >= 0;
+  const dataLines = hasHeaderRow ? lines.slice(1) : lines;
+  const fi = iFirst >= 0 ? iFirst : 0;
+  const li = iLast >= 0 ? iLast : 1;
+  const ei = iEmail >= 0 ? iEmail : 2;
+
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const seen = new Set<string>();
+  const rows: BulkRow[] = dataLines.map(line => {
+    const cells = splitLine(line);
+    const email = (cells[ei] || '').trim().toLowerCase();
+    const first_name = (cells[fi] || '').trim();
+    const last_name = (cells[li] || '').trim();
+    let issue: string | null = null;
+    if (!email) issue = 'Falta email';
+    else if (!emailRe.test(email)) issue = 'Email inválido';
+    else if (seen.has(email)) issue = 'Duplicado en el archivo';
+    if (!issue && !first_name) issue = 'Falta nombre';
+    if (!issue) seen.add(email);
+    return { first_name, last_name, email, issue };
+  });
+
+  return rows.sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`));
+}
+
+function downloadParticipantsTemplate() {
+  const csv = 'nombre,apellido,email\nJuan,Pérez,juan.perez@correo.com\nMaría,González,maria.gonzalez@correo.com\n';
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'plantilla_participantes.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function BulkUploadModal({ programId, onClose, onDone }: { programId: string; onClose: () => void; onDone: () => void }) {
+  const [role, setRole] = useState<ParticipantRole>('mentor');
+  const [sendInvitation, setSendInvitation] = useState(false);
+  const [rows, setRows] = useState<BulkRow[]>([]);
+  const [fileName, setFileName] = useState('');
+  const [fileError, setFileError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ results: { email: string; status: string; name?: string; detail?: string }[]; created: number; total: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const validRows = rows.filter(r => !r.issue);
+  const invalidCount = rows.length - validRows.length;
+
+  const onFile = async (file: File) => {
+    setFileError('');
+    setFileName(file.name);
+    try {
+      const text = await file.text();
+      const parsed = parseParticipantsCSV(text);
+      if (parsed.length === 0) { setFileError('No encontramos filas en el archivo.'); setRows([]); return; }
+      setRows(parsed);
+    } catch {
+      setFileError('No pudimos leer el archivo. Asegúrate de que sea un CSV válido.');
+      setRows([]);
+    }
+  };
+
+  const confirmUpload = async () => {
+    if (validRows.length === 0) return;
+    setSubmitting(true);
+    try {
+      const res = await apiFetch(`${API_URL}/api/programs/${programId}/participants/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role,
+          send_invitation: sendInvitation,
+          rows: validRows.map(r => ({ email: r.email, first_name: r.first_name, last_name: r.last_name })),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.detail || 'No pudimos procesar la carga masiva');
+      }
+      const data = await res.json();
+      setResult(data);
+      onDone();
+    } catch (e) {
+      setFileError(e instanceof Error ? e.message : 'Error al subir la planilla');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl border border-zinc-200 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-zinc-100 flex-shrink-0">
+          <div>
+            <h3 className="text-base font-bold text-zinc-900">Carga masiva de participantes</h3>
+            <p className="text-[11.5px] text-zinc-500 mt-0.5">Sube una planilla CSV y revisa la lista antes de crearlos.</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition"><I.Close className="w-4 h-4" /></button>
+        </div>
+
+        <div className="p-5 space-y-4 overflow-y-auto">
+          {result ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl border border-zinc-200 p-3 text-center">
+                  <div className="text-xl font-extrabold text-emerald-600">{result.created}</div>
+                  <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 font-semibold mt-1">Creados</div>
+                </div>
+                <div className="rounded-xl border border-zinc-200 p-3 text-center">
+                  <div className="text-xl font-extrabold text-amber-600">{result.results.filter(r => r.status === 'ya_existia').length}</div>
+                  <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 font-semibold mt-1">Ya existían</div>
+                </div>
+                <div className="rounded-xl border border-zinc-200 p-3 text-center">
+                  <div className="text-xl font-extrabold text-red-600">{result.results.filter(r => r.status === 'error').length}</div>
+                  <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 font-semibold mt-1">Errores</div>
+                </div>
+              </div>
+              <div className="space-y-1 max-h-72 overflow-y-auto">
+                {result.results.map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-100 text-[12px]">
+                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase ${
+                      r.status === 'creado' ? 'bg-emerald-100 text-emerald-700' : r.status === 'ya_existia' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                    }`}>{r.status === 'creado' ? 'Creado' : r.status === 'ya_existia' ? 'Ya existía' : 'Error'}</span>
+                    <span className="font-medium text-zinc-800">{r.name || r.email}</span>
+                    <span className="text-zinc-400">{r.email}</span>
+                    {r.detail && <span className="text-red-500 ml-auto">{r.detail}</span>}
+                  </div>
+                ))}
+              </div>
+              <button onClick={onClose} className="w-full py-2.5 rounded-lg bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-800 transition">Listo</button>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Rol en el programa</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['mentor', 'mentee', 'facilitator', 'participant_cell'] as ParticipantRole[]).map(r => (
+                    <button key={r} type="button" onClick={() => setRole(r)} className={`px-3 py-2 rounded-lg text-[12px] font-semibold border transition ${role === r ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-zinc-200 text-zinc-700 hover:border-zinc-300'}`}>
+                      {PARTICIPANT_ROLE_LABEL[r]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button type="button" onClick={downloadParticipantsTemplate} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-zinc-300 text-zinc-600 text-[12.5px] font-semibold hover:border-zinc-400 hover:bg-zinc-50 transition">
+                <I.Download className="w-3.5 h-3.5" /> Descargar plantilla CSV
+              </button>
+
+              <div>
+                <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-zinc-900 text-white text-[12.5px] font-semibold hover:bg-zinc-800 transition">
+                  <I.Upload className="w-3.5 h-3.5" /> {fileName || 'Subir planilla CSV'}
+                </button>
+                {fileError && <p className="text-[11.5px] text-red-600 mt-1.5">{fileError}</p>}
+              </div>
+
+              {rows.length > 0 && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[12px] font-semibold text-zinc-700">
+                      {validRows.length} de {rows.length} listos para crear
+                      {invalidCount > 0 && <span className="text-amber-600 font-normal"> · {invalidCount} con problemas</span>}
+                    </p>
+                  </div>
+                  <div className="border border-zinc-200 rounded-xl overflow-hidden">
+                    <div className="max-h-64 overflow-y-auto divide-y divide-zinc-100">
+                      {rows.map((r, i) => (
+                        <div key={i} className={`flex items-center gap-3 px-3 py-2 text-[12px] ${r.issue ? 'bg-red-50/40' : ''}`}>
+                          <span className="flex-1 min-w-0 truncate font-medium text-zinc-800">{r.first_name} {r.last_name}</span>
+                          <span className="flex-1 min-w-0 truncate text-zinc-500">{r.email}</span>
+                          {r.issue ? (
+                            <span className="flex-shrink-0 text-[10.5px] font-semibold text-red-600">{r.issue}</span>
+                          ) : (
+                            <span className="flex-shrink-0 text-[10.5px] font-semibold text-emerald-600">OK</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-3 p-3 rounded-xl bg-zinc-50 border border-zinc-200 cursor-pointer">
+                    <input type="checkbox" checked={sendInvitation} onChange={e => setSendInvitation(e.target.checked)} className="w-4 h-4 rounded accent-blue-600" />
+                    <div className="flex-1">
+                      <div className="text-[12.5px] font-semibold text-zinc-900">Enviar acceso ahora por email</div>
+                      <div className="text-[11px] text-zinc-500">Si lo dejas sin marcar, quedan agregados al programa y les envías el acceso después.</div>
+                    </div>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={confirmUpload}
+                    disabled={submitting || validRows.length === 0}
+                    className="w-full py-2.5 rounded-lg bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-800 transition disabled:opacity-60"
+                  >
+                    {submitting ? 'Creando…' : `Confirmar y crear ${validRows.length} participante${validRows.length !== 1 ? 's' : ''}`}
+                  </button>
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
