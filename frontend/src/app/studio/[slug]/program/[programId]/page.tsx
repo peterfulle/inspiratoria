@@ -408,7 +408,7 @@ export default function ProgramManagerConsole() {
         onToggleCollapsed={toggleSidebar}
       />
 
-      <main className={`flex-1 min-h-screen transition-[margin] duration-200 ${sidebarCollapsed ? 'ml-[76px]' : 'ml-64'}`}>
+      <main className={`flex-1 min-h-screen transition-[margin] duration-200 ${sidebarCollapsed ? 'ml-[76px]' : 'ml-[268px]'}`}>
         {/* Topbar */}
         <header className="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-zinc-100">
           <div className="px-8 py-3.5 flex items-center justify-between gap-6">
@@ -524,7 +524,8 @@ export default function ProgramManagerConsole() {
 
                 {program.description && (
                   <div className="rounded-xl bg-zinc-50 border border-zinc-100 p-5 mb-6">
-                    <p className="text-[13.5px] text-zinc-600 leading-[1.7] max-w-3xl text-justify" style={{ hyphens: 'auto' }}>{program.description}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400 mb-2">Descripción del programa</p>
+                    <p className="text-[13.5px] text-zinc-600 leading-[1.7]">{program.description}</p>
                   </div>
                 )}
 
@@ -621,34 +622,37 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab, colla
       <button
         onClick={() => onTab(id)}
         title={collapsed ? label : undefined}
-        className={`group/nav w-full flex items-center gap-2.5 rounded-lg text-[12.5px] font-medium transition-all relative ${
-          collapsed ? 'justify-center px-0 py-2' : 'pl-3 pr-2 py-[7px]'
-        } ${active ? 'bg-primary-50 text-zinc-900' : 'text-zinc-500 hover:bg-zinc-100/80 hover:text-zinc-900'}`}
+        className={`group/nav w-full flex items-center gap-3 rounded-xl text-[13px] font-medium transition-all duration-150 relative ${
+          collapsed ? 'justify-center px-0 py-2.5' : 'pl-3 pr-3 py-2.5'
+        } ${active ? 'bg-zinc-950 text-white shadow-[0_4px_14px_-4px_rgba(0,0,0,0.35)]' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'}`}
       >
-        <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full bg-primary-500 transition-all ${active ? 'h-5 opacity-100' : 'h-5 opacity-0'}`} />
-        <span className={`w-[15px] h-[15px] flex-shrink-0 transition-colors ${active ? 'text-primary-700' : 'text-zinc-400 group-hover/nav:text-zinc-600'}`}>{icon}</span>
+        <span className={`flex items-center justify-center w-6 h-6 rounded-lg flex-shrink-0 transition-colors ${
+          active ? 'bg-primary-500 text-zinc-950' : 'text-zinc-400 group-hover/nav:text-zinc-600'
+        }`} style={{ width: 24, height: 24 }}>
+          <span className="w-[15px] h-[15px] flex items-center justify-center">{icon}</span>
+        </span>
         {!collapsed && <span className="truncate">{label}</span>}
       </button>
     );
   };
 
   return (
-    <aside className={`fixed left-0 top-0 bottom-0 bg-white border-r border-zinc-100 z-40 flex flex-col transition-[width] duration-200 ${collapsed ? 'w-[76px]' : 'w-64'}`}>
+    <aside className={`fixed left-0 top-0 bottom-0 bg-white border-r border-zinc-200/70 shadow-[1px_0_0_rgba(0,0,0,0.02)] z-40 flex flex-col transition-[width] duration-200 ${collapsed ? 'w-[76px]' : 'w-[268px]'}`}>
       {/* Marca */}
-      <div className={`flex items-center h-16 flex-shrink-0 ${collapsed ? 'justify-center px-0' : 'justify-between px-4'}`}>
+      <div className={`flex items-center h-[70px] flex-shrink-0 ${collapsed ? 'justify-center px-0' : 'justify-between px-4'}`}>
         <Link href="/dashboard" className="flex items-center gap-2.5 group min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-zinc-950 flex items-center justify-center overflow-hidden flex-shrink-0">
-            <Image src="/images/logo.png" alt="Inspiratoria" width={32} height={32} className="object-cover" />
+          <div className="w-9 h-9 rounded-xl bg-zinc-950 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
+            <Image src="/images/logo.png" alt="Inspiratoria" width={36} height={36} className="object-cover" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-[13.5px] font-semibold text-zinc-900 leading-tight tracking-tight">Inspiratoria</p>
-              <p className="text-[10px] text-zinc-400 font-medium tracking-tight">Studio</p>
+              <p className="text-[14px] font-semibold text-zinc-900 leading-tight tracking-tight">Inspiratoria</p>
+              <p className="text-[10.5px] text-zinc-400 font-medium tracking-tight">Studio</p>
             </div>
           )}
         </Link>
         {!collapsed && (
-          <button onClick={onToggleCollapsed} title="Colapsar" className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600 transition flex-shrink-0">
+          <button onClick={onToggleCollapsed} title="Colapsar" className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600 transition flex-shrink-0">
             <I.Back className="w-3.5 h-3.5" />
           </button>
         )}
@@ -656,48 +660,53 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab, colla
 
       {/* Contexto del programa */}
       {!collapsed && (
-        <div className="px-3 pb-3">
-          <div className="px-3 py-2.5 rounded-lg bg-zinc-50">
-            <p className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-zinc-400 truncate">{program.company?.name || slug}</p>
-            <p className="text-[12.5px] font-semibold text-zinc-900 truncate mt-0.5 leading-snug">{program.name}</p>
+        <div className="px-3.5 pb-4">
+          <div className="px-3.5 py-3 rounded-xl bg-gradient-to-br from-zinc-50 to-zinc-100/60 border border-zinc-200/60">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="w-5 h-5 rounded-md bg-white border border-zinc-200 flex items-center justify-center text-[9px] font-bold text-zinc-500 flex-shrink-0">
+                {(program.company?.name || slug).charAt(0).toUpperCase()}
+              </span>
+              <p className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-zinc-400 truncate">{program.company?.name || slug}</p>
+            </div>
+            <p className="text-[13px] font-semibold text-zinc-900 truncate leading-snug">{program.name}</p>
           </div>
         </div>
       )}
       {collapsed && (
-        <div className="flex justify-center pb-3">
-          <div title={program.name} className="w-9 h-9 rounded-lg bg-zinc-50 flex items-center justify-center text-[11px] font-bold text-zinc-500">
+        <div className="flex justify-center pb-4">
+          <div title={program.name} className="w-9 h-9 rounded-xl bg-zinc-50 border border-zinc-200/60 flex items-center justify-center text-[11px] font-bold text-zinc-500">
             {(program.company?.name || slug).charAt(0).toUpperCase()}
           </div>
         </div>
       )}
 
       {/* Navegación */}
-      <nav className="flex-1 overflow-y-auto px-3 pt-1">
+      <nav className="flex-1 overflow-y-auto px-3.5 pt-1">
         {NAV_GROUPS.map((group, gi) => (
-          <div key={gi} className={gi > 0 ? 'mt-4' : ''}>
+          <div key={gi} className={gi > 0 ? 'mt-5' : ''}>
             {group.label && !collapsed && (
-              <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">{group.label}</p>
+              <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-400">{group.label}</p>
             )}
-            {group.label && collapsed && <div className="mx-2 mb-2 border-t border-zinc-100" />}
-            <div className="space-y-0.5">
+            {group.label && collapsed && <div className="mx-2 mb-3 border-t border-zinc-100" />}
+            <div className="space-y-1">
               {group.items.map(t => <NavItem key={t.id} {...t} />)}
             </div>
           </div>
         ))}
 
-        <div className="mt-4 pt-3 border-t border-zinc-100 space-y-0.5">
+        <div className="mt-5 pt-4 border-t border-zinc-100 space-y-1 pb-2">
           <Link href={`/studio/${slug}/dashboard`} title={collapsed ? 'Vista Corporativa' : undefined}
-            className={`w-full flex items-center gap-2.5 rounded-lg text-[12px] text-zinc-500 hover:bg-zinc-100/80 hover:text-zinc-900 transition-colors ${collapsed ? 'justify-center px-0 py-2' : 'pl-3 pr-2 py-[7px]'}`}>
-            <I.Layout className="w-[15px] h-[15px] text-zinc-400 flex-shrink-0" />
+            className={`w-full flex items-center gap-3 rounded-xl text-[12.5px] font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors ${collapsed ? 'justify-center px-0 py-2.5' : 'pl-3 pr-3 py-2.5'}`}>
+            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-400 flex-shrink-0"><I.Layout className="w-[15px] h-[15px]" /></span>
             {!collapsed && 'Vista Corporativa'}
           </Link>
           <Link href="/dashboard" title={collapsed ? 'Inicio admin' : undefined}
-            className={`w-full flex items-center gap-2.5 rounded-lg text-[12px] text-zinc-500 hover:bg-zinc-100/80 hover:text-zinc-900 transition-colors ${collapsed ? 'justify-center px-0 py-2' : 'pl-3 pr-2 py-[7px]'}`}>
-            <I.Home className="w-[15px] h-[15px] text-zinc-400 flex-shrink-0" />
+            className={`w-full flex items-center gap-3 rounded-xl text-[12.5px] font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors ${collapsed ? 'justify-center px-0 py-2.5' : 'pl-3 pr-3 py-2.5'}`}>
+            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-400 flex-shrink-0"><I.Home className="w-[15px] h-[15px]" /></span>
             {!collapsed && 'Inicio admin'}
           </Link>
           {collapsed && (
-            <button onClick={onToggleCollapsed} title="Expandir" className="w-full flex items-center justify-center py-2 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition">
+            <button onClick={onToggleCollapsed} title="Expandir" className="w-full flex items-center justify-center py-2.5 rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition">
               <I.Back className="w-3.5 h-3.5 rotate-180" />
             </button>
           )}
@@ -705,12 +714,12 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab, colla
       </nav>
 
       {/* Usuario */}
-      <div className={`py-3 border-t border-zinc-100 ${collapsed ? 'px-0 flex justify-center' : 'px-3'}`}>
-        <div className={`flex items-center gap-2.5 ${collapsed ? '' : 'px-1.5 py-1'}`}>
+      <div className={`py-3.5 border-t border-zinc-100 flex-shrink-0 ${collapsed ? 'px-0 flex justify-center' : 'px-3.5'}`}>
+        <div className={`flex items-center gap-2.5 rounded-xl transition-colors ${collapsed ? '' : 'px-2 py-1.5 hover:bg-zinc-50'}`}>
           {currentUser?.avatar_url ? (
-            <img src={currentUser.avatar_url} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+            <img src={currentUser.avatar_url} alt="" className="w-9 h-9 rounded-xl object-cover flex-shrink-0" />
           ) : (
-            <div title={collapsed ? (currentUser?.full_name || 'Admin') : undefined} className="w-8 h-8 rounded-lg bg-zinc-950 flex items-center justify-center text-[12px] font-semibold text-white flex-shrink-0">
+            <div title={collapsed ? (currentUser?.full_name || 'Admin') : undefined} className="w-9 h-9 rounded-xl bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center text-[12.5px] font-semibold text-white flex-shrink-0 shadow-sm">
               {initials}
             </div>
           )}
@@ -720,7 +729,7 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab, colla
                 <p className="text-[12.5px] font-semibold text-zinc-900 truncate leading-tight">{currentUser?.full_name || 'Admin'}</p>
                 <p className="text-[10.5px] text-zinc-400 truncate">{roleLabel}</p>
               </div>
-              <button onClick={onLogout} title="Cerrar sesión" className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0">
+              <button onClick={onLogout} title="Cerrar sesión" className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0">
                 <I.Logout className="w-4 h-4" />
               </button>
             </>
