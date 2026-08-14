@@ -470,6 +470,8 @@ class AuditLogResponse(BaseModel):
     id: str
     program_id: Optional[str] = None
     actor: Optional[str] = None
+    actor_id: Optional[str] = None
+    actor_avatar_url: Optional[str] = None
     action: str
     entity: str
     entity_id: Optional[str] = None
@@ -1029,7 +1031,7 @@ async def bulk_create_participants(program_id: str, payload: BulkParticipantRequ
 
         created = sum(1 for r in results if r["status"] == "creado")
         _audit_sync(program, _actor(authorization), "participants_bulk_added", "participant", None, {
-            "role": participant_role, "count": created, "total_rows": len(payload.rows),
+            "role": participant_role, "count": created, "total_rows": len(payload.rows), "results": results,
         })
         return {"results": results, "created": created, "total": len(payload.rows)}
 
@@ -1780,7 +1782,9 @@ async def get_audit_logs(
         return [{
             "id": str(log.id),
             "program_id": str(log.program_id) if log.program_id else None,
-            "actor": (log.admin_user.full_name or log.admin_user.email) if log.admin_user else "sistema/anónimo",
+            "actor": log.admin_user.display_name if log.admin_user else "Sistema/anónimo",
+            "actor_id": str(log.admin_user_id) if log.admin_user_id else None,
+            "actor_avatar_url": log.admin_user.avatar_url if log.admin_user else None,
             "action": log.action,
             "entity": log.entity,
             "entity_id": log.entity_id,

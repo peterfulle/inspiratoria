@@ -2159,6 +2159,7 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [enrollLink, setEnrollLink] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewingId, setPreviewingId] = useState<string | null>(null);
@@ -2298,6 +2299,9 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
                 </button>
               ))}
             </div>
+            <button onClick={() => setShowHistory(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:border-zinc-300 hover:bg-zinc-50 transition">
+              <I.Clock className="w-3.5 h-3.5" /> Histórico
+            </button>
             <button onClick={() => setShowBulk(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:border-zinc-300 hover:bg-zinc-50 transition">
               <I.Upload className="w-3.5 h-3.5" /> Carga masiva
             </button>
@@ -2394,6 +2398,13 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
           programId={programId}
           onClose={() => setShowBulk(false)}
           onDone={() => { onChange(); }}
+        />
+      )}
+
+      {showHistory && (
+        <BulkHistoryModal
+          programId={programId}
+          onClose={() => setShowHistory(false)}
         />
       )}
     </div>
@@ -2972,6 +2983,115 @@ function BulkUploadModal({ programId, onClose, onDone }: { programId: string; on
                 </>
               )}
             </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// HISTÓRICO DE CARGAS MASIVAS — auditoría por evento: admin, fecha, usuarios
+// ============================================================================
+type BulkHistoryRow = { email: string; name?: string; status: string; detail?: string };
+type BulkHistoryEntry = {
+  id: string;
+  actor: string | null;
+  actor_avatar_url: string | null;
+  created_at: string;
+  details: { role?: string; count?: number; total_rows?: number; results?: BulkHistoryRow[] };
+};
+
+function bulkRoleLabel(role?: string): string {
+  return role ? (PARTICIPANT_ROLE_LABEL[role as ParticipantRole] || role) : '—';
+}
+
+function BulkHistoryModal({ programId, onClose }: { programId: string; onClose: () => void }) {
+  const [entries, setEntries] = useState<BulkHistoryEntry[] | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiFetch(`${API_URL}/api/programs/${programId}/audit-logs?action=participants_bulk_added&limit=100`);
+        setEntries(res.ok ? await res.json() : []);
+      } catch {
+        setEntries([]);
+      }
+    })();
+  }, [programId]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl border border-zinc-200 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-zinc-100 flex-shrink-0">
+          <div>
+            <h3 className="text-base font-bold text-zinc-900">Histórico de cargas masivas</h3>
+            <p className="text-[11.5px] text-zinc-500 mt-0.5">Seguimiento de cada carga: quién la hizo, cuándo y a quiénes agregó.</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition"><I.Close className="w-4 h-4" /></button>
+        </div>
+
+        <div className="p-5 overflow-y-auto">
+          {entries === null ? (
+            <div className="flex items-center justify-center py-10 gap-2"><Spinner /><span className="text-[12px] text-zinc-400">Cargando histórico…</span></div>
+          ) : entries.length === 0 ? (
+            <Empty msg="Todavía no se ha hecho ninguna carga masiva en este programa" icon={<I.Clock />} />
+          ) : (
+            <div className="space-y-3">
+              {entries.map(entry => {
+                const d = entry.details || {};
+                const results = d.results || [];
+                const created = results.filter(r => r.status === 'creado').length;
+                const existed = results.filter(r => r.status === 'ya_existia').length;
+                const errored = results.filter(r => r.status === 'error').length;
+                const when = entry.created_at ? new Date(entry.created_at) : null;
+                const isOpen = expandedId === entry.id;
+                return (
+                  <div key={entry.id} className="rounded-xl border border-zinc-200 overflow-hidden">
+                    <button
+                      onClick={() => setExpandedId(isOpen ? null : entry.id)}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-zinc-50 transition"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center flex-shrink-0 overflow-hidden text-[11px] font-bold text-zinc-600">
+                        {entry.actor_avatar_url ? (
+                          <img src={entry.actor_avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          (entry.actor || '?').charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[12.5px] font-semibold text-zinc-900 truncate">
+                          {entry.actor || 'Sistema'} <span className="font-normal text-zinc-400">agregó {d.count ?? created} {bulkRoleLabel(d.role).toLowerCase()}{(d.count ?? created) !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="text-[11px] text-zinc-400 mt-0.5">
+                          {when ? `${when.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })} · ${when.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                          {existed > 0 && ` · ${existed} ya existía${existed !== 1 ? 'n' : ''}`}
+                          {errored > 0 && ` · ${errored} error${errored !== 1 ? 'es' : ''}`}
+                        </div>
+                      </div>
+                      <I.Chevron className={`w-3.5 h-3.5 text-zinc-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isOpen && (
+                      <div className="border-t border-zinc-100 divide-y divide-zinc-100">
+                        {results.map((r, i) => (
+                          <div key={i} className="flex items-center gap-2 px-3 py-2 text-[12px]">
+                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase flex-shrink-0 ${
+                              r.status === 'creado' ? 'bg-emerald-100 text-emerald-700' : r.status === 'ya_existia' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                            }`}>{r.status === 'creado' ? 'Creado' : r.status === 'ya_existia' ? 'Ya existía' : 'Error'}</span>
+                            <span className="font-medium text-zinc-800 truncate">{r.name || r.email}</span>
+                            <span className="text-zinc-400 truncate">{r.email}</span>
+                          </div>
+                        ))}
+                        {results.length === 0 && (
+                          <div className="px-3 py-2 text-[11.5px] text-zinc-400">Sin detalle por participante para este evento.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
