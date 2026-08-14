@@ -3152,11 +3152,27 @@ async def get_portal_data(portal_code: str):
         except User.DoesNotExist:
             return None
 
-        from programs.models import ProgramParticipant
+        from programs.models import ProgramParticipant, ParticipantAccessLog
+        from datetime import timedelta
         programs_data = []
         pps = ProgramParticipant.objects.select_related('program', 'program__company').filter(
             user=user, deleted_at__isnull=True
         ).order_by('-created_at')
+        now = timezone.now()
+        for pp in pps:
+            # Primer acceso real al portal -> pasa de "pendiente" a "activo".
+            # Antes solo un admin podía activar manualmente, así que alguien que
+            # ya usaba la plataforma seguía apareciendo como "Pendiente" en Reportes.
+            if pp.status == 'pending':
+                pp.status = 'active'
+                if not pp.activated_at:
+                    pp.activated_at = now
+                pp.save(update_fields=['status', 'activated_at'])
+            # Un registro de acceso por hora aprox. (no uno por request) para que
+            # "Accesos promedio" en Reportes refleje sesiones reales, no ruido.
+            last_log = ParticipantAccessLog.objects.filter(participant=pp).order_by('-occurred_at').first()
+            if not last_log or (now - last_log.occurred_at) > timedelta(hours=1):
+                ParticipantAccessLog.objects.create(participant=pp, occurred_at=now)
         for pp in pps:
             if pp.program:
                 programs_data.append({
