@@ -2020,6 +2020,7 @@ export default function ParticipantPortalPage() {
         showAssignedPrograms={false}
         onBack={() => navigate('dashboard')}
         backLabel="Inicio"
+        variant="portal"
       />
     );
   };

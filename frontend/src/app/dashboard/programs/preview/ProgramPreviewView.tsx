@@ -90,12 +90,14 @@ export default function ProgramPreviewView({
   showAssignedPrograms = true,
   onBack,
   backLabel = "Programas",
+  variant = "studio",
 }: {
   template: ProgramTemplate;
   assignedPrograms?: Array<{ id: string; name: string; status: string; company?: { name: string; slug?: string } | null }>;
   showAssignedPrograms?: boolean;
   onBack: () => void;
   backLabel?: string;
+  variant?: "studio" | "portal";
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<"overview" | "modules" | "config">("overview");
@@ -142,6 +144,7 @@ export default function ProgramPreviewView({
   if (!template) return null;
 
   const cat = catCfg[template.category] || catCfg.leadership;
+  const heroBg = variant === "portal" ? "linear-gradient(135deg,#0e7490,#0891b2)" : cat.gradient;
   const totS = template.modules.reduce((a, m) => a + m.sessions, 0);
   const totR = template.modules.reduce((a, m) => a + m.resources.length, 0);
   const totA = template.modules.reduce((a, m) => a + m.activities.length, 0);
@@ -213,16 +216,22 @@ export default function ProgramPreviewView({
       })()}
 
       {/* TOP BAR */}
-      <header className="topbar no-print">
-        <button onClick={onBack} className="btn-ghost">{I.arrowLeft}<span>{backLabel}</span></button>
-        <div className="row gap12 ai-c">
+      {variant === "studio" ? (
+        <header className="topbar no-print">
+          <button onClick={onBack} className="btn-ghost">{I.arrowLeft}<span>{backLabel}</span></button>
+          <div className="row gap12 ai-c">
+            <button onClick={print} className="btn-ghost">{I.printer}<span>Imprimir</span></button>
+            <div className={`status-pill ${template.status}`}>{template.status === "published" ? "Publicado" : "Borrador"}</div>
+          </div>
+        </header>
+      ) : (
+        <div className="row jc-end no-print" style={{ padding: "14px 24px 0" }}>
           <button onClick={print} className="btn-ghost">{I.printer}<span>Imprimir</span></button>
-          <div className={`status-pill ${template.status}`}>{template.status === "published" ? "Publicado" : "Borrador"}</div>
         </div>
-      </header>
+      )}
 
       {/* HERO */}
-      <section className="hero" style={{ background: cat.gradient }}>
+      <section className="hero" style={{ background: heroBg }}>
         <div className="hero-in">
           <div className="row gap12 ai-c mb20">
             <span className="cat-pill">{cat.label}</span>
@@ -284,7 +293,7 @@ export default function ProgramPreviewView({
       )}
 
       {/* TABS */}
-      <nav className="tabs-bar no-print">
+      <nav className="tabs-bar no-print" style={variant === "portal" ? { top: 0 } : undefined}>
         <div className="tabs-in">
           {([
             { k: "overview" as const, l: "Vista General", i: I.clipboard },
