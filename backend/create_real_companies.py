@@ -5,7 +5,7 @@ Empresas solicitadas: SQM, Clínica Las Condes, IDEAL, Banco de Chile
 import os
 import django
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mentorloop_clone.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'alfleto_ai.settings')
 django.setup()
 
 from companies.models import Company

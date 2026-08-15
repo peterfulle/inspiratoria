@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / '.env')
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mentorloop_clone.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'alfleto_ai.settings')
 import django; django.setup()
 
 from companies.models import Company, User

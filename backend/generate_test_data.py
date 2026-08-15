@@ -7,7 +7,7 @@ import os
 import django
 from datetime import datetime, timedelta
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mentorloop_clone.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alfleto_ai.settings")
 django.setup()
 
 from programs.models import Program, Activity, Alert, Participant

@@ -1,5 +1,5 @@
 import os, django, secrets
-os.environ['DJANGO_SETTINGS_MODULE'] = 'mentorloop_clone.settings'
+os.environ['DJANGO_SETTINGS_MODULE'] = 'alfleto_ai.settings'
 django.setup()
 from companies.models import User
 from django.utils import timezone

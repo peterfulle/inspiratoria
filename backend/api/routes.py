@@ -5,7 +5,7 @@ from typing import Optional, List
 import django
 
 # Django setup MUST happen before importing any Django models/views
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mentorloop_clone.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alfleto_ai.settings")
 django.setup()
 
 from django.db import IntegrityError, transaction

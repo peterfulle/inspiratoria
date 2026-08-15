@@ -6,7 +6,7 @@ Script para crear un usuario admin de prueba
 import os
 import django
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mentorloop_clone.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alfleto_ai.settings")
 django.setup()
 
 from companies.models import User, Company

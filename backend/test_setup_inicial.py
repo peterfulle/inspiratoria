@@ -5,7 +5,7 @@ Valida que los clientes se habiliten automáticamente cuando tienen datos comple
 import os
 import django
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mentorloop_clone.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'alfleto_ai.settings')
 django.setup()
 
 from companies.models import Company

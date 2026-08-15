@@ -9,7 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.routing import Mount
 from starlette.staticfiles import StaticFiles
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mentorloop_clone.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alfleto_ai.settings")
 
 django_asgi_app = get_asgi_application()
 

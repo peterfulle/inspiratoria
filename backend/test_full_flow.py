@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv(backend_dir / '.env')
 
 import os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mentorloop_clone.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'alfleto_ai.settings')
 
 import django
 django.setup()

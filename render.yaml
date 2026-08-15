@@ -10,7 +10,7 @@ services:
       pip install -r backend/requirements.txt
       python backend/manage.py collectstatic --noinput
       python backend/manage.py migrate
-    startCommand: cd backend && uvicorn mentorloop_clone.asgi:application --host 0.0.0.0 --port $PORT
+    startCommand: cd backend && uvicorn alfleto_ai.asgi:application --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.16
