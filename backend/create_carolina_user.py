@@ -6,7 +6,7 @@ Script para crear usuario carolina
 import os
 import django
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alfleto_ai.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mentorloop_clone.settings")
 django.setup()
 
 from companies.models import User, Company

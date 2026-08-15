@@ -14,7 +14,7 @@ sys.path.insert(0, str(backend_dir))
 from dotenv import load_dotenv
 load_dotenv(backend_dir / '.env')
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'alfleto_ai.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mentorloop_clone.settings')
 
 import django
 django.setup()

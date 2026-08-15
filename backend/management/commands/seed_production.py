@@ -11,7 +11,7 @@ from pathlib import Path
 backend_dir = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alfleto_ai.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mentorloop_clone.settings")
 
 import django
 django.setup()

@@ -42,7 +42,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "alfleto_ai.urls"
+ROOT_URLCONF = "mentorloop_clone.urls"
 
 TEMPLATES = [
     {
@@ -60,8 +60,8 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "alfleto_ai.wsgi.application"
-ASGI_APPLICATION = "alfleto_ai.asgi.application"
+WSGI_APPLICATION = "mentorloop_clone.wsgi.application"
+ASGI_APPLICATION = "mentorloop_clone.asgi.application"
 
 DATABASES = {
     "default": dj_database_url.config(

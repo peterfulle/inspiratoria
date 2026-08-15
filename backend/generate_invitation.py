@@ -12,7 +12,7 @@ import django
 backend_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, backend_dir)
 os.chdir(backend_dir)  # Change to backend directory
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'alfleto_ai.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mentorloop_clone.settings')
 django.setup()
 
 from invitations.models import PendingInvitation
