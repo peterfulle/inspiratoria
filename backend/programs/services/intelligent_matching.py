@@ -135,9 +135,42 @@ EXPERIENCE_RANK: Dict[str, int] = {
     "expert": 5, "experto": 5, "director": 5, "executive": 5, "ejecutivo": 5,
 }
 
+# Onboarding real de este producto pide el nivel como rango de años en
+# español ("3 a 5 años", "6 a 10 años"...), no como palabra ("senior").
+# El lookup por palabra de arriba nunca calzaba con esos datos y dejaba
+# experience_fit en 0 para prácticamente todos los pares — se agrega este
+# parser de rango numérico como fuente principal, con el lookup por palabra
+# como respaldo para perfiles que sí usan ese formato.
+_YEAR_RANGE_RE = re.compile(r"(\d+)\s*a\s*(\d+)|menos\s*de\s*(\d+)|mas\s*de\s*(\d+)|(\d+)\s*\+")
+
 
 def _experience_rank(level: str) -> int:
-    return EXPERIENCE_RANK.get(_norm(level), 0)
+    word_rank = EXPERIENCE_RANK.get(_norm(level), 0)
+    if word_rank:
+        return word_rank
+    m = _YEAR_RANGE_RE.search(_norm(level))
+    if not m:
+        return 0
+    lo, hi, less_than, more_than1, more_than2 = m.groups()
+    if lo and hi:
+        years = (int(lo) + int(hi)) / 2
+    elif less_than:
+        years = max(0, int(less_than) - 1)
+    elif more_than1:
+        years = int(more_than1) + 1
+    elif more_than2:
+        years = int(more_than2) + 1
+    else:
+        return 0
+    if years < 2:
+        return 1
+    if years < 6:
+        return 2
+    if years < 11:
+        return 3
+    if years < 16:
+        return 4
+    return 5
 
 
 def _profile(user: User, role: str) -> Dict[str, Any]:
@@ -197,38 +230,34 @@ def score_pair(mentor: User, mentee: User) -> Dict[str, Any]:
     # 1) skills × (goals + interests)
     mentee_focus = e["mentee_goals"] + e["mentee_interests"]
     ratio, matches = _items_overlap(m["skills"], mentee_focus)
-    pts = ratio * WEIGHTS["skills_x_goals"]
     breakdown["skills_x_goals"] = {
         "weight": WEIGHTS["skills_x_goals"],
-        "earned": round(pts, 2),
         "ratio": round(ratio, 3),
         "matches": matches,
+        "applicable": bool(m["skills"] and mentee_focus),
         "label": "Skills del mentor vs goals/intereses del mentee",
     }
     matched_overall += matches
 
     # 2) topics × challenges (+ interests)
-    ratio, matches = _items_overlap(
-        m["mentor_topics"], e["mentee_challenges"] + e["mentee_interests"]
-    )
-    pts2 = ratio * WEIGHTS["topics_x_challenges"]
+    topics_focus = e["mentee_challenges"] + e["mentee_interests"]
+    ratio, matches = _items_overlap(m["mentor_topics"], topics_focus)
     breakdown["topics_x_challenges"] = {
         "weight": WEIGHTS["topics_x_challenges"],
-        "earned": round(pts2, 2),
         "ratio": round(ratio, 3),
         "matches": matches,
+        "applicable": bool(m["mentor_topics"] and topics_focus),
         "label": "Temas del mentor vs desafíos/intereses del mentee",
     }
     matched_overall += matches
 
     # 3) style fit
     ratio, matches = _items_overlap(m["mentor_style"], e["preferred_mentor_style"])
-    pts3 = ratio * WEIGHTS["style_fit"]
     breakdown["style_fit"] = {
         "weight": WEIGHTS["style_fit"],
-        "earned": round(pts3, 2),
         "ratio": round(ratio, 3),
         "matches": matches,
+        "applicable": bool(m["mentor_style"] and e["preferred_mentor_style"]),
         "label": "Compatibilidad de estilo de mentoring",
     }
     matched_overall += matches
@@ -236,6 +265,7 @@ def score_pair(mentor: User, mentee: User) -> Dict[str, Any]:
     # 4) experience fit
     mentor_rank = _experience_rank(m["experience_level"])
     mentee_rank = _experience_rank(e["experience_level"])
+    gap = None
     if mentor_rank > 0 and mentee_rank > 0:
         gap = mentor_rank - mentee_rank
         # Best when mentor is 1-3 levels above mentee
@@ -252,18 +282,24 @@ def score_pair(mentor: User, mentee: User) -> Dict[str, Any]:
     else:
         level_score = 0.0
 
-    area_ratio, area_matches = _items_overlap(
-        m["experience_area"],
-        e["mentee_interests"] + e["mentee_goals"] + e["mentee_challenges"],
-    )
-    exp_total = (level_score * 0.5 + area_ratio * 0.5)
-    pts4 = exp_total * WEIGHTS["experience_fit"]
+    exp_focus = e["mentee_interests"] + e["mentee_goals"] + e["mentee_challenges"]
+    area_ratio, area_matches = _items_overlap(m["experience_area"], exp_focus)
+    has_level = mentor_rank > 0 or mentee_rank > 0
+    has_area = bool(m["experience_area"] and exp_focus)
+    if has_level and has_area:
+        exp_total = level_score * 0.5 + area_ratio * 0.5
+    elif has_level:
+        exp_total = level_score
+    elif has_area:
+        exp_total = area_ratio
+    else:
+        exp_total = 0.0
     breakdown["experience_fit"] = {
         "weight": WEIGHTS["experience_fit"],
-        "earned": round(pts4, 2),
         "ratio": round(exp_total, 3),
         "matches": area_matches,
-        "level_gap": gap if (mentor_rank and mentee_rank) else None,
+        "applicable": has_level or has_area,
+        "level_gap": gap,
         "mentor_level": m["experience_level"] or None,
         "mentee_level": e["experience_level"] or None,
         "label": "Nivel y área de experiencia",
@@ -271,15 +307,13 @@ def score_pair(mentor: User, mentee: User) -> Dict[str, Any]:
     matched_overall += area_matches
 
     # 5) objectives fit
-    ratio, matches = _items_overlap(
-        m["mentor_objectives"], e["mentee_expectations"] + e["mentee_goals"]
-    )
-    pts5 = ratio * WEIGHTS["objectives_fit"]
+    obj_focus = e["mentee_expectations"] + e["mentee_goals"]
+    ratio, matches = _items_overlap(m["mentor_objectives"], obj_focus)
     breakdown["objectives_fit"] = {
         "weight": WEIGHTS["objectives_fit"],
-        "earned": round(pts5, 2),
         "ratio": round(ratio, 3),
         "matches": matches,
+        "applicable": bool(m["mentor_objectives"] and obj_focus),
         "label": "Objetivos del mentor vs expectativas del mentee",
     }
     matched_overall += matches
@@ -287,25 +321,44 @@ def score_pair(mentor: User, mentee: User) -> Dict[str, Any]:
     # 6) domain fit (free-text headline/position/department/bio)
     mentor_domain_text = " ".join([m["position"], m["department"], m["headline"], m["bio"]])
     mentee_domain_text = " ".join([e["position"], e["department"], e["headline"], e["bio"]])
-    ratio, matches_tok = _overlap_ratio(_tokens(mentor_domain_text), _tokens(mentee_domain_text))
-    pts6 = ratio * WEIGHTS["domain_fit"]
+    mentor_domain_tok = _tokens(mentor_domain_text)
+    mentee_domain_tok = _tokens(mentee_domain_text)
+    ratio, matches_tok = _overlap_ratio(mentor_domain_tok, mentee_domain_tok)
     breakdown["domain_fit"] = {
         "weight": WEIGHTS["domain_fit"],
-        "earned": round(pts6, 2),
         "ratio": round(ratio, 3),
         "matches": matches_tok,
+        "applicable": bool(mentor_domain_tok and mentee_domain_tok),
         "label": "Afinidad de rol/área profesional",
     }
     matched_overall += matches_tok
 
-    raw_total = pts + pts2 + pts3 + pts4 + pts5 + pts6
+    # ── Redistribución de pesos por cobertura real de datos ──────────
+    # Antes, una dimensión sin datos en ninguno de los dos perfiles (ej.
+    # "skills", casi siempre vacío en el onboarding de este producto)
+    # simplemente sumaba 0 puntos sobre 100 — penalizando el match por
+    # falta de un dato que nunca se le pidió a nadie. Ahora, solo las
+    # dimensiones con datos en AMBOS lados ("aplicables") reparten el
+    # 100% del peso entre ellas; las demás quedan fuera del cálculo y se
+    # marcan explícitamente como "sin datos" en vez de "mal match".
+    applicable_weight = sum(info["weight"] for info in breakdown.values() if info["applicable"])
+    coverage = applicable_weight / 100 if applicable_weight else 0.0
 
-    # Attenuation by mentee profile completeness (avoid inflated scores when empty)
-    mentee_strength = _profile_strength(e)
-    mentor_strength = _profile_strength(m)
-    # Soft attenuation: never below 0.6 to not over-punish empty profiles
-    attenuation = 0.6 + 0.4 * ((mentee_strength + mentor_strength) / 2)
-    final_total = round(raw_total * attenuation, 2)
+    for info in breakdown.values():
+        if info["applicable"] and applicable_weight:
+            effective_weight = info["weight"] / applicable_weight * 100
+        else:
+            effective_weight = 0.0
+        info["effective_weight"] = round(effective_weight, 2)
+        info["earned"] = round(info["ratio"] * effective_weight, 2)
+
+    redistributed_score = sum(info["earned"] for info in breakdown.values())
+    # Confianza por cobertura: si solo la mitad del cuestionario tenía
+    # datos comparables en ambos lados, un match perfecto en esa mitad
+    # no debería leerse como "100% compatible" — se atenúa según cuánto
+    # del total se pudo evaluar realmente.
+    confidence = 0.5 + 0.5 * coverage
+    final_total = round(redistributed_score * confidence, 2)
 
     # Build human-readable reasons
     reasons: List[str] = []
@@ -318,14 +371,26 @@ def score_pair(mentor: User, mentee: User) -> Dict[str, Any]:
             else:
                 reasons.append(label)
     if not reasons:
-        reasons.append("Coincidencia base — los perfiles tienen poco detalle aún.")
+        if applicable_weight == 0:
+            reasons.append("Ambos perfiles están casi vacíos — no hay suficiente información para evaluar el match.")
+        else:
+            reasons.append("Coincidencia base — los perfiles tienen poco detalle en común todavía.")
+
+    if final_total >= 75:
+        band = "Excelente"
+    elif final_total >= 55:
+        band = "Bueno"
+    elif final_total >= 35:
+        band = "Moderado"
+    else:
+        band = "Bajo"
 
     return {
         "score": min(100.0, final_total),
-        "raw_score": round(raw_total, 2),
-        "attenuation": round(attenuation, 3),
-        "mentor_profile_strength": round(mentor_strength, 3),
-        "mentee_profile_strength": round(mentee_strength, 3),
+        "score_band": band,
+        "coverage_pct": round(coverage * 100),
+        "applicable_dimensions": [k for k, v in breakdown.items() if v["applicable"]],
+        "unavailable_dimensions": [k for k, v in breakdown.items() if not v["applicable"]],
         "breakdown": breakdown,
         "matched_keywords": sorted(set(matched_overall))[:25],
         "reasons": reasons,

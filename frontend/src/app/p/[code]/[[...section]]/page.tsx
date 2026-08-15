@@ -972,6 +972,8 @@ export default function ParticipantPortalPage() {
   const [myMentees, setMyMentees] = useState<any[]>([]);
   const [menteesLoading, setMenteesLoading] = useState(false);
   const [selectedMentee, setSelectedMentee] = useState<any>(null);
+  const [menteeStats, setMenteeStats] = useState<any>(null);
+  const [menteeStatsLoading, setMenteeStatsLoading] = useState(false);
 
   // My Mentor state (for mentees)
   const [myMentor, setMyMentor] = useState<any>(null);
@@ -980,13 +982,19 @@ export default function ParticipantPortalPage() {
   // Sessions state
   const [mySessions, setMySessions] = useState<any[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [sessionForm, setSessionForm] = useState({ mentee_id: '', program_id: '', title: '', description: '', scheduled_at: '', duration_minutes: 60, meeting_url: '' });
+  const [sessionForm, setSessionForm] = useState({ mentee_id: '', program_id: '', title: '', description: '', scheduled_at: '', duration_minutes: 60, modality: 'online' as 'online' | 'in_person' | 'hybrid', meeting_url: '', location: '', location_instructions: '' });
   const [showSessionForm, setShowSessionForm] = useState(false);
   const [editingSession, setEditingSession] = useState<any>(null);
   const [sessionNotesForm, setSessionNotesForm] = useState({ session_notes: '', topics_covered: [] as string[], mentee_mood: 0, next_steps: '' });
   const [showNotesModal, setShowNotesModal] = useState<any>(null);
   const [aiSuggestion, setAiSuggestion] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [aiManualTemplate, setAiManualTemplate] = useState('');
+  const [reflectionForm, setReflectionForm] = useState<{ [sessionId: string]: { reflection: string; commitment: string; confidence: number } }>({});
+  const [reflectionSaving, setReflectionSaving] = useState<string | null>(null);
+  const [ackNoteForm, setAckNoteForm] = useState<{ [sessionId: string]: string }>({});
+  const [ackSaving, setAckSaving] = useState<string | null>(null);
 
   // Activities state
   const [portalActivities, setPortalActivities] = useState<any[]>([]);
@@ -999,6 +1007,9 @@ export default function ParticipantPortalPage() {
   // Session form state
   const [sessionFormError, setSessionFormError] = useState('');
   const [sessionCreating, setSessionCreating] = useState(false);
+
+  // Progreso real de mentoría (fuente única: MentoringSession, no calendario/plantilla)
+  const [sessionProgress, setSessionProgress] = useState<any>(null);
 
   // Chat state
   const [chatPrograms, setChatPrograms] = useState<any[]>([]);
@@ -1340,6 +1351,27 @@ export default function ParticipantPortalPage() {
       .catch(() => setEcosystemData(null))
       .finally(() => setEcosystemLoading(false));
   }, [activeNav, portalCode, selectedProgram?.id]);
+
+  // Progreso real de mentoría — una sola fuente de verdad (MentoringSession),
+  // se recarga cuando cambia el programa activo.
+  useEffect(() => {
+    if (!portalCode || !activeProgram?.id) { setSessionProgress(null); return; }
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/session-progress?program_id=${activeProgram.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setSessionProgress(data))
+      .catch(() => setSessionProgress(null));
+  }, [portalCode, activeProgram?.id]);
+
+  // Ficha 360 de un mentee puntual — mismo motor de session-progress, acotado a la dupla.
+  useEffect(() => {
+    if (!portalCode || !selectedMentee?.id || !selectedMentee?.program_id) { setMenteeStats(null); return; }
+    setMenteeStatsLoading(true);
+    apiFetch(`${API_URL}/api/companies/portal/${portalCode}/session-progress?program_id=${selectedMentee.program_id}&other_user_id=${selectedMentee.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setMenteeStats(data))
+      .catch(() => setMenteeStats(null))
+      .finally(() => setMenteeStatsLoading(false));
+  }, [portalCode, selectedMentee?.id, selectedMentee?.program_id]);
 
   // Fetch the full program template (con archivos) cuando se entra a Módulos —
   // misma llamada que usa Studio, siempre en vivo, para replicar esa vista exacta.
@@ -1974,7 +2006,11 @@ export default function ParticipantPortalPage() {
     const elapsedMs = Math.max(0, now.getTime() - startDate.getTime());
     const totalMs = endDate.getTime() - startDate.getTime();
     const overallProgressRaw = totalMs > 0 ? Math.min(100, (elapsedMs / totalMs) * 100) : 0;
-    const overallProgress = Math.round(overallProgressRaw);
+    // Fuente única de verdad: si ya hay sesiones de mentoría reales, el
+    // progreso se basa en completadas/total (4 completadas de 4 = 100%),
+    // no en tiempo de calendario transcurrido. Sin sesiones aún, se usa el
+    // estimado por calendario como respaldo.
+    const overallProgress = sessionProgress?.has_sessions ? sessionProgress.progress_pct : Math.round(overallProgressRaw);
 
     // Days remaining
     const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (24 * 3600 * 1000)));
@@ -1995,7 +2031,11 @@ export default function ParticipantPortalPage() {
     });
 
     const completedModules = moduleStatuses.filter((m: any) => m.status === 'completed').length;
-    const completedActivities = activities.filter((a: any) => a.status === 'completed').length;
+    // Igual que overallProgress: si hay sesiones de mentoría reales, ese es
+    // el número de "actividades" que le importa al mentor/mentee — evita
+    // que quede en 0/4 aunque ya haya completado sus 4 sesiones.
+    const completedActivities = sessionProgress?.has_sessions ? sessionProgress.completed_sessions : activities.filter((a: any) => a.status === 'completed').length;
+    const totalActivitiesForCard = sessionProgress?.has_sessions ? sessionProgress.total_sessions : activities.length;
 
     // Build timeline items: interleave modules with milestones at correct positions
     type TLItem = { type: 'module'; mod: any; idx: number; status: any } | { type: 'milestone'; ms: any; idx: number };
@@ -2058,7 +2098,7 @@ export default function ParticipantPortalPage() {
           {[
             { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#2563eb" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>, bg: '#dbeafe', val: `${completedModules}/${modules.length}`, label: 'Módulos completados', color: '#2563eb' },
             { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#d97706" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>, bg: '#fef3c7', val: `${daysRemaining}`, label: 'Días restantes', color: '#d97706' },
-            { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>, bg: '#d1fae5', val: `${completedActivities}/${activities.length}`, label: 'Actividades', color: '#059669' },
+            { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>, bg: '#d1fae5', val: `${completedActivities}/${totalActivitiesForCard}`, label: 'Actividades', color: '#059669' },
             { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#db2777" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>, bg: '#fce7f3', val: nextMilestone ? `Sem ${nextMilestone.week}` : '—', label: nextMilestone ? nextMilestone.name : 'Sin hitos pendientes', color: '#db2777' },
           ].map((s, i) => (
             <div key={i} className="prg-stat">
@@ -2245,8 +2285,14 @@ export default function ParticipantPortalPage() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f8f8f8' }}>
                   <span style={{ color: '#6b7280' }}>Sesiones totales</span>
-                  <span style={{ fontWeight: 700, color: '#111827' }}>{totalSessions}</span>
+                  <span style={{ fontWeight: 700, color: '#111827' }}>{sessionProgress?.has_sessions ? sessionProgress.total_sessions : totalSessions}</span>
                 </div>
+                {sessionProgress?.has_sessions && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f8f8f8' }}>
+                    <span style={{ color: '#6b7280' }}>Sesiones completadas</span>
+                    <span style={{ fontWeight: 700, color: '#059669' }}>{sessionProgress.completed_sessions}</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
                   <span style={{ color: '#6b7280' }}>Participantes</span>
                   <span style={{ fontWeight: 700, color: '#111827' }}>{programParticipants.length}</span>
@@ -3276,6 +3322,77 @@ export default function ParticipantPortalPage() {
               <button onClick={() => { setSessionForm(f => ({ ...f, mentee_id: m.id, program_id: m.program_id })); setShowSessionForm(true); navigate('my-sessions'); }} style={{ padding: '10px 20px', borderRadius: 10, background: '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Agendar sesión</button>
             </div>
           </div>
+
+          {/* Ficha 360 — avance, sesiones, compromisos, tendencia emocional */}
+          <div style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, marginTop: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#111827', marginBottom: 16 }}>Seguimiento de mentoría</div>
+            {menteeStatsLoading ? (
+              <InlineSpinner />
+            ) : !menteeStats?.has_sessions ? (
+              <div style={{ fontSize: '0.82rem', color: '#9ca3af', textAlign: 'center', padding: '16px 0' }}>Todavía no hay sesiones registradas con {bestName(m).split(' ')[0]}.</div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+                  <div style={{ background: '#f0fdfa', borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0e7490' }}>{menteeStats.progress_pct}%</div>
+                    <div style={{ fontSize: '0.68rem', color: '#6b7280', marginTop: 2 }}>Avance</div>
+                  </div>
+                  <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#059669' }}>{menteeStats.completed_sessions}/{menteeStats.total_sessions}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#6b7280', marginTop: 2 }}>Sesiones</div>
+                  </div>
+                  <div style={{ background: '#fef2f2', borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#be185d' }}>{menteeStats.avg_mood != null ? `${menteeStats.avg_mood}/5` : '—'}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#6b7280', marginTop: 2 }}>Ánimo prom.</div>
+                  </div>
+                  <div style={{ background: '#fffbeb', borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400e' }}>{menteeStats.last_session ? new Date(menteeStats.last_session).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : '—'}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#6b7280', marginTop: 2 }}>Última sesión</div>
+                  </div>
+                </div>
+
+                {menteeStats.mood_trend?.length > 1 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.78rem', color: '#374151', marginBottom: 8 }}>Tendencia emocional</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 44 }}>
+                      {menteeStats.mood_trend.map((pt: any, i: number) => (
+                        <div key={i} title={`${pt.mood}/5`} style={{ flex: 1, height: `${(pt.mood / 5) * 100}%`, minHeight: 4, borderRadius: 4, background: pt.mood >= 4 ? '#10b981' : pt.mood >= 3 ? '#0891b2' : '#f59e0b' }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {menteeStats.next_steps && (
+                  <div style={{ marginBottom: 20, background: '#f9fafb', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Último compromiso</div>
+                    <div style={{ fontSize: '0.82rem', color: '#374151' }}>{menteeStats.next_steps}</div>
+                  </div>
+                )}
+
+                {menteeStats.topics?.length > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.78rem', color: '#374151', marginBottom: 8 }}>Temas cubiertos</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{menteeStats.topics.map((t: string) => <span key={t} style={{ padding: '3px 10px', borderRadius: 14, background: '#f3f4f6', color: '#4b5563', fontSize: '0.72rem' }}>{t}</span>)}</div>
+                  </div>
+                )}
+
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.78rem', color: '#374151', marginBottom: 8 }}>Historial de sesiones</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {menteeStats.recent_sessions?.map((s: any) => (
+                      <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: '0.78rem' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, color: '#111827' }}>{s.title}</span>
+                          {s.mentee_mood && <span style={{ marginLeft: 8, color: '#9ca3af' }}>ánimo {s.mentee_mood}/5</span>}
+                        </div>
+                        <span style={{ color: '#9ca3af', fontSize: '0.72rem' }}>{s.scheduled_at ? new Date(s.scheduled_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : '—'} · {LABELS.status[s.status] || s.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       );
     }
@@ -3312,15 +3429,22 @@ export default function ParticipantPortalPage() {
     if (!sessionForm.title) { setSessionFormError('El título es obligatorio'); return; }
     if (!sessionForm.scheduled_at) { setSessionFormError('La fecha es obligatoria'); return; }
     if (!sessionForm.mentee_id) { setSessionFormError('Debes seleccionar un mentee'); return; }
+    if (sessionForm.modality !== 'online' && !sessionForm.location.trim()) { setSessionFormError('Ingresa la ubicación de la sesión presencial/híbrida'); return; }
     setSessionCreating(true);
     try {
+      // sessionForm.scheduled_at viene de un <input type="datetime-local">, que
+      // representa la hora local del navegador SIN zona horaria. new Date(...)
+      // lo interpreta como hora local y toISOString() lo convierte a UTC real —
+      // si se manda el string tal cual, el backend lo tomaba como si ya fuera
+      // UTC y la sesión quedaba guardada 3-4 horas antes de lo ingresado.
+      const payload = { ...sessionForm, scheduled_at: new Date(sessionForm.scheduled_at).toISOString() };
       const r = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sessionForm),
+        body: JSON.stringify(payload),
       });
       if (r.ok) {
         setShowSessionForm(false);
-        setSessionForm({ mentee_id: '', program_id: '', title: '', description: '', scheduled_at: '', duration_minutes: 60, meeting_url: '' });
+        setSessionForm({ mentee_id: '', program_id: '', title: '', description: '', scheduled_at: '', duration_minutes: 60, modality: 'online', meeting_url: '', location: '', location_instructions: '' });
         const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
         if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
       } else {
@@ -3350,10 +3474,20 @@ export default function ParticipantPortalPage() {
   const handleAiSuggest = async (sessionId: string) => {
     setAiLoading(true);
     setAiSuggestion('');
+    setAiError('');
+    setAiManualTemplate('');
     try {
       const r = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/ai-suggest`, { method: 'POST' });
-      if (r.ok) { const d = await r.json(); setAiSuggestion(d.suggestion || ''); }
-    } catch {}
+      if (r.ok) {
+        const d = await r.json();
+        if (d.success) setAiSuggestion(d.suggestion || '');
+        else { setAiError(d.error || 'No pudimos generar la sugerencia.'); setAiManualTemplate(d.manual_template || ''); }
+      } else {
+        setAiError('No pudimos conectar con el servicio de IA. Intenta de nuevo en unos minutos.');
+      }
+    } catch {
+      setAiError('Error de conexión. Revisa tu internet e intenta de nuevo.');
+    }
     setAiLoading(false);
   };
 
@@ -3364,6 +3498,39 @@ export default function ParticipantPortalPage() {
       const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
       if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
     } catch {}
+  };
+
+  const handleSaveReflection = async (sessionId: string) => {
+    const f = reflectionForm[sessionId];
+    if (!f?.reflection?.trim()) return;
+    setReflectionSaving(sessionId);
+    try {
+      const r = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/reflection`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reflection: f.reflection.trim(), commitment: f.commitment || '', confidence: f.confidence || null }),
+      });
+      if (r.ok) {
+        const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
+        if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
+        setReflectionForm(p => { const n = { ...p }; delete n[sessionId]; return n; });
+      }
+    } catch {}
+    setReflectionSaving(null);
+  };
+
+  const handleAcknowledgeReflection = async (sessionId: string) => {
+    setAckSaving(sessionId);
+    try {
+      const r = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/acknowledge`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: ackNoteForm[sessionId] || '' }),
+      });
+      if (r.ok) {
+        const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
+        if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
+      }
+    } catch {}
+    setAckSaving(null);
   };
 
   const handleCompleteActivity = async (actId: number) => {
@@ -3411,9 +3578,38 @@ export default function ParticipantPortalPage() {
                 <div className="prof-field"><label>Fecha y hora *</label><input type="datetime-local" value={sessionForm.scheduled_at} onChange={e => setSessionForm(f => ({ ...f, scheduled_at: e.target.value }))} /></div>
                 <div className="prof-field"><label>Duración (min)</label><input type="number" value={sessionForm.duration_minutes} onChange={e => setSessionForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 60 }))} /></div>
                 <div className="prof-field">
-                  <label>Enlace de reunión (opcional)</label>
-                  <input value={sessionForm.meeting_url} onChange={e => setSessionForm(f => ({ ...f, meeting_url: e.target.value }))} placeholder="Se genera automáticamente un Google Meet si lo dejas vacío" />
+                  <label>Modalidad *</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {([
+                      { v: 'online', l: 'Online' },
+                      { v: 'in_person', l: 'Presencial' },
+                      { v: 'hybrid', l: 'Híbrida' },
+                    ] as const).map(opt => (
+                      <button key={opt.v} type="button" onClick={() => setSessionForm(f => ({ ...f, modality: opt.v }))}
+                        style={{ flex: 1, padding: '9px 10px', borderRadius: 10, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: sessionForm.modality === opt.v ? '1.5px solid #0891b2' : '1.5px solid #d1d5db', background: sessionForm.modality === opt.v ? '#ecfeff' : '#fff', color: sessionForm.modality === opt.v ? '#0e7490' : '#374151' }}>
+                        {opt.l}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+                {sessionForm.modality !== 'in_person' && (
+                  <div className="prof-field">
+                    <label>Enlace de reunión (opcional)</label>
+                    <input value={sessionForm.meeting_url} onChange={e => setSessionForm(f => ({ ...f, meeting_url: e.target.value }))} placeholder="Se genera automáticamente un Google Meet si lo dejas vacío" />
+                  </div>
+                )}
+                {sessionForm.modality !== 'online' && (
+                  <>
+                    <div className="prof-field">
+                      <label>Ubicación *</label>
+                      <input value={sessionForm.location} onChange={e => setSessionForm(f => ({ ...f, location: e.target.value }))} placeholder="Ej: Oficinas SQM Antofagasta, Av. Grecia 1234" />
+                    </div>
+                    <div className="prof-field">
+                      <label>Instrucciones de llegada (opcional)</label>
+                      <textarea value={sessionForm.location_instructions} onChange={e => setSessionForm(f => ({ ...f, location_instructions: e.target.value }))} rows={2} placeholder="Ej: Preguntar en recepción por..." />
+                    </div>
+                  </>
+                )}
                 <div className="prof-field"><label>Descripción</label><textarea value={sessionForm.description} onChange={e => setSessionForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Temas a tratar..." /></div>
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
@@ -3455,7 +3651,24 @@ export default function ParticipantPortalPage() {
                     {aiSuggestion}
                   </div>
                 )}
-                {showNotesModal.ai_suggestion && !aiSuggestion && (
+                {aiError && (
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: aiManualTemplate ? 12 : 0 }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '0.82rem', color: '#92400e', marginBottom: 8 }}>{aiError}</div>
+                        <button onClick={() => handleAiSuggest(showNotesModal.id)} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #d97706', background: '#fff', color: '#92400e', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Reintentar</button>
+                      </div>
+                    </div>
+                    {aiManualTemplate && (
+                      <div style={{ background: '#fff', borderRadius: 8, padding: 12, fontSize: '0.78rem', color: '#374151', lineHeight: 1.6, whiteSpace: 'pre-wrap', border: '1px solid #f3f4f6' }}>
+                        <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Mientras tanto, usa esta plantilla base</div>
+                        {aiManualTemplate}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {showNotesModal.ai_suggestion && !aiSuggestion && !aiError && (
                   <div style={{ background: '#f5f3ff', borderRadius: 12, padding: 16, fontSize: '0.82rem', color: '#374151', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
                     <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginBottom: 6 }}>Sugerencia anterior:</div>
                     {showNotesModal.ai_suggestion}
@@ -3479,9 +3692,12 @@ export default function ParticipantPortalPage() {
                   </div>
                   <div style={{ fontSize: '0.82rem', color: '#4b5563', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> {new Date(s.scheduled_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} • {s.duration_minutes} min</div>
                   {s.meeting_url && <a href={s.meeting_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.78rem', color: '#0891b2', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Unirse a la reunión</a>}
+                  {s.modality && s.modality !== 'online' && s.location && (
+                    <div style={{ fontSize: '0.78rem', color: '#92400e', display: 'flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92400e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> {s.location}</div>
+                  )}
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                     <button onClick={() => handleCompleteSession(s.id)} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #10b981', background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Completar</button>
-                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Notas</button>
+                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setAiError(''); setAiManualTemplate(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Notas</button>
                   </div>
                 </div>
               ))}
@@ -3501,9 +3717,28 @@ export default function ParticipantPortalPage() {
                     <span style={{ padding: '4px 10px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.72rem', fontWeight: 600 }}>Completada</span>
                   </div>
                   {s.session_notes && <div style={{ fontSize: '0.8rem', color: '#4b5563', marginTop: 6, lineHeight: 1.5, borderLeft: '3px solid #e5e7eb', paddingLeft: 12 }}>{s.session_notes.slice(0, 200)}{s.session_notes.length > 200 ? '...' : ''}</div>}
+
+                  {/* Reflexión de la mentee — bitácora propia, no depende de las notas del mentor */}
+                  {s.mentee_reflection && (
+                    <div style={{ marginTop: 10, padding: '10px 14px', background: '#fdf4ff', borderRadius: 10, border: '1px solid #f3e8ff' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.75rem', color: '#7c3aed', marginBottom: 4 }}>Reflexión de {bestName(s.mentee).split(' ')[0]}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#374151', lineHeight: 1.5 }}>{s.mentee_reflection}</div>
+                      {s.mentee_commitment && <div style={{ fontSize: '0.78rem', color: '#6b21a8', marginTop: 6 }}><strong>Compromiso:</strong> {s.mentee_commitment}</div>}
+                      {s.mentee_confidence && <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: 4 }}>Confianza: {s.mentee_confidence}/5</div>}
+                      {s.mentor_acknowledged_at ? (
+                        <div style={{ marginTop: 8, fontSize: '0.72rem', color: '#059669', fontWeight: 600 }}>✓ Confirmaste haberla leído{s.mentor_acknowledgment_note ? `: "${s.mentor_acknowledgment_note}"` : ''}</div>
+                      ) : (
+                        <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+                          <input value={ackNoteForm[s.id] || ''} onChange={e => setAckNoteForm(p => ({ ...p, [s.id]: e.target.value }))} placeholder="Comentario breve (opcional)" style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: '0.75rem' }} />
+                          <button onClick={() => handleAcknowledgeReflection(s.id)} disabled={ackSaving === s.id} style={{ padding: '6px 12px', borderRadius: 8, background: '#7c3aed', color: '#fff', border: 'none', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{ackSaving === s.id ? '...' : 'Confirmar'}</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> {s.session_notes ? 'Ver notas' : 'Agregar notas'}</span></button>
-                    <button onClick={() => { setAiSuggestion(''); setShowNotesModal(s); setTimeout(() => handleAiSuggest(s.id), 200); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #8b5cf6', background: '#f5f3ff', color: '#6d28d9', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6d28d9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> IA: Próxima sesión</button>
+                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setAiError(''); setAiManualTemplate(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> {s.session_notes ? 'Ver notas' : 'Agregar notas'}</span></button>
+                    <button onClick={() => { setAiSuggestion(''); setAiError(''); setAiManualTemplate(''); setShowNotesModal(s); setTimeout(() => handleAiSuggest(s.id), 200); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #8b5cf6', background: '#f5f3ff', color: '#6d28d9', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6d28d9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> IA: Próxima sesión</button>
                   </div>
                 </div>
               ))}
@@ -4181,6 +4416,11 @@ export default function ParticipantPortalPage() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     {new Date(upcoming[0].scheduled_at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} • {upcoming[0].duration_minutes} min
                   </div>
+                  {upcoming[0].modality && upcoming[0].modality !== 'online' && upcoming[0].location && (
+                    <div style={{ fontSize: '0.8rem', color: '#92400e', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92400e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> {upcoming[0].location}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 10 }}>
                     {upcoming[0].meeting_url && (
                       <a href={upcoming[0].meeting_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 16px', borderRadius: 10, background: '#0891b2', color: '#fff', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none' }}>
@@ -4258,6 +4498,11 @@ export default function ParticipantPortalPage() {
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Unirse a la reunión
                     </a>
                   )}
+                  {s.modality && s.modality !== 'online' && s.location && (
+                    <div style={{ fontSize: '0.8rem', color: '#92400e', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92400e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> {s.location}
+                    </div>
+                  )}
                   {s.description && <p style={{ fontSize: '0.8rem', color: '#4b5563', marginTop: 10, lineHeight: 1.5, borderLeft: '3px solid #e0f2fe', paddingLeft: 12 }}>{s.description}</p>}
                 </div>
               ))}
@@ -4286,6 +4531,57 @@ export default function ParticipantPortalPage() {
                     <div style={{ marginTop: 10, padding: '10px 14px', background: '#f0fdfa', borderRadius: 10, border: '1px solid #ccfbf1' }}>
                       <div style={{ fontWeight: 600, fontSize: '0.75rem', color: '#047857', marginBottom: 4 }}>Próximos pasos</div>
                       <div style={{ fontSize: '0.8rem', color: '#374151', lineHeight: 1.5 }}>{s.next_steps}</div>
+                    </div>
+                  )}
+
+                  {/* Bitácora de la mentee — reflexión propia, independiente de las notas del mentor */}
+                  {s.mentee_reflection ? (
+                    <div style={{ marginTop: 10, padding: '10px 14px', background: '#fdf4ff', borderRadius: 10, border: '1px solid #f3e8ff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.75rem', color: '#7c3aed' }}>Tu reflexión</div>
+                        {s.mentor_acknowledged_at ? (
+                          <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 600 }}>✓ Vista por tu mentor</span>
+                        ) : (
+                          <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>Pendiente de revisión</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#374151', lineHeight: 1.5 }}>{s.mentee_reflection}</div>
+                      {s.mentee_commitment && <div style={{ fontSize: '0.78rem', color: '#6b21a8', marginTop: 6 }}><strong>Mi compromiso:</strong> {s.mentee_commitment}</div>}
+                      {s.mentee_confidence && <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: 4 }}>Confianza: {s.mentee_confidence}/5</div>}
+                      {s.mentor_acknowledgment_note && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3e8ff', fontSize: '0.78rem', color: '#374151' }}>
+                          <strong style={{ color: '#7c3aed' }}>{bestName(s.mentor).split(' ')[0]}:</strong> {s.mentor_acknowledgment_note}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 10, padding: '12px 14px', background: '#fafafa', borderRadius: 10, border: '1px dashed #e5e7eb' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.75rem', color: '#6b7280', marginBottom: 8 }}>¿Qué te llevas de esta sesión? (2 min)</div>
+                      <textarea
+                        value={reflectionForm[s.id]?.reflection || ''}
+                        onChange={e => setReflectionForm(p => ({ ...p, [s.id]: { ...(p[s.id] || { commitment: '', confidence: 0 }), reflection: e.target.value.slice(0, 500) } }))}
+                        rows={2} maxLength={500} placeholder="Lo más importante que me llevo..."
+                        style={{ width: '100%', padding: 8, borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: '0.8rem', resize: 'vertical', boxSizing: 'border-box' }}
+                      />
+                      <input
+                        value={reflectionForm[s.id]?.commitment || ''}
+                        onChange={e => setReflectionForm(p => ({ ...p, [s.id]: { ...(p[s.id] || { reflection: '', confidence: 0 }), commitment: e.target.value } }))}
+                        placeholder="Mi próximo compromiso (opcional)"
+                        style={{ width: '100%', marginTop: 6, padding: 8, borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                      />
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>Confianza:</span>
+                          {[1,2,3,4,5].map(n => (
+                            <button key={n} type="button" onClick={() => setReflectionForm(p => ({ ...p, [s.id]: { ...(p[s.id] || { reflection: '', commitment: '' }), confidence: n } }))}
+                              style={{ width: 26, height: 26, borderRadius: '50%', border: (reflectionForm[s.id]?.confidence || 0) === n ? '2px solid #7c3aed' : '1.5px solid #d1d5db', background: (reflectionForm[s.id]?.confidence || 0) === n ? '#f3e8ff' : '#fff', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer' }}>{n}</button>
+                          ))}
+                        </div>
+                        <button onClick={() => handleSaveReflection(s.id)} disabled={!reflectionForm[s.id]?.reflection?.trim() || reflectionSaving === s.id}
+                          style={{ padding: '6px 14px', borderRadius: 8, background: reflectionForm[s.id]?.reflection?.trim() ? '#7c3aed' : '#e5e7eb', color: reflectionForm[s.id]?.reflection?.trim() ? '#fff' : '#9ca3af', border: 'none', fontSize: '0.75rem', fontWeight: 600, cursor: reflectionForm[s.id]?.reflection?.trim() ? 'pointer' : 'not-allowed' }}>
+                          {reflectionSaving === s.id ? 'Guardando...' : 'Guardar'}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -4414,6 +4710,11 @@ export default function ParticipantPortalPage() {
               <a href={upcoming[0].meeting_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 16px', borderRadius: 10, background: '#0891b2', color: '#fff', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none', marginTop: 4 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Unirse a la reunión
               </a>
+            )}
+            {upcoming[0].modality && upcoming[0].modality !== 'online' && upcoming[0].location && (
+              <div style={{ fontSize: '0.8rem', color: '#92400e', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92400e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> {upcoming[0].location}
+              </div>
             )}
             <div style={{ marginTop: 10 }}>
               <button onClick={() => navigate('my-sessions')} style={{ fontSize: '0.78rem', color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Ver todas las sesiones →</button>

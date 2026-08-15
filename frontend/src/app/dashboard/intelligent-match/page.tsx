@@ -17,10 +17,10 @@ interface Breakdown {
 
 interface MatchResult {
   score: number;
-  raw_score: number;
-  attenuation: number;
-  mentor_profile_strength: number;
-  mentee_profile_strength: number;
+  score_band: string;
+  coverage_pct: number;
+  applicable_dimensions: string[];
+  unavailable_dimensions: string[];
   breakdown: Record<string, Breakdown>;
   matched_keywords: string[];
   reasons: string[];

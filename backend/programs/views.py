@@ -232,14 +232,23 @@ def send_match_notification_email(
 
     subject = f"Tienes nuevo match en {program.name} · Inspiratoria"
 
-    # Score badge
+    # Score badge — mismas bandas que el motor de matching (Excelente/Bueno/Moderado/Bajo),
+    # sin rojo alarmante para scores bajos: un score bajo puede ser por falta de datos
+    # de perfil, no necesariamente un mal match.
     score_block = ""
     if score is not None:
-        color = "#10b981" if score >= 70 else "#f59e0b" if score >= 50 else "#ef4444"
+        if score >= 75:
+            color, band = "#10b981", "Excelente"
+        elif score >= 55:
+            color, band = "#2563eb", "Bueno"
+        elif score >= 35:
+            color, band = "#f59e0b", "Moderado"
+        else:
+            color, band = "#71717a", "Bajo"
         score_block = (
             f'<div style="display:inline-block;background:{color}1A;color:{color};'
             f'padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;'
-            f'letter-spacing:0.4px;text-transform:uppercase;">Match score: {score:.0f}/100</div>'
+            f'letter-spacing:0.4px;text-transform:uppercase;">Compatibilidad {band} · {score:.0f}/100</div>'
         )
 
     # Keywords
@@ -577,6 +586,17 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
         for act in all_activities:
             activities_by_program.setdefault(act.program_id, []).append(act)
 
+        # Completadas por ESTE usuario específicamente (Activity.status es un
+        # flag compartido que setea el staff — no refleja si ESTE participante
+        # ya hizo su parte, ej. cuando la actividad espeja una sesión 1:1 que
+        # el mentor marcó completada solo para su mentee).
+        from programs.models import ActivityCompletion
+        my_completed_activity_ids = set(
+            ActivityCompletion.objects.filter(
+                user=user, activity_id__in=[a.id for a in all_activities]
+            ).values_list('activity_id', flat=True)
+        )
+
         training_ids = [a.id for a in all_activities if a.activity_type == 'training']
         modules_by_activity: dict = {}
         for mod in Content.objects.filter(activity_id__in=training_ids).order_by('order'):
@@ -605,7 +625,8 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
             acts = activities_by_program.get(p.id, [])
             activities = [{
                 'id': a.id, 'name': a.name, 'description': a.description,
-                'activity_type': a.activity_type, 'status': a.status,
+                'activity_type': a.activity_type,
+                'status': 'completed' if a.id in my_completed_activity_ids else a.status,
                 'start_date': a.start_date, 'end_date': a.end_date,
                 'modality': a.modality, 'meeting_url': a.meeting_url,
             } for a in acts]
@@ -2061,11 +2082,14 @@ class SessionCreateIn(BaseModel):
     scheduled_at: datetime
     duration_minutes: int = 60
     status: str = "scheduled"
+    modality: str = "online"
     session_notes: str = ""
     topics_covered: List[str] = Field(default_factory=list)
     mentee_mood: Optional[int] = None
     next_steps: str = ""
     meeting_url: str = ""
+    location: str = ""
+    location_instructions: str = ""
 
 
 class SessionUpdateIn(BaseModel):
@@ -2073,11 +2097,14 @@ class SessionUpdateIn(BaseModel):
     scheduled_at: Optional[datetime] = None
     duration_minutes: Optional[int] = None
     status: Optional[str] = None
+    modality: Optional[str] = None
     session_notes: Optional[str] = None
     topics_covered: Optional[List[str]] = None
     mentee_mood: Optional[int] = None
     next_steps: Optional[str] = None
     meeting_url: Optional[str] = None
+    location: Optional[str] = None
+    location_instructions: Optional[str] = None
 
 
 def _serialize_session(s):
@@ -2088,12 +2115,21 @@ def _serialize_session(s):
         "scheduled_at": s.scheduled_at.isoformat() if s.scheduled_at else None,
         "duration_minutes": s.duration_minutes,
         "status": s.status,
+        "modality": s.modality,
         "meeting_url": s.meeting_url,
+        "location": s.location or "",
+        "location_instructions": s.location_instructions or "",
         "session_notes": s.session_notes,
         "topics_covered": s.topics_covered or [],
         "mentee_mood": s.mentee_mood,
         "next_steps": s.next_steps,
         "created_at": s.created_at.isoformat() if s.created_at else None,
+        "mentee_reflection": s.mentee_reflection or "",
+        "mentee_commitment": s.mentee_commitment or "",
+        "mentee_confidence": s.mentee_confidence,
+        "mentee_reflection_at": s.mentee_reflection_at.isoformat() if s.mentee_reflection_at else None,
+        "mentor_acknowledged_at": s.mentor_acknowledged_at.isoformat() if s.mentor_acknowledged_at else None,
+        "mentor_acknowledgment_note": s.mentor_acknowledgment_note or "",
     }
 
 
@@ -2198,12 +2234,18 @@ async def create_session(program_id: str, payload: SessionCreateIn, authorizatio
             scheduled_at=payload.scheduled_at,
             duration_minutes=payload.duration_minutes or 60,
             status=payload.status or "scheduled",
+            modality=payload.modality or "online",
             session_notes=payload.session_notes or "",
             topics_covered=payload.topics_covered or [],
             mentee_mood=payload.mentee_mood,
             next_steps=payload.next_steps or "",
             meeting_url=payload.meeting_url or "",
+            location=payload.location or "",
+            location_instructions=payload.location_instructions or "",
         )
+        if s.status == "completed":
+            from .models import link_session_to_activity
+            link_session_to_activity(s)
         return _serialize_session(s)
     return await sync_to_async(create)()
 
@@ -2221,9 +2263,13 @@ async def update_session(program_id: str, session_id: str, payload: SessionUpdat
             s = MentoringSession.objects.get(id=session_id, program_id=program_id)
         except MentoringSession.DoesNotExist:
             raise HTTPException(status_code=404, detail="Sesión no encontrada")
-        for k, v in payload.model_dump(exclude_unset=True).items():
+        updates = payload.model_dump(exclude_unset=True)
+        for k, v in updates.items():
             setattr(s, k, v)
         s.save()
+        if updates.get("status") == "completed":
+            from .models import link_session_to_activity
+            link_session_to_activity(s)
         return _serialize_session(s)
     return await sync_to_async(update)()
 

@@ -5116,6 +5116,25 @@ def _get_portal_user(portal_code: str):
         raise HTTPException(status_code=404, detail="Portal no encontrado")
 
 
+def _parse_scheduled_at(raw: str):
+    """Parsea un datetime ISO a un valor aware.
+
+    Si el string ya trae zona horaria (offset o 'Z'), se respeta tal cual.
+    Si llega naive (sin offset), NO se asume UTC — todos los usuarios de la
+    plataforma operan en Chile, así que se interpreta como America/Santiago.
+    Esto es la corrección de un bug real: el formulario de "Agendar sesión"
+    mandaba la hora local sin convertir, y al asumirla como UTC una sesión
+    ingresada a las 10:00 terminaba guardada 3-4 horas antes.
+    """
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo
+
+    parsed = _dt.fromisoformat(raw.replace("Z", "+00:00"))
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, ZoneInfo("America/Santiago"))
+    return parsed
+
+
 # ── My Mentor (for mentees) ─────────────────────────────────────────
 
 @router.get("/portal/{portal_code}/my-mentor")
@@ -5294,7 +5313,10 @@ class SessionCreateRequest(BaseModel):
     description: str = ""
     scheduled_at: str
     duration_minutes: int = 60
+    modality: str = "online"
     meeting_url: str = ""
+    location: str = ""
+    location_instructions: str = ""
 
 class SessionNotesRequest(BaseModel):
     session_notes: str = ""
@@ -5318,14 +5340,107 @@ async def get_my_sessions(portal_code: str):
         return {"sessions": [{
             "id": str(s.id), "title": s.title, "description": s.description,
             "scheduled_at": s.scheduled_at.isoformat(), "duration_minutes": s.duration_minutes,
-            "status": s.status, "meeting_url": s.meeting_url or "",
+            "status": s.status, "modality": s.modality, "meeting_url": s.meeting_url or "",
+            "location": s.location or "", "location_instructions": s.location_instructions or "",
             "mentor": {"id": str(s.mentor.id), "username": s.mentor.username, "full_name": s.mentor.display_name, "avatar_url": getattr(s.mentor, "avatar_url", "") or ""},
             "mentee": {"id": str(s.mentee.id), "username": s.mentee.username, "full_name": s.mentee.display_name, "avatar_url": getattr(s.mentee, "avatar_url", "") or ""},
             "program_name": s.program.name, "program_id": str(s.program.id),
             "session_notes": s.session_notes or "", "topics_covered": s.topics_covered or [],
             "mentee_mood": s.mentee_mood, "next_steps": s.next_steps or "",
             "ai_suggestion": s.ai_suggestion or "", "created_at": s.created_at.isoformat(),
+            "mentee_reflection": s.mentee_reflection or "", "mentee_commitment": s.mentee_commitment or "",
+            "mentee_confidence": s.mentee_confidence,
+            "mentee_reflection_at": s.mentee_reflection_at.isoformat() if s.mentee_reflection_at else None,
+            "mentor_acknowledged_at": s.mentor_acknowledged_at.isoformat() if s.mentor_acknowledged_at else None,
+            "mentor_acknowledgment_note": s.mentor_acknowledgment_note or "",
         } for s in sessions]}
+
+    return await sync_to_async(_resolve)()
+
+
+@router.get("/portal/{portal_code}/session-progress")
+async def get_session_progress(portal_code: str, program_id: str, other_user_id: Optional[str] = None):
+    """
+    Progreso REAL de mentoría del usuario en un programa, calculado 100%
+    desde MentoringSession — una sola fuente de verdad para "Progreso
+    general", "Sesiones totales" y avance de actividades en el dashboard.
+    Antes esos tres números salían de tres cálculos distintos (fechas de
+    calendario, config estática de la plantilla, y un flag de Activity que
+    no es por-usuario) y por eso podían quedar en 0% aunque el usuario ya
+    hubiera completado todas sus sesiones.
+
+    Si se pasa `other_user_id`, se acota a la dupla específica (usado en la
+    ficha 360 de un mentee/mentor puntual); si no, agrega todas las
+    sesiones del usuario en el programa (usado en el dashboard general).
+    """
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import MentoringSession
+        from django.db.models import Q
+
+        qs = MentoringSession.objects.filter(program_id=program_id)
+        if other_user_id:
+            qs = qs.filter(
+                Q(mentor=user, mentee_id=other_user_id) | Q(mentee=user, mentor_id=other_user_id)
+            )
+        else:
+            qs = qs.filter(Q(mentor=user) | Q(mentee=user))
+        sessions = list(qs.order_by("scheduled_at"))
+
+        completed = [s for s in sessions if s.status == "completed"]
+        n_completed = len(completed)
+        n_scheduled = len([s for s in sessions if s.status == "scheduled"])
+        n_cancelled = len([s for s in sessions if s.status == "cancelled"])
+        n_noshow = len([s for s in sessions if s.status == "no_show"])
+        total = n_completed + n_scheduled + n_noshow  # sin canceladas
+
+        moods = [s.mentee_mood for s in completed if s.mentee_mood]
+        avg_mood = round(sum(moods) / len(moods), 2) if moods else None
+
+        now = timezone.now()
+        last_session = max((s.scheduled_at for s in completed if s.scheduled_at), default=None)
+        upcoming = [s.scheduled_at for s in sessions if s.status == "scheduled" and s.scheduled_at and s.scheduled_at > now]
+        next_session = min(upcoming, default=None)
+
+        topics = []
+        for s in completed:
+            for t in (s.topics_covered or []):
+                if t not in topics:
+                    topics.append(t)
+        next_steps = ""
+        for s in sorted(completed, key=lambda x: x.scheduled_at or now, reverse=True):
+            if s.next_steps:
+                next_steps = s.next_steps
+                break
+
+        progress_pct = round(n_completed / total * 100) if total else 0
+
+        mood_trend = [
+            {"scheduled_at": s.scheduled_at.isoformat() if s.scheduled_at else None, "mood": s.mentee_mood}
+            for s in completed if s.mentee_mood
+        ]
+
+        return {
+            "has_sessions": total > 0,
+            "total_sessions": total,
+            "completed_sessions": n_completed,
+            "scheduled_sessions": n_scheduled,
+            "cancelled_sessions": n_cancelled,
+            "no_show_sessions": n_noshow,
+            "progress_pct": progress_pct,
+            "last_session": last_session.isoformat() if last_session else None,
+            "next_session": next_session.isoformat() if next_session else None,
+            "avg_mood": avg_mood,
+            "mood_trend": mood_trend,
+            "topics": topics,
+            "next_steps": next_steps,
+            "recent_sessions": [{
+                "id": str(s.id), "title": s.title,
+                "scheduled_at": s.scheduled_at.isoformat() if s.scheduled_at else None,
+                "status": s.status, "mentee_mood": s.mentee_mood,
+                "session_notes": s.session_notes or "", "next_steps": s.next_steps or "",
+            } for s in sorted(sessions, key=lambda x: x.scheduled_at or now, reverse=True)[:6]],
+        }
 
     return await sync_to_async(_resolve)()
 
@@ -5336,7 +5451,6 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
     def _resolve():
         user = _get_portal_user(portal_code)
         from programs.models import MentoringSession, Program, AuditLog, Notification
-        from datetime import datetime as dt
         from django.core.mail import send_mail
         from django.conf import settings as django_settings
 
@@ -5349,12 +5463,14 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
         except Program.DoesNotExist:
             raise HTTPException(status_code=404, detail="Programa no encontrado")
 
-        scheduled = dt.fromisoformat(payload.scheduled_at.replace("Z", "+00:00"))
+        scheduled = _parse_scheduled_at(payload.scheduled_at)
+        modality = payload.modality if payload.modality in ("online", "in_person", "hybrid") else "online"
 
-        # Videollamada automática por Google Meet — si Google no está
-        # configurado o falla, seguimos sin bloquear la creación de la sesión.
+        # Videollamada automática por Google Meet — solo tiene sentido si la
+        # sesión es online/híbrida. Una sesión presencial (ej. visita a
+        # oficinas) no debe generar un Meet aunque el link quede vacío.
         meeting_url = payload.meeting_url
-        if not meeting_url:
+        if modality in ("online", "hybrid") and not meeting_url:
             from .google_meet_service import create_meet_event
             meeting_url = create_meet_event(
                 title=payload.title,
@@ -5368,7 +5484,8 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
             program=program, mentor=user, mentee=mentee,
             title=payload.title, description=payload.description,
             scheduled_at=scheduled, duration_minutes=payload.duration_minutes,
-            meeting_url=meeting_url,
+            modality=modality, meeting_url=meeting_url,
+            location=payload.location or "", location_instructions=payload.location_instructions or "",
         )
 
         # ── Audit log (bitácora) ────────────────────────────────
@@ -5384,12 +5501,18 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
                 "mentee": mentee.full_name or mentee.email,
                 "scheduled_at": session.scheduled_at.isoformat(),
                 "duration_minutes": session.duration_minutes,
+                "modality": session.modality,
                 "meeting_url": session.meeting_url or "",
+                "location": session.location or "",
             },
         )
 
         # ── In-app notifications ────────────────────────────────
-        formatted_date = scheduled.strftime("%d/%m/%Y a las %H:%M")
+        # scheduled está en UTC (aware) — convertir a hora de Chile antes de
+        # mostrarla en notificaciones/correos, si no el mismo bug de horario
+        # reaparece aquí aunque el dato guardado ya esté correcto.
+        from zoneinfo import ZoneInfo as _ZoneInfo
+        formatted_date = timezone.localtime(scheduled, _ZoneInfo("America/Santiago")).strftime("%d/%m/%Y a las %H:%M")
         Notification.objects.create(
             recipient=mentee, sender=user,
             notification_type="system",
@@ -5408,11 +5531,21 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
         # ── Email to mentee ─────────────────────────────────────
         frontend_url = getattr(django_settings, "FRONTEND_URL", "https://plataforma.inspiratoria.org")
         mentee_portal_link = f"{frontend_url}/p/{mentee.portal_code}/sesiones" if mentee.portal_code else frontend_url
+        MODALITY_LABEL_ES = {"online": "Online", "in_person": "Presencial", "hybrid": "Híbrida"}
+        modality_label = MODALITY_LABEL_ES.get(session.modality, "Online")
+
         meeting_block = ""
         if session.meeting_url:
-            meeting_block = f"""
+            meeting_block += f"""
               <div style="text-align:center;margin:20px 0 0 0;">
                 <a href="{session.meeting_url}" style="display:inline-block;background:#0891b2;color:#ffffff;padding:12px 32px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none;">Enlace de reunión</a>
+              </div>"""
+        if session.location:
+            meeting_block += f"""
+              <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;margin-top:16px;">
+                <p style="margin:0 0 4px 0;color:#92400e;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">Ubicación</p>
+                <p style="margin:0;color:#78350f;font-size:13px;font-weight:600;">{session.location}</p>
+                {f'<p style="margin:6px 0 0 0;color:#92400e;font-size:12.5px;">{session.location_instructions}</p>' if session.location_instructions else ''}
               </div>"""
 
         mentee_html = f"""
@@ -5445,6 +5578,10 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
                   <tr>
                     <td style="padding:6px 0;color:#6b7280;font-size:13px;">Duración</td>
                     <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{session.duration_minutes} minutos</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;">Modalidad</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{modality_label}</td>
                   </tr>
                   <tr>
                     <td style="padding:6px 0;color:#6b7280;font-size:13px;">Programa</td>
@@ -5496,6 +5633,10 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
                   <tr>
                     <td style="padding:6px 0;color:#6b7280;font-size:13px;">Duración</td>
                     <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{session.duration_minutes} minutos</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;color:#6b7280;font-size:13px;">Modalidad</td>
+                    <td style="padding:6px 0;color:#111827;font-size:13px;font-weight:600;">{modality_label}</td>
                   </tr>
                   <tr>
                     <td style="padding:6px 0;color:#6b7280;font-size:13px;">Programa</td>
@@ -5553,7 +5694,6 @@ async def update_session(portal_code: str, session_id: str, payload: SessionCrea
     def _resolve():
         user = _get_portal_user(portal_code)
         from programs.models import MentoringSession
-        from datetime import datetime as dt
 
         try:
             session = MentoringSession.objects.get(id=session_id, mentor=user)
@@ -5562,11 +5702,14 @@ async def update_session(portal_code: str, session_id: str, payload: SessionCrea
 
         session.title = payload.title
         session.description = payload.description
-        session.scheduled_at = dt.fromisoformat(payload.scheduled_at.replace("Z", "+00:00"))
+        session.scheduled_at = _parse_scheduled_at(payload.scheduled_at)
         session.duration_minutes = payload.duration_minutes
+        session.modality = payload.modality if payload.modality in ("online", "in_person", "hybrid") else "online"
+        session.location = payload.location or ""
+        session.location_instructions = payload.location_instructions or ""
         if payload.meeting_url:
             session.meeting_url = payload.meeting_url
-        elif not session.meeting_url:
+        elif not session.meeting_url and session.modality in ("online", "hybrid"):
             from .google_meet_service import create_meet_event
             session.meeting_url = create_meet_event(
                 title=session.title,
@@ -5575,6 +5718,8 @@ async def update_session(portal_code: str, session_id: str, payload: SessionCrea
                 duration_minutes=session.duration_minutes,
                 attendee_emails=[session.mentor.email, session.mentee.email],
             ) or ""
+        elif session.modality == "in_person":
+            session.meeting_url = ""
         session.save()
         return {"success": True, "id": str(session.id)}
 
@@ -5596,6 +5741,9 @@ async def update_session_status(portal_code: str, session_id: str, status_val: s
         if status_val in ("completed", "cancelled", "no_show"):
             session.status = status_val
             session.save(update_fields=["status", "updated_at"])
+            if status_val == "completed":
+                from programs.models import link_session_to_activity
+                link_session_to_activity(session)
         return {"success": True, "status": session.status}
 
     return await sync_to_async(_resolve)()
@@ -5620,6 +5768,78 @@ async def save_session_notes(portal_code: str, session_id: str, payload: Session
         session.mentee_mood = payload.mentee_mood
         session.next_steps = payload.next_steps
         session.save()
+        return {"success": True}
+
+    return await sync_to_async(_resolve)()
+
+
+class MenteeReflectionRequest(BaseModel):
+    reflection: str = Field(..., max_length=500)
+    commitment: str = ""
+    confidence: Optional[int] = None
+
+
+@router.post("/portal/{portal_code}/sessions/{session_id}/reflection")
+async def save_mentee_reflection(portal_code: str, session_id: str, payload: MenteeReflectionRequest):
+    """
+    Bitácora mínima de la MENTEE: qué se lleva de la sesión, su próximo
+    compromiso y su nivel de confianza (1-5). Solo la propia mentee puede
+    escribir esto — es deliberadamente independiente de las notas del
+    mentor, para que el registro no dependa 100% de que él tenga tiempo.
+    """
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import MentoringSession
+
+        try:
+            session = MentoringSession.objects.get(id=session_id, mentee=user)
+        except MentoringSession.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Sesión no encontrada")
+
+        session.mentee_reflection = payload.reflection.strip()[:500]
+        session.mentee_commitment = payload.commitment.strip()
+        if payload.confidence is not None and 1 <= payload.confidence <= 5:
+            session.mentee_confidence = payload.confidence
+        session.mentee_reflection_at = timezone.now()
+        # Una nueva reflexión reabre la confirmación del mentor.
+        session.mentor_acknowledged_at = None
+        session.save(update_fields=[
+            "mentee_reflection", "mentee_commitment", "mentee_confidence",
+            "mentee_reflection_at", "mentor_acknowledged_at", "updated_at",
+        ])
+
+        from programs.models import Notification
+        Notification.objects.create(
+            recipient=session.mentor, sender=user,
+            notification_type="system",
+            title="Tu mentee dejó una reflexión",
+            message=f"{user.full_name or user.email} registró su avance de \"{session.title}\".",
+            link=f"/p/{session.mentor.portal_code}/sesiones" if session.mentor.portal_code else "",
+        )
+        return {"success": True}
+
+    return await sync_to_async(_resolve)()
+
+
+class MentorAcknowledgeRequest(BaseModel):
+    note: str = Field("", max_length=280)
+
+
+@router.post("/portal/{portal_code}/sessions/{session_id}/acknowledge")
+async def acknowledge_mentee_reflection(portal_code: str, session_id: str, payload: MentorAcknowledgeRequest):
+    """El mentor confirma que leyó la reflexión de la mentee (1-2 min), con un comentario opcional de una frase."""
+    def _resolve():
+        user = _get_portal_user(portal_code)
+        from programs.models import MentoringSession
+
+        try:
+            session = MentoringSession.objects.get(id=session_id, mentor=user)
+        except MentoringSession.DoesNotExist:
+            raise HTTPException(status_code=404, detail="Sesión no encontrada")
+
+        session.mentor_acknowledged_at = timezone.now()
+        session.mentor_acknowledgment_note = payload.note.strip()[:280]
+        session.save(update_fields=["mentor_acknowledged_at", "mentor_acknowledgment_note", "updated_at"])
         return {"success": True}
 
     return await sync_to_async(_resolve)()
@@ -5671,16 +5891,36 @@ Genera en español:
 4. Preguntas poderosas para abrir la conversación
 5. Recursos o lecturas recomendadas"""
 
+        # Plantilla base editable — se ofrece cuando la IA falla, para que el
+        # flujo del mentor nunca quede bloqueado esperando una respuesta que
+        # no llegará. No es un error disfrazado de sugerencia: se marca
+        # explícitamente con success=False para que el frontend lo distinga.
+        manual_template = (
+            f"Plan sugerido para la próxima sesión con {mentee.full_name or mentee.email}:\n\n"
+            "1. Título: (a definir según el objetivo de esta etapa)\n"
+            "2. Objetivos clave:\n   - \n   - \n   - \n"
+            "3. Actividades/ejercicios: \n"
+            "4. Preguntas para abrir la conversación:\n   - ¿Cómo te sentiste con los próximos pasos de la última sesión?\n   - ¿Qué avanzaste y qué se te dificultó?\n"
+            "5. Recursos recomendados: \n"
+        )
+
         try:
             from programs.ai_service import GeminiAIService
             result = GeminiAIService._call_gemini(prompt, temperature=0.7)
-            if result:
-                session.ai_suggestion = result
-                session.save(update_fields=["ai_suggestion", "updated_at"])
-                return {"suggestion": result}
-        except Exception:
-            pass
-        return {"suggestion": "No se pudo generar sugerencia. Verifica la configuración de la IA."}
+        except Exception as exc:
+            print(f"[ai_suggest_next_session] {exc}")
+            result = None
+
+        if result:
+            session.ai_suggestion = result
+            session.save(update_fields=["ai_suggestion", "updated_at"])
+            return {"success": True, "suggestion": result}
+
+        return {
+            "success": False,
+            "error": "No pudimos generar la sugerencia con IA en este momento (puede ser un problema temporal de configuración o de conexión).",
+            "manual_template": manual_template,
+        }
 
     return await sync_to_async(_resolve)()
 

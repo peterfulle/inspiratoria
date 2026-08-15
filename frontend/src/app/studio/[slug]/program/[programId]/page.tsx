@@ -2614,14 +2614,29 @@ function ChipRow({ items, tone = 'zinc', max = 14 }: { items?: string[]; tone?: 
 }
 
 // Barra de una dimensión del breakdown del matching
-function DimensionBar({ label, earned, weight, matches }: { label: string; earned: number; weight: number; matches?: string[] }) {
-  const pct = weight ? Math.round((earned / weight) * 100) : 0;
+function DimensionBar({ label, earned, weight, effectiveWeight, applicable, matches }: { label: string; earned: number; weight: number; effectiveWeight?: number; applicable?: boolean; matches?: string[] }) {
+  if (applicable === false) {
+    return (
+      <div>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className="text-[11px] text-zinc-400">{label}</span>
+          <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">Sin datos</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+          <div className="h-full rounded-full" style={{ width: '100%', background: 'repeating-linear-gradient(45deg, #f4f4f5, #f4f4f5 4px, #e4e4e7 4px, #e4e4e7 8px)' }} />
+        </div>
+        <div className="text-[10px] text-zinc-400 mt-1">No cuenta para el score — este {label.toLowerCase()} no está completado por ninguna de las dos partes (peso original: {weight} pts).</div>
+      </div>
+    );
+  }
+  const ew = effectiveWeight ?? weight;
+  const pct = ew ? Math.round((earned / ew) * 100) : 0;
   const color = pct >= 66 ? '#16a34a' : pct >= 33 ? '#2563eb' : '#a1a1aa';
   return (
     <div>
       <div className="flex items-center justify-between gap-2 mb-1">
         <span className="text-[11px] text-zinc-600">{label}</span>
-        <span className="text-[11px] font-semibold text-zinc-900">{(earned ?? 0).toFixed(1)}<span className="text-zinc-400 font-normal">/{weight}</span></span>
+        <span className="text-[11px] font-semibold text-zinc-900">{(earned ?? 0).toFixed(1)}<span className="text-zinc-400 font-normal">/{ew.toFixed(0)}</span></span>
       </div>
       <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden">
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
@@ -2651,17 +2666,24 @@ function MiniProfileRow({ label, items }: { label: string; items?: string[] }) {
 function MatchDetail({ r }: { r: any }) {
   const bd: Record<string, any> = r.breakdown || {};
   const dims = Object.values(bd);
-  const mStrength = Math.round((r.mentor_profile_strength ?? 0) * 100);
-  const eStrength = Math.round((r.mentee_profile_strength ?? 0) * 100);
+  const coverage = r.coverage_pct ?? 0;
   return (
     <div className="px-5 pb-4">
       <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 grid lg:grid-cols-2 gap-x-6 gap-y-4">
+        {/* Cómo se calcula */}
+        <div className="lg:col-span-2 rounded-lg px-3.5 py-2.5 bg-blue-50/60 border border-blue-100 flex items-start gap-2.5">
+          <svg className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+          <div className="text-[11px] text-blue-900 leading-relaxed">
+            <span className="font-semibold">¿Cómo calculamos esta compatibilidad?</span> Comparamos 6 dimensiones del perfil de ambos (skills, temas, estilo, experiencia, objetivos, rol). Solo se evalúan las dimensiones donde <em>ambas</em> personas completaron datos — este match pudo evaluarse sobre el <strong>{coverage}%</strong> del cuestionario ({r.unavailable_dimensions?.length || 0} de {dims.length} dimensiones no tenían datos suficientes en alguno de los dos perfiles). El score no sustituye tu criterio — es un apoyo para priorizar a quién revisar primero.
+          </div>
+        </div>
+
         {/* Compatibilidad por dimensión */}
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.07em] text-zinc-400 mb-3">Compatibilidad por dimensión</div>
           <div className="space-y-3">
             {dims.length > 0 ? dims.map((d: any, i: number) => (
-              <DimensionBar key={i} label={d.label} earned={d.earned} weight={d.weight} matches={d.matches} />
+              <DimensionBar key={i} label={d.label} earned={d.earned} weight={d.weight} effectiveWeight={d.effective_weight} applicable={d.applicable} matches={d.matches} />
             )) : <span className="text-[11px] text-zinc-400">Sin desglose disponible</span>}
           </div>
         </div>
@@ -2676,7 +2698,6 @@ function MatchDetail({ r }: { r: any }) {
             <div className="rounded-lg bg-white border border-zinc-200 p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Mentor</span>
-                <span className="text-[9.5px] text-zinc-400">perfil {mStrength}%</span>
               </div>
               <div className="text-[12px] font-semibold text-zinc-900 truncate">{r.mentor?.name}</div>
               {r.mentor?.headline && <div className="text-[10.5px] text-zinc-500 mb-1.5 truncate">{r.mentor.headline}</div>}
@@ -2688,7 +2709,6 @@ function MatchDetail({ r }: { r: any }) {
             <div className="rounded-lg bg-white border border-zinc-200 p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Mentee</span>
-                <span className="text-[9.5px] text-zinc-400">perfil {eStrength}%</span>
               </div>
               <div className="text-[12px] font-semibold text-zinc-900 truncate">{r.mentee?.name}</div>
               {r.mentee?.headline && <div className="text-[10.5px] text-zinc-500 mb-1.5 truncate">{r.mentee.headline}</div>}
@@ -3156,14 +3176,14 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
     setMatchLoading(false);
   };
 
-  const activatePair = async (mentor_user_id: string, mentee_user_id: string, score: number, ai_rec?: string) => {
+  const activatePair = async (mentor_user_id: string, mentee_user_id: string, score: number, ai_rec?: string, breakdown?: any, matched_keywords?: string[], reasons?: string[]) => {
     const key = `${mentor_user_id}-${mentee_user_id}`;
     setActivations(p => ({ ...p, [key]: 'loading' }));
     try {
       const res = await apiFetch(`${API_URL}/api/matches/intelligent/activate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ program_id: programId, mentor_user_id, mentee_user_id, score, ai_recommendation: ai_rec, vinculation_type: 'mentoria' }),
+        body: JSON.stringify({ program_id: programId, mentor_user_id, mentee_user_id, score, ai_recommendation: ai_rec, breakdown, matched_keywords, reasons, vinculation_type: 'mentoria' }),
       });
       if (!res.ok) throw new Error();
       setActivations(p => ({ ...p, [key]: 'done' }));
@@ -3172,7 +3192,8 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
     } catch { setActivations(p => ({ ...p, [key]: 'error' })); showToast('Error al activar', 'error'); }
   };
 
-  const sc = (s: number) => s >= 65 ? { color: '#16a34a', bg: '#dcfce7' } : s >= 45 ? { color: '#d97706', bg: '#fef3c7' } : { color: '#dc2626', bg: '#fee2e2' };
+  // Bandas alineadas con score_band del backend (Excelente/Bueno/Moderado/Bajo)
+  const sc = (s: number) => s >= 75 ? { color: '#16a34a', bg: '#dcfce7' } : s >= 55 ? { color: '#2563eb', bg: '#dbeafe' } : s >= 35 ? { color: '#d97706', bg: '#fef3c7' } : { color: '#71717a', bg: '#f4f4f5' };
   const mentors = participants.filter(p => p.role === 'mentor');
   const mentees = participants.filter(p => p.role === 'mentee');
 
@@ -3347,7 +3368,7 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
                         <div className="flex items-center gap-1.5">
                           <button onClick={() => setPreviewMatch(r)} title="Vista previa del match"
                             className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-[11.5px] font-semibold text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition whitespace-nowrap"><I.Sparkles className="w-3.5 h-3.5" />Preview</button>
-                          <button onClick={() => activatePair(r.mentor?.id, r.mentee?.id, r.score, r.ai_recommendation)}
+                          <button onClick={() => activatePair(r.mentor?.id, r.mentee?.id, r.score, r.ai_recommendation, r.breakdown, r.matched_keywords, r.reasons)}
                             className="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-zinc-800 transition whitespace-nowrap"><I.Zap className="w-3.5 h-3.5" />Vincular</button>
                         </div>
                       )}
@@ -3394,7 +3415,7 @@ function PairProgressModal({ programId, vinc, onClose, showToast }: { programId:
   const [showForm, setShowForm] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [exporting, setExporting] = React.useState(false);
-  const empty = { title: 'Sesión de mentoría', date: '', duration: '60', status: 'completed', mood: '', topics: '', notes: '', next_steps: '' };
+  const empty = { title: 'Sesión de mentoría', date: '', duration: '60', status: 'completed', modality: 'online', location: '', mood: '', topics: '', notes: '', next_steps: '' };
   const [form, setForm] = React.useState(empty);
 
   const load = React.useCallback(async () => {
@@ -3416,7 +3437,8 @@ function PairProgressModal({ programId, vinc, onClose, showToast }: { programId:
         body: JSON.stringify({
           mentor_id: mentor.id, mentee_id: mentee.id, title: form.title || 'Sesión de mentoría',
           scheduled_at: new Date(form.date).toISOString(), duration_minutes: Number(form.duration) || 60,
-          status: form.status, mentee_mood: form.mood ? Number(form.mood) : null,
+          status: form.status, modality: form.modality, location: form.location,
+          mentee_mood: form.mood ? Number(form.mood) : null,
           topics_covered: form.topics.split(',').map(t => t.trim()).filter(Boolean),
           session_notes: form.notes, next_steps: form.next_steps,
         }),
@@ -3552,6 +3574,15 @@ function PairProgressModal({ programId, vinc, onClose, showToast }: { programId:
                       <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Duración (min)</label><input type="number" value={form.duration} onChange={e => setForm({ ...form, duration: e.target.value })} className={inputCls} /></div>
                       <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Ánimo mentee (1-5)</label><input type="number" min={1} max={5} value={form.mood} onChange={e => setForm({ ...form, mood: e.target.value })} className={inputCls} /></div>
                     </div>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Modalidad</label>
+                        <select value={form.modality} onChange={e => setForm({ ...form, modality: e.target.value })} className={inputCls}>
+                          <option value="online">Online</option><option value="in_person">Presencial</option><option value="hybrid">Híbrida</option>
+                        </select></div>
+                      {form.modality !== 'online' && (
+                        <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Ubicación</label><input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="Ej: Oficinas SQM Antofagasta" className={inputCls} /></div>
+                      )}
+                    </div>
                     <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Temas (separados por coma)</label><input value={form.topics} onChange={e => setForm({ ...form, topics: e.target.value })} placeholder="Liderazgo, Comunicación" className={inputCls} /></div>
                     <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Notas de la sesión</label><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} className={inputCls} /></div>
                     <div><label className="block text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">Próximos pasos</label><input value={form.next_steps} onChange={e => setForm({ ...form, next_steps: e.target.value })} className={inputCls} /></div>
@@ -3580,6 +3611,7 @@ function PairProgressModal({ programId, vinc, onClose, showToast }: { programId:
                             </div>
                             <span className="text-[11px] text-zinc-400 flex-shrink-0">{x.scheduled_at ? new Date(x.scheduled_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} · {x.duration_minutes}m{x.mentee_mood ? ` · ánimo ${x.mentee_mood}/5` : ''}</span>
                           </div>
+                          {x.modality && x.modality !== 'online' && x.location && <p className="text-[11px] text-amber-700 mb-1">📍 {x.location}</p>}
                           {x.topics_covered?.length > 0 && <div className="flex flex-wrap gap-1 mb-1.5">{x.topics_covered.map((t: string, i: number) => <span key={i} className="inline-flex px-1.5 py-0.5 rounded text-[9.5px] bg-zinc-50 text-zinc-500 border border-zinc-100">{t}</span>)}</div>}
                           {x.session_notes && <p className="text-[11.5px] text-zinc-600 leading-relaxed">{x.session_notes}</p>}
                           {x.next_steps && <p className="text-[11px] text-zinc-500 mt-1"><span className="font-semibold">Próximos pasos:</span> {x.next_steps}</p>}

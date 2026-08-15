@@ -800,6 +800,11 @@ class MentoringSession(models.Model):
         ("cancelled", "Cancelada"),
         ("no_show", "No asistió"),
     ]
+    MODALITY_CHOICES = [
+        ("online", "Online"),
+        ("in_person", "Presencial"),
+        ("hybrid", "Híbrido"),
+    ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     program = models.ForeignKey(Program, on_delete=models.CASCADE, related_name="mentoring_sessions")
@@ -810,7 +815,10 @@ class MentoringSession(models.Model):
     scheduled_at = models.DateTimeField()
     duration_minutes = models.PositiveIntegerField(default=60)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="scheduled")
+    modality = models.CharField(max_length=20, choices=MODALITY_CHOICES, default="online")
     meeting_url = models.URLField(blank=True)
+    location = models.CharField(max_length=500, blank=True)
+    location_instructions = models.TextField(blank=True)
 
     # Notes written by mentor after session
     session_notes = models.TextField(blank=True)
@@ -820,6 +828,18 @@ class MentoringSession(models.Model):
 
     # AI-generated content suggestion for next session
     ai_suggestion = models.TextField(blank=True)
+
+    # ── Bitácora de la mentee (MVP) ──────────────────────────────────
+    # Registro breve que llena la MENTEE (no el mentor): qué se lleva de la
+    # sesión, su próximo compromiso y su nivel de confianza. Existe para que
+    # el avance no dependa 100% de que el mentor escriba notas — la mentee
+    # puede dejar constancia de su propio progreso en menos de 4 minutos.
+    mentee_reflection = models.CharField(max_length=500, blank=True)
+    mentee_commitment = models.TextField(blank=True)
+    mentee_confidence = models.PositiveSmallIntegerField(null=True, blank=True, help_text="1-5")
+    mentee_reflection_at = models.DateTimeField(null=True, blank=True)
+    mentor_acknowledged_at = models.DateTimeField(null=True, blank=True)
+    mentor_acknowledgment_note = models.CharField(max_length=280, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -845,6 +865,42 @@ class ActivityCompletion(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.full_name} — {self.activity.name}"
+
+
+_SESSION_NUMBER_RE = None  # compilado perezosamente para no importar `re` a nivel de módulo dos veces
+
+
+def link_session_to_activity(session: "MentoringSession"):
+    """
+    Al completar una sesión de mentoría, busca la Activity del programa que
+    representa la misma sesión en la ruta/roadmap (ambas suelen nombrarse
+    "Sesión N | ...", aunque el resto del título no coincida) y marca esa
+    Activity como completada para el mentee — así el avance del roadmap y
+    el de las sesiones dejan de ser fuentes de verdad separadas.
+    Best-effort: si no hay una Activity con el mismo número de sesión, no
+    hace nada (no falla la actualización de la sesión).
+    """
+    import re
+    global _SESSION_NUMBER_RE
+    if _SESSION_NUMBER_RE is None:
+        _SESSION_NUMBER_RE = re.compile(r"sesi[oó]n\s*(\d+)", re.IGNORECASE)
+
+    match = _SESSION_NUMBER_RE.search(session.title or "")
+    if not match:
+        return None
+    session_num = match.group(1)
+
+    activity = None
+    for a in Activity.objects.filter(program_id=session.program_id):
+        am = _SESSION_NUMBER_RE.search(a.name or "")
+        if am and am.group(1) == session_num:
+            activity = a
+            break
+    if not activity:
+        return None
+
+    completion, _ = ActivityCompletion.objects.get_or_create(activity=activity, user=session.mentee)
+    return completion
 
 
 class ContentView(models.Model):
