@@ -1565,7 +1565,7 @@ export default function ParticipantPortalPage() {
               const hasBanner = !!(mp.banner_image || mp.banner_svg);
               return (
                 <div key={mp.id} onClick={() => { setSelectedProgram(mp); navigate('my-modules'); }}
-                  style={{ background: hasBanner ? '#111827' : gradient, borderRadius: 16, padding: '28px 28px 20px', cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', transition: 'all 0.2s', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'relative', overflow: 'hidden' }}>
+                  style={{ background: hasBanner ? '#111827' : gradient, borderRadius: 16, padding: '40px 32px 30px', minHeight: 220, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', transition: 'all 0.2s', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'relative', overflow: 'hidden' }}>
                   {mp.banner_image ? (
                     <img src={mp.banner_image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : mp.banner_svg ? (
@@ -1603,9 +1603,9 @@ export default function ParticipantPortalPage() {
           <div className="stats-grid">
             {[
               { label: 'Programas activos', value: myPrograms.length, change: `Inscrito como ${roleLabel.toLowerCase()}`, stripe: '#0891b2' },
-              { label: 'Módulos', value: programTemplate?.modules?.length || myPrograms.reduce((a: number, p: any) => a + (p.modules?.length || 0), 0), change: 'Contenido del programa', stripe: '#6366f1' },
-              { label: 'Actividades', value: programDetail?.activities?.length || myPrograms.reduce((a: number, p: any) => a + (p.activities?.length || 0), 0), change: 'Ejercicios y entrenamientos', stripe: '#059669' },
-              { label: 'Empresa', value: companyName || '—', change: roleLabel, stripe: '#f59e0b' },
+              { label: 'Módulos', value: programTemplate?.modules?.length || myPrograms.reduce((a: number, p: any) => a + (p.modules?.length || 0), 0), change: 'Contenido del programa', stripe: '#0891b2' },
+              { label: 'Actividades', value: programDetail?.activities?.length || myPrograms.reduce((a: number, p: any) => a + (p.activities?.length || 0), 0), change: 'Ejercicios y entrenamientos', stripe: '#0891b2' },
+              { label: 'Empresa', value: companyName || '—', change: roleLabel, stripe: '#0891b2' },
             ].map((s, i) => (
               <div key={i} className="stat-card">
                 <div className="stat-card-stripe" style={{ background: s.stripe }} />
@@ -2084,7 +2084,7 @@ export default function ParticipantPortalPage() {
           <div className="prg-bar-track">
             <div className="prg-bar-fill" style={{
               width: `${overallProgress}%`,
-              background: overallProgress >= 75 ? 'linear-gradient(90deg, #10b981, #34d399)' : overallProgress >= 40 ? 'linear-gradient(90deg, #0891b2, #06b6d4)' : 'linear-gradient(90deg, #6366f1, #818cf8)',
+              background: 'linear-gradient(90deg, #0891b2, #06b6d4)',
             }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: '0.7rem', color: '#9ca3af' }}>
@@ -2096,16 +2096,16 @@ export default function ParticipantPortalPage() {
         {/* Stats row */}
         <div className="prg-stats">
           {[
-            { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#2563eb" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>, bg: '#dbeafe', val: `${completedModules}/${modules.length}`, label: 'Módulos completados', color: '#2563eb' },
-            { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#d97706" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>, bg: '#fef3c7', val: `${daysRemaining}`, label: 'Días restantes', color: '#d97706' },
-            { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>, bg: '#d1fae5', val: `${completedActivities}/${totalActivitiesForCard}`, label: 'Actividades', color: '#059669' },
-            { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#db2777" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>, bg: '#fce7f3', val: nextMilestone ? `Sem ${nextMilestone.week}` : '—', label: nextMilestone ? nextMilestone.name : 'Sin hitos pendientes', color: '#db2777' },
+            { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#0891b2" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>, val: `${completedModules}/${modules.length}`, label: 'Módulos completados' },
+            { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#0891b2" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>, val: `${daysRemaining}`, label: 'Días restantes' },
+            { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#0891b2" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>, val: `${completedActivities}/${totalActivitiesForCard}`, label: 'Actividades' },
+            { svg: <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#0891b2" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>, val: nextMilestone ? `Sem ${nextMilestone.week}` : '—', label: nextMilestone ? nextMilestone.name : 'Sin hitos pendientes' },
           ].map((s, i) => (
             <div key={i} className="prg-stat">
-              <div className="prg-stat-icon" style={{ background: s.bg }}>
+              <div className="prg-stat-icon" style={{ background: '#f1f5f9' }}>
                 {s.svg}
               </div>
-              <div className="prg-stat-val" style={{ color: s.color }}>{s.val}</div>
+              <div className="prg-stat-val">{s.val}</div>
               <div className="prg-stat-label">{s.label}</div>
             </div>
           ))}
@@ -2215,14 +2215,14 @@ export default function ParticipantPortalPage() {
                     <div className="prg-cal-bar">
                       <div className="prg-cal-fill" style={{
                         width: `${w.progress}%`,
-                        background: w.progress === 100 ? '#10b981' : w.isCurrent ? '#0891b2' : '#d1d5db',
+                        background: w.progress > 0 ? '#0891b2' : '#d1d5db',
                       }} />
                     </div>
                     <div className="prg-cal-dots">
                       {w.milestones.map((_ms: any, mi: number) => (
                         <div key={mi} className="prg-cal-dot" style={{ background: '#f59e0b' }} title={_ms.name} />
                       ))}
-                      {w.hasActivity && <div className="prg-cal-dot" style={{ background: '#6366f1' }} />}
+                      {w.hasActivity && <div className="prg-cal-dot" style={{ background: '#0891b2' }} />}
                     </div>
                   </div>
                 ))}
@@ -4346,7 +4346,7 @@ export default function ParticipantPortalPage() {
                 const hasBanner = !!(mp.banner_image || mp.banner_svg);
                 return (
                   <div key={mp.id} onClick={() => { setSelectedProgram(mp); navigate('my-modules'); }}
-                    style={{ background: hasBanner ? '#111827' : gradient, borderRadius: 16, padding: '28px 28px 20px', cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', transition: 'all 0.2s', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'relative', overflow: 'hidden' }}>
+                    style={{ background: hasBanner ? '#111827' : gradient, borderRadius: 16, padding: '40px 32px 30px', minHeight: 220, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', transition: 'all 0.2s', boxShadow: '0 4px 24px rgba(0,0,0,0.12)', position: 'relative', overflow: 'hidden' }}>
                     {mp.banner_image ? (
                       <img src={mp.banner_image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : mp.banner_svg ? (
@@ -4407,7 +4407,7 @@ export default function ParticipantPortalPage() {
             {upcoming.length > 0 && (
               <div style={{ marginBottom: 24 }}>
                 <h2 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Próxima sesión
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Próxima sesión
                 </h2>
                 <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6' }}>
                   <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#111827', marginBottom: 6 }}>{upcoming[0].title}</div>
@@ -4437,9 +4437,9 @@ export default function ParticipantPortalPage() {
             <div className="stats-grid">
               {[
                 { label: 'Programas activos', value: myPrograms.length, change: 'Inscrito como Mentee', stripe: '#0891b2' },
-                { label: 'Sesiones programadas', value: upcoming.length, change: 'Próximas sesiones', stripe: '#6366f1' },
-                { label: 'Sesiones completadas', value: completed.length, change: 'Total de sesiones: ' + (upcoming.length + completed.length), stripe: '#059669' },
-                { label: 'Empresa', value: companyName || '—', change: 'Mentee', stripe: '#f59e0b' },
+                { label: 'Sesiones programadas', value: upcoming.length, change: 'Próximas sesiones', stripe: '#0891b2' },
+                { label: 'Sesiones completadas', value: completed.length, change: 'Total de sesiones: ' + (upcoming.length + completed.length), stripe: '#0891b2' },
+                { label: 'Empresa', value: companyName || '—', change: 'Mentee', stripe: '#0891b2' },
               ].map((s, i) => (
                 <div key={i} className="stat-card">
                   <div className="stat-card-stripe" style={{ background: s.stripe }} />
