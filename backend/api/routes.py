@@ -376,25 +376,48 @@ def team_chat_history(limit: int = 50, authorization: Optional[str] = Header(Non
 @router.get("/programs", response_model=List[ProgramOut])
 def list_programs(company_id: Optional[str] = None, template_id: Optional[str] = None, authorization: Optional[str] = Header(None)) -> List[dict]:
     from companies.auth_deps import get_current_user, is_admin
-    from programs.models import Activity, ProgramParticipant
+    from programs.models import Activity, ProgramParticipant, ProgramTemplate
     from django.db import close_old_connections
+    from django.db.models import Count
     close_old_connections()
 
     actor = get_current_user(authorization)
     if not is_admin(actor):
         company_id = str(actor.company_id) if actor.company_id else "__none__"
 
-    programs = Program.objects.select_related('company', 'template').all()
+    # NO select_related('template') ni fetch sin .only(): Program.design_snapshot
+    # puede pesar varios MB (medido hasta 8.5MB) y sin .only() el ORM trae la fila
+    # completa — con múltiples programas eso multiplica varios MB por cada carga
+    # de esta lista. Se excluye explícitamente y se resuelve el template aparte,
+    # en una sola consulta liviana para todos los programas (evita N+1).
+    programs = Program.objects.select_related('company').defer('design_snapshot')
     if company_id:
         programs = programs.filter(company_id=company_id)
     if template_id:
         programs = programs.filter(template_id=template_id)
+    programs = list(programs)
+
+    template_ids = {p.template_id for p in programs if p.template_id}
+    templates_by_id = {
+        t['id']: t for t in ProgramTemplate.objects.filter(id__in=template_ids).values('id', 'name', 'slug')
+    }
+
+    program_ids = [p.id for p in programs]
+    all_activities = list(Activity.objects.filter(program_id__in=program_ids))
+    activities_by_program: dict = {}
+    for a in all_activities:
+        activities_by_program.setdefault(a.program_id, []).append(a)
+
+    participants_counts = {
+        row['program_id']: row['total']
+        for row in ProgramParticipant.objects.filter(
+            program_id__in=program_ids, deleted_at__isnull=True
+        ).values('program_id').annotate(total=Count('id'))
+    }
 
     result = []
 
     for p in programs:
-        # Obtener actividades del programa
-        activities = Activity.objects.filter(program=p)
         activities_data = [
             {
                 "id": str(a.id),
@@ -407,15 +430,12 @@ def list_programs(company_id: Optional[str] = None, template_id: Optional[str] =
                 "meeting_url": a.meeting_url,
                 "location_address": a.location_address,
             }
-            for a in activities
+            for a in activities_by_program.get(p.id, [])
         ]
-        
-        # Count participants
-        participants_count = ProgramParticipant.objects.filter(
-            program=p,
-            deleted_at__isnull=True
-        ).count()
-        
+
+        participants_count = participants_counts.get(p.id, 0)
+        template_brief = templates_by_id.get(p.template_id) if p.template_id else None
+
         result.append({
             "id": str(p.id),
             "name": p.name,
@@ -429,10 +449,10 @@ def list_programs(company_id: Optional[str] = None, template_id: Optional[str] =
             } if p.company else None,
             "status": p.status,
             "template": {
-                "id": str(p.template.id),
-                "name": p.template.name,
-                "slug": p.template.slug,
-            } if p.template else None,
+                "id": str(template_brief['id']),
+                "name": template_brief['name'],
+                "slug": template_brief['slug'],
+            } if template_brief else None,
             "cohort_year": p.cohort_year,
             "activities": activities_data,
             "activities_count": len(activities_data),
@@ -742,17 +762,31 @@ def get_program_company_slug(program_id: str) -> dict:
 
 @router.get("/programs/{program_id}", response_model=ProgramOut)
 def get_program(program_id: str, authorization: Optional[str] = Header(None)) -> dict:
-    from django.db import close_old_connections
+    from django.db import close_old_connections, connection
     close_old_connections()
     from companies.auth_deps import get_current_user, require_company_access
-    from programs.models import Activity, Content, ProgramParticipant
+    from programs.models import Activity, Content, ProgramParticipant, ProgramTemplate
     import uuid
 
     actor = get_current_user(authorization)
 
     try:
-        program = Program.objects.select_related('company', 'template').get(id=uuid.UUID(program_id))
+        # OJO: NO usar select_related('template') acá — ProgramTemplate trae
+        # varios JSONField pesados (modules/milestones/matching_rules/etc,
+        # puede pesar varios MB) y solo necesitamos id/name/slug. Mismo bug
+        # que design_snapshot más abajo: traer el objeto completo por un JOIN
+        # multiplica el tamaño de la respuesta y el tiempo de esta consulta.
+        program = Program.objects.select_related('company').only(
+            'id', 'name', 'description', 'theme', 'company_id', 'status',
+            'template_id', 'cohort_year', 'requires_certification',
+            'banner_svg', 'banner_image', 'created_at', 'updated_at',
+            'company__id', 'company__name', 'company__slug',
+        ).get(id=uuid.UUID(program_id))
         require_company_access(actor, program.company_id)
+
+        template_brief = None
+        if program.template_id:
+            template_brief = ProgramTemplate.objects.filter(id=program.template_id).values('id', 'name', 'slug').first()
 
         # Obtener actividades del programa
         activities = list(Activity.objects.filter(program=program))
@@ -818,7 +852,35 @@ def get_program(program_id: str, authorization: Optional[str] = Header(None)) ->
         participants_count = ProgramParticipant.objects.filter(
             program=program, deleted_at__isnull=True
         ).count()
-        
+
+        # design_snapshot es una copia congelada del diseño de la plantilla al
+        # crear el programa — puede pesar varios MB (medido hasta 8.5MB, con
+        # recursos/archivos embebidos por módulo). Traer la columna completa
+        # con el ORM (incluso con .only(), incluso solo para descartarla
+        # después) fuerza a Postgres a leer y transferir el blob entero,
+        # costando ~2-3s por sí solo. Acá se le pide a Postgres que extraiga
+        # SOLO los nombres de módulos y el conteo de hitos — lo único que usa
+        # el resumen del programa — sin nunca traer el blob completo a Django.
+        with connection.cursor() as _cur:
+            _cur.execute(
+                """
+                SELECT
+                  COALESCE(jsonb_path_query_array(design_snapshot, '$.modules[*].name'), '[]'::jsonb),
+                  jsonb_array_length(COALESCE(design_snapshot->'milestones', '[]'::jsonb))
+                FROM programs_program WHERE id = %s
+                """,
+                [str(program.id)],
+            )
+            _snap_row = _cur.fetchone()
+        _module_names = _snap_row[0] if _snap_row else []
+        if isinstance(_module_names, str):
+            import json as _json
+            _module_names = _json.loads(_module_names)
+        design_snapshot_brief = {
+            "modules": [{"name": n} for n in (_module_names or [])],
+            "milestones": [{} for _ in range(_snap_row[1] if _snap_row else 0)],
+        }
+
         return {
             "id": str(program.id),
             "name": program.name,
@@ -832,12 +894,12 @@ def get_program(program_id: str, authorization: Optional[str] = Header(None)) ->
             } if program.company else None,
             "status": program.status,
             "template": {
-                "id": str(program.template.id),
-                "name": program.template.name,
-                "slug": program.template.slug,
-            } if program.template else None,
+                "id": str(template_brief["id"]),
+                "name": template_brief["name"],
+                "slug": template_brief["slug"],
+            } if template_brief else None,
             "cohort_year": program.cohort_year,
-            "design_snapshot": program.design_snapshot or {},
+            "design_snapshot": design_snapshot_brief,
             "activities": activities_data,
             "activities_count": len(activities_data),
             "participants_count": participants_count,
