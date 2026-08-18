@@ -236,17 +236,19 @@ export default function ProgramPreviewView({
         style={
           variant === "portal"
             ? {
-                background: "#fff",
-                border: "1px solid #eef1f4",
+                background: "linear-gradient(180deg, #f0fbfd 0%, #ffffff 220px)",
+                border: "1px solid #e5f2f4",
+                borderTop: "4px solid #0891b2",
                 margin: "4px 24px 0",
                 borderRadius: 20,
-                padding: "32px 32px 28px",
-                boxShadow: "0 1px 3px rgba(15,23,42,.04)",
+                padding: "30px 32px 28px",
+                boxShadow: "0 4px 20px rgba(15,23,42,.05)",
               }
             : { background: heroBg }
         }
       >
         <div className="hero-in">
+          {variant === "portal" && <div className="hero-badge-deco">{I.book}</div>}
           <div className="row gap12 ai-c mb20">
             <span className="cat-pill">{cat.label}</span>
             <code className="slug-code">/{template.slug}</code>
@@ -865,13 +867,15 @@ const CSS = `
 .tag{padding:4px 14px;border-radius:20px;font-size:13px;font-weight:500;background:rgba(255,255,255,.15);color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.1)}
 
 /* hero — portal light variant (más UX de plataforma, sin bloque de color sólido) */
+.hero-light{position:relative}
+.hero-badge-deco{position:absolute;top:30px;right:32px;width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#0891b2,#06b6d4);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 6px 16px rgba(8,145,178,.28)}
 .hero-light .hero-title{color:#0f172a}
 .hero-light .hero-desc{color:#64748b}
-.hero-light .cat-pill{background:#ecfeff;color:#0e7490;backdrop-filter:none}
+.hero-light .cat-pill{background:#cffafe;color:#0e7490;font-weight:700;backdrop-filter:none}
 .hero-light .slug-code{color:#94a3b8}
-.hero-light .stat-card{background:#f8fafc;border:1px solid #e2e8f0;backdrop-filter:none}
-.hero-light .stat-card:hover{background:#f1f5f9}
-.hero-light .stat-icon{color:#0891b2;opacity:1}
+.hero-light .stat-card{background:#fff;border:1px solid #e2e8f0;backdrop-filter:none;box-shadow:0 1px 2px rgba(15,23,42,.03)}
+.hero-light .stat-card:hover{border-color:#a5e6ef;box-shadow:0 4px 12px rgba(8,145,178,.08)}
+.hero-light .stat-icon{color:#0891b2;opacity:1;width:36px;height:36px;border-radius:10px;background:#ecfeff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .hero-light .stat-lbl{color:#94a3b8}
 .hero-light .stat-val{color:#0f172a}
 .hero-light .tag{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}
