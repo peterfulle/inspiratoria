@@ -231,47 +231,60 @@ export default function ProgramPreviewView({
       )}
 
       {/* HERO */}
-      <section
-        className={`hero${variant === "portal" ? " hero-light" : ""}`}
-        style={
-          variant === "portal"
-            ? {
-                background: "linear-gradient(180deg, #f0fbfd 0%, #ffffff 220px)",
-                border: "1px solid #e5f2f4",
-                borderTop: "4px solid #0891b2",
-                margin: "4px 24px 0",
-                borderRadius: 20,
-                padding: "30px 32px 28px",
-                boxShadow: "0 4px 20px rgba(15,23,42,.05)",
-              }
-            : { background: heroBg }
-        }
-      >
-        <div className="hero-in">
-          {variant === "portal" && <div className="hero-badge-deco">{I.book}</div>}
-          <div className="row gap12 ai-c mb20">
-            <span className="cat-pill">{cat.label}</span>
-            <code className="slug-code">/{template.slug}</code>
-          </div>
-          <h1 className="hero-title">{template.name}</h1>
-          <p className="hero-desc">{template.description}</p>
-
-          <div className="stats-row">
-            {stats.map(s => (
-              <div key={s.label} className="stat-card">
-                <div className="stat-icon">{s.icon}</div>
-                <div><div className="stat-lbl">{s.label}</div><div className="stat-val">{s.val}</div></div>
+      {variant === "portal" ? (
+        <div className="pv-header">
+          <div className="pv-header-row">
+            <div>
+              <div className="row gap8 ai-c mb6">
+                <span className="pv-pill">{cat.label}</span>
+                <code className="pv-slug">/{template.slug}</code>
               </div>
-            ))}
-          </div>
-
-          {template.tags.length > 0 && (
-            <div className="tags-row">
-              {template.tags.map(t => <span key={t} className="tag">#{t}</span>)}
+              <h1 className="pv-title">{template.name}</h1>
+              <p className="pv-desc">{template.description}</p>
+              {template.tags.length > 0 && (
+                <div className="tags-row" style={{ marginTop: 14 }}>
+                  {template.tags.map(t => <span key={t} className="pv-tag">#{t}</span>)}
+                </div>
+              )}
             </div>
-          )}
+            <div className="pv-stats-row">
+              {stats.map(s => (
+                <div key={s.label} className="pv-stat">
+                  <div className="pv-stat-icon">{s.icon}</div>
+                  <div className="pv-stat-label">{s.label}</div>
+                  <div className="pv-stat-value">{s.val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-      </section>
+      ) : (
+        <section className="hero" style={{ background: heroBg }}>
+          <div className="hero-in">
+            <div className="row gap12 ai-c mb20">
+              <span className="cat-pill">{cat.label}</span>
+              <code className="slug-code">/{template.slug}</code>
+            </div>
+            <h1 className="hero-title">{template.name}</h1>
+            <p className="hero-desc">{template.description}</p>
+
+            <div className="stats-row">
+              {stats.map(s => (
+                <div key={s.label} className="stat-card">
+                  <div className="stat-icon">{s.icon}</div>
+                  <div><div className="stat-lbl">{s.label}</div><div className="stat-val">{s.val}</div></div>
+                </div>
+              ))}
+            </div>
+
+            {template.tags.length > 0 && (
+              <div className="tags-row">
+                {template.tags.map(t => <span key={t} className="tag">#{t}</span>)}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* PROGRAMAS ASIGNADOS (instancias reales de esta plantilla) */}
       {showAssignedPrograms && (
@@ -866,19 +879,20 @@ const CSS = `
 .tags-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
 .tag{padding:4px 14px;border-radius:20px;font-size:13px;font-weight:500;background:rgba(255,255,255,.15);color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.1)}
 
-/* hero — portal light variant (más UX de plataforma, sin bloque de color sólido) */
-.hero-light{position:relative}
-.hero-badge-deco{position:absolute;top:30px;right:32px;width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#0891b2,#06b6d4);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 6px 16px rgba(8,145,178,.28)}
-.hero-light .hero-title{color:#0f172a}
-.hero-light .hero-desc{color:#64748b}
-.hero-light .cat-pill{background:#cffafe;color:#0e7490;font-weight:700;backdrop-filter:none}
-.hero-light .slug-code{color:#94a3b8}
-.hero-light .stat-card{background:#fff;border:1px solid #e2e8f0;backdrop-filter:none;box-shadow:0 1px 2px rgba(15,23,42,.03)}
-.hero-light .stat-card:hover{border-color:#a5e6ef;box-shadow:0 4px 12px rgba(8,145,178,.08)}
-.hero-light .stat-icon{color:#0891b2;opacity:1;width:36px;height:36px;border-radius:10px;background:#ecfeff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.hero-light .stat-lbl{color:#94a3b8}
-.hero-light .stat-val{color:#0f172a}
-.hero-light .tag{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}
+/* pv-header — header nativo del portal (mismo lenguaje visual que Home/Ecosistema, sin banner) */
+.pv-header{padding:20px 24px 0}
+.pv-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.pv-pill{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:#f4f5f6;color:#52525b;border:1px solid #ececec;white-space:nowrap}
+.pv-slug{font-size:13px;color:#9ca3af;font-family:monospace}
+.pv-title{font-size:22px;font-weight:700;color:#111827;letter-spacing:-.02em;margin:0 0 6px}
+.pv-desc{font-size:14px;color:#6b7280;line-height:1.6;max-width:640px}
+.pv-tag{padding:4px 14px;border-radius:20px;font-size:12px;font-weight:500;background:#f4f5f6;color:#52525b;border:1px solid #ececec}
+.pv-stats-row{display:flex;flex-wrap:wrap;gap:10px;flex-shrink:0}
+.pv-stat{background:#fff;border:1px solid #eef0f2;border-radius:14px;padding:10px 18px;min-width:132px;position:relative;box-shadow:0 1px 2px rgba(15,23,42,.03)}
+.pv-stat-icon{position:absolute;right:14px;top:12px;color:#c3ccd6}
+.pv-stat-label{font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;padding-right:20px;white-space:nowrap}
+.pv-stat-value{font-size:18px;font-weight:800;color:#111827}
+@media(max-width:900px){.pv-stats-row{width:100%}.pv-stat{flex:1;min-width:96px}}
 
 /* tabs */
 .tabs-bar{background:#fff;border-bottom:1px solid #e2e8f0;position:sticky;top:49px;z-index:40}
