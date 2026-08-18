@@ -232,16 +232,16 @@ export default function ProgramPreviewView({
 
       {/* HERO */}
       <section
-        className="hero"
+        className={`hero${variant === "portal" ? " hero-light" : ""}`}
         style={
           variant === "portal"
             ? {
-                background: `linear-gradient(135deg, rgba(14,116,144,.92), rgba(8,145,178,.92)), url(/sqmentors/fondo1.jpeg)`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
+                background: "#fff",
+                border: "1px solid #eef1f4",
                 margin: "4px 24px 0",
                 borderRadius: 20,
-                padding: "40px 32px 36px",
+                padding: "32px 32px 28px",
+                boxShadow: "0 1px 3px rgba(15,23,42,.04)",
               }
             : { background: heroBg }
         }
@@ -863,6 +863,18 @@ const CSS = `
 .stat-val{font-size:22px;font-weight:800;margin-top:2px}
 .tags-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
 .tag{padding:4px 14px;border-radius:20px;font-size:13px;font-weight:500;background:rgba(255,255,255,.15);color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.1)}
+
+/* hero — portal light variant (más UX de plataforma, sin bloque de color sólido) */
+.hero-light .hero-title{color:#0f172a}
+.hero-light .hero-desc{color:#64748b}
+.hero-light .cat-pill{background:#ecfeff;color:#0e7490;backdrop-filter:none}
+.hero-light .slug-code{color:#94a3b8}
+.hero-light .stat-card{background:#f8fafc;border:1px solid #e2e8f0;backdrop-filter:none}
+.hero-light .stat-card:hover{background:#f1f5f9}
+.hero-light .stat-icon{color:#0891b2;opacity:1}
+.hero-light .stat-lbl{color:#94a3b8}
+.hero-light .stat-val{color:#0f172a}
+.hero-light .tag{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}
 
 /* tabs */
 .tabs-bar{background:#fff;border-bottom:1px solid #e2e8f0;position:sticky;top:49px;z-index:40}
