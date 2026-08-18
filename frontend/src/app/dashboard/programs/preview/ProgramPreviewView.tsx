@@ -887,12 +887,13 @@ const CSS = `
 .pv-title{font-size:22px;font-weight:700;color:#111827;letter-spacing:-.02em;margin:0 0 6px}
 .pv-desc{font-size:14px;color:#6b7280;line-height:1.6;max-width:640px}
 .pv-tag{padding:4px 14px;border-radius:20px;font-size:12px;font-weight:500;background:#f4f5f6;color:#52525b;border:1px solid #ececec}
-.pv-stats-row{display:flex;flex-wrap:wrap;gap:10px;flex-shrink:0}
-.pv-stat{background:#fff;border:1px solid #eef0f2;border-radius:14px;padding:10px 18px;min-width:132px;position:relative;box-shadow:0 1px 2px rgba(15,23,42,.03)}
+.pv-stats-row{display:grid;grid-template-columns:repeat(6,minmax(112px,1fr));gap:10px;flex-shrink:0}
+.pv-stat{background:#fff;border:1px solid #eef0f2;border-radius:14px;padding:10px 16px;position:relative;box-shadow:0 1px 2px rgba(15,23,42,.03)}
 .pv-stat-icon{position:absolute;right:14px;top:12px;color:#c3ccd6}
-.pv-stat-label{font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;padding-right:20px;white-space:nowrap}
+.pv-stat-label{font-size:10.5px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px;padding-right:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pv-stat-value{font-size:18px;font-weight:800;color:#111827}
-@media(max-width:900px){.pv-stats-row{width:100%}.pv-stat{flex:1;min-width:96px}}
+@media(max-width:900px){.pv-stats-row{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:520px){.pv-stats-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* tabs */
 .tabs-bar{background:#fff;border-bottom:1px solid #e2e8f0;position:sticky;top:49px;z-index:40}
