@@ -1977,12 +1977,46 @@ def _generate_otp() -> str:
     return ''.join(random.choices(string.digits, k=4))
 
 
+INSPIRATORIA_LOGO_CID = "inspiratoria_logo"
+
+
+def send_branded_html_email(subject: str, plain_message: str, html_message: str, to_email: str) -> None:
+    """Envía un email HTML con el logo de Inspiratoria incrustado como adjunto
+    inline (CID) en vez de una <img> apuntando a una URL remota. La mayoría de
+    clientes de correo bloquean imágenes remotas por defecto en el primer
+    envío ("mostrar imágenes"), lo que hacía que el logo apareciera roto o
+    invisible — un adjunto inline no depende de esa carga externa.
+    El html_message debe referenciar el logo como src="cid:{INSPIRATORIA_LOGO_CID}".
+    """
+    from django.core.mail import EmailMultiAlternatives
+    from email.mime.image import MIMEImage
+    from pathlib import Path
+
+    msg = EmailMultiAlternatives(
+        subject=subject,
+        body=plain_message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[to_email],
+    )
+    msg.attach_alternative(html_message, "text/html")
+    msg.mixed_subtype = "related"
+
+    logo_path = Path(settings.BASE_DIR) / "static" / "email" / "logo.png"
+    if logo_path.exists():
+        with open(logo_path, "rb") as f:
+            logo_image = MIMEImage(f.read())
+        logo_image.add_header("Content-ID", f"<{INSPIRATORIA_LOGO_CID}>")
+        logo_image.add_header("Content-Disposition", "inline", filename="logo.png")
+        msg.attach(logo_image)
+
+    msg.send(fail_silently=False)
+
+
 def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bool = False, activation_token: str = ""):
     """Envía email con código OTP — diseño minimalista blanco Inspiratoria"""
     import urllib.parse
     encoded_email = urllib.parse.quote(user_email)
     frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-    logo_url = f"{frontend_url}/images/logo.png"
     if activation_token:
         login_link = f"{frontend_url}/activate/{activation_token}"
     else:
@@ -2062,7 +2096,7 @@ def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bo
 
         <!-- Logo -->
         <div style="text-align:center;padding-bottom:32px;">
-          <img src="{logo_url}" alt="Inspiratoria" style="height:36px;width:auto;" />
+          <img src="cid:{INSPIRATORIA_LOGO_CID}" alt="Inspiratoria" style="height:36px;width:auto;" />
         </div>
 
         <!-- Card -->
@@ -2109,14 +2143,7 @@ def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bo
       </div>
     </div>
     """
-    send_mail(
-        subject=subject,
-        message=plain_message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user_email],
-        html_message=html_message,
-        fail_silently=False,
-    )
+    send_branded_html_email(subject, plain_message, html_message, user_email)
 
 
 def _send_corp_admin_invite_email(user_email: str, user_name: str, company_name: str, otp_code: str, activation_token: str):

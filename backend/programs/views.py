@@ -16,6 +16,7 @@ from django.utils import timezone
 from django.db import models as db_models
 
 from companies.models import User
+from companies.views import send_branded_html_email, INSPIRATORIA_LOGO_CID
 from .models import Program, ProgramParticipant, Vinculation, AuditLog
 
 router = APIRouter(prefix="/programs", tags=["Programs"])
@@ -76,7 +77,6 @@ def send_participant_access_email(user: User, otp_code: str, activation_token: s
     """Envía el email de bienvenida al programa, con logo real e instrucciones de acceso."""
     frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
     activation_link = f"{frontend_url}/activate/{activation_token}"
-    logo_url = f"{frontend_url}/images/logo.png"
 
     first_name = (user.full_name or user.first_name or "participante").split()[0]
     d1, d2, d3, d4 = otp_code[0], otp_code[1], otp_code[2], otp_code[3]
@@ -127,7 +127,7 @@ def send_participant_access_email(user: User, otp_code: str, activation_token: s
     <div style="background-color:#f9fafb;padding:40px 16px;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
       <div style="max-width:520px;margin:0 auto;">
         <div style="text-align:center;padding-bottom:32px;">
-          <img src="{logo_url}" alt="Inspiratoria" style="height:36px;width:auto;" />
+          <img src="cid:{INSPIRATORIA_LOGO_CID}" alt="Inspiratoria" style="height:36px;width:auto;" />
         </div>
         <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:40px 36px;">
           <p style="margin:0 0 24px 0;color:#111827;font-size:17px;font-weight:500;">
@@ -173,14 +173,7 @@ def send_participant_access_email(user: User, otp_code: str, activation_token: s
     """
 
     try:
-        send_mail(
-            subject=subject,
-            message=plain_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            html_message=html_message,
-            fail_silently=False,
-        )
+        send_branded_html_email(subject, plain_message, html_message, user.email)
         print(f"[PARTICIPANT EMAIL] Enviado a {user.email}")
     except Exception as e:
         print(f"[PARTICIPANT EMAIL ERROR] No se pudo enviar a {user.email}: {e}")
@@ -371,7 +364,9 @@ class UserSearchResult(BaseModel):
     role: str
     company: Optional[str] = None
     is_onboarded: bool
-    
+    avatar_url: str = ""
+    profile_complete: bool = False
+
     class Config:
         from_attributes = True
 
@@ -414,6 +409,7 @@ class ParticipantResponse(BaseModel):
     invitation_sent_at: Optional[datetime] = None
     activated_at: Optional[datetime] = None
     last_access_at: Optional[datetime] = None
+    last_portal_access_at: Optional[datetime] = None
     configuration: Dict[str, Any] = {}
     created_at: datetime
     updated_at: datetime
@@ -748,6 +744,8 @@ async def list_participants(
                     "role": p.user.role,
                     "company": p.user.company.name if p.user.company else None,
                     "is_onboarded": p.user.is_onboarded,
+                    "avatar_url": getattr(p.user, 'avatar_url', '') or "",
+                    "profile_complete": bool(getattr(p.user, 'avatar_url', '')) and bool(getattr(p.user, 'skills', None)),
                 },
                 "program_id": str(program.id),
                 "role": p.role,
@@ -755,6 +753,7 @@ async def list_participants(
                 "invitation_sent_at": p.invitation_sent_at,
                 "activated_at": p.activated_at,
                 "last_access_at": p.last_access_at,
+                "last_portal_access_at": p.last_portal_access_at,
                 "configuration": p.configuration or {},
                 "created_at": p.created_at,
                 "updated_at": p.updated_at,

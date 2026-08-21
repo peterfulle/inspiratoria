@@ -385,9 +385,21 @@ def score_pair(mentor: User, mentee: User) -> Dict[str, Any]:
     else:
         band = "Bajo"
 
+    mentor_strength = _profile_strength(m)
+    mentee_strength = _profile_strength(e)
+    has_profile = mentor_strength > 0 and mentee_strength > 0
+    if not has_profile:
+        who = []
+        if mentor_strength == 0:
+            who.append("el mentor")
+        if mentee_strength == 0:
+            who.append("el mentee")
+        reasons = [f"Aún no se puede calcular un match real: {' y '.join(who)} no ha completado su perfil todavía."]
+
     return {
         "score": min(100.0, final_total),
-        "score_band": band,
+        "has_profile": has_profile,
+        "score_band": band if has_profile else "Sin perfil",
         "coverage_pct": round(coverage * 100),
         "applicable_dimensions": [k for k, v in breakdown.items() if v["applicable"]],
         "unavailable_dimensions": [k for k, v in breakdown.items() if not v["applicable"]],

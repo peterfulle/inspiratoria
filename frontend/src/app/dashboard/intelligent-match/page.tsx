@@ -17,6 +17,7 @@ interface Breakdown {
 
 interface MatchResult {
   score: number;
+  has_profile?: boolean;
   score_band: string;
   coverage_pct: number;
   applicable_dimensions: string[];
@@ -52,7 +53,8 @@ interface Program {
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
-const scoreColor = (s: number) => {
+const scoreColor = (s: number, hasProfile: boolean = true) => {
+  if (!hasProfile) return { bg: "bg-gray-100", border: "border-gray-200", text: "text-gray-500", bar: "bg-gray-300" };
   if (s >= 70) return { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", bar: "bg-emerald-500" };
   if (s >= 50) return { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", bar: "bg-amber-500" };
   if (s >= 30) return { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", bar: "bg-orange-500" };
@@ -322,10 +324,15 @@ export default function IntelligentMatchPage() {
 
   const summary = useMemo(() => {
     if (!results.length) return null;
-    const scores = results.map((r) => r.score);
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    // El promedio y "match alto" solo consideran duplas con perfil completo
+    // de ambos lados — mezclar scores reales con los de perfiles vacíos
+    // (que siempre puntúan ~0) hacía bajar el promedio de forma engañosa.
+    const withProfile = results.filter((r) => r.has_profile !== false);
+    const scores = withProfile.map((r) => r.score);
+    const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
     const high = scores.filter((s) => s >= 70).length;
-    return { avg: avg.toFixed(1), high, total: scores.length };
+    const noProfile = results.length - withProfile.length;
+    return { avg: avg.toFixed(1), high, total: scores.length, noProfile };
   }, [results]);
 
   if (!user) return null;
@@ -478,7 +485,7 @@ export default function IntelligentMatchPage() {
 
         {/* Summary */}
         {summary && (
-          <section className="grid grid-cols-3 gap-4">
+          <section className="grid grid-cols-4 gap-4">
             <div className="rounded-2xl border border-gray-200 bg-white p-5">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Suggesties</p>
               <p className="mt-2 text-3xl font-bold text-gray-900">{summary.total}</p>
@@ -494,6 +501,11 @@ export default function IntelligentMatchPage() {
               <p className="mt-2 text-3xl font-bold text-emerald-600">{summary.high}</p>
               <p className="text-xs text-gray-500">recomendados directamente</p>
             </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Sin perfil</p>
+              <p className="mt-2 text-3xl font-bold text-gray-400">{summary.noProfile}</p>
+              <p className="text-xs text-gray-500">mentor y/o mentee sin completar</p>
+            </div>
           </section>
         )}
 
@@ -501,7 +513,8 @@ export default function IntelligentMatchPage() {
         {results.length > 0 && (
           <section className="space-y-4">
             {results.map((r, idx) => {
-              const c = scoreColor(r.score);
+              const hasProfile = r.has_profile !== false;
+              const c = scoreColor(r.score, hasProfile);
               return (
                 <div
                   key={`${r.mentor.id}-${r.mentee.id}`}
@@ -527,9 +540,15 @@ export default function IntelligentMatchPage() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <div className={`rounded-xl ${c.bg} px-4 py-2 text-right`}>
-                        <p className={`text-2xl font-bold ${c.text}`}>{r.score.toFixed(1)}</p>
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">/ 100</p>
+                      <div className={`rounded-xl ${c.bg} px-4 py-2 text-right`} title={hasProfile ? undefined : 'Mentor y/o mentee aún no completaron su perfil — el score no es representativo todavía'}>
+                        {hasProfile ? (
+                          <>
+                            <p className={`text-2xl font-bold ${c.text}`}>{r.score.toFixed(1)}</p>
+                            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">/ 100</p>
+                          </>
+                        ) : (
+                          <p className={`text-sm font-bold ${c.text}`}>Sin perfil</p>
+                        )}
                       </div>
                       {(() => {
                         const key = `${r.mentor.id}-${r.mentee.id}`;

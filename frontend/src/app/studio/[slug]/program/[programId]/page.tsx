@@ -45,8 +45,9 @@ interface ProgramDetail {
 }
 interface Participant {
   id: string;
-  user: { id: string; nombre: string; apellidos: string; full_name: string; email: string; telefono: string; avatar_url: string; headline: string; };
+  user: { id: string; nombre: string; apellidos: string; full_name: string; email: string; telefono: string; avatar_url: string; headline: string; profile_complete?: boolean; };
   role: string; status: string; invitation_sent_at: string | null; activated_at: string | null; created_at: string | null;
+  last_portal_access_at?: string | null;
 }
 interface PM { id: string; full_name: string; email: string; role: string; avatar_url: string; }
 interface AssignedPM { id: string; full_name: string; email: string; role: string; avatar_url: string; phone?: string; position?: string; }
@@ -2160,6 +2161,7 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
   const [showAdd, setShowAdd] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showStatus, setShowStatus] = useState(false);
   const [enrollLink, setEnrollLink] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewingId, setPreviewingId] = useState<string | null>(null);
@@ -2193,6 +2195,8 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
     others: participants.filter(p => !['mentor', 'mentee', 'facilitator'].includes(p.role)).length,
     pending: participants.filter(p => p.status === 'pending').length,
     active: participants.filter(p => p.status === 'active').length,
+    loggedIn: participants.filter(p => !!p.last_portal_access_at).length,
+    noProfile: participants.filter(p => !p.user.profile_complete).length,
   };
 
   const filtered = participants.filter(p => {
@@ -2257,13 +2261,14 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
         {[
           { label: 'Total', value: stats.total, color: 'text-zinc-900' },
           { label: 'Mentores', value: stats.mentors, color: 'text-zinc-900' },
           { label: 'Mentees', value: stats.mentees, color: 'text-sky-700' },
           { label: 'Facilitadores', value: stats.facilitators, color: 'text-amber-700' },
           { label: 'Pendientes', value: stats.pending, color: 'text-orange-600' },
+          { label: 'Sin perfil', value: stats.noProfile, color: 'text-rose-600' },
         ].map(s => (
           <div key={s.label} className="bg-white border border-zinc-200 rounded-xl p-3">
             <div className={`text-2xl font-extrabold ${s.color}`}>{s.value}</div>
@@ -2299,6 +2304,9 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
                 </button>
               ))}
             </div>
+            <button onClick={() => setShowStatus(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:border-zinc-300 hover:bg-zinc-50 transition">
+              <I.Activity className="w-3.5 h-3.5" /> Status
+            </button>
             <button onClick={() => setShowHistory(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-[12px] font-semibold hover:border-zinc-300 hover:bg-zinc-50 transition">
               <I.Clock className="w-3.5 h-3.5" /> Histórico
             </button>
@@ -2407,6 +2415,71 @@ function TabParticipantes({ participants, programId, onChange, showToast }: { pa
           onClose={() => setShowHistory(false)}
         />
       )}
+
+      {showStatus && (
+        <StatusModal
+          participants={participants}
+          onClose={() => setShowStatus(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function StatusModal({ participants, onClose }: { participants: Participant[]; onClose: () => void }) {
+  const rows = [...participants].sort((a, b) => (a.user.full_name || a.user.email).localeCompare(b.user.full_name || b.user.email));
+  const loggedInCount = rows.filter(p => !!p.last_portal_access_at).length;
+  const profileCount = rows.filter(p => !!p.user.profile_complete).length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl border border-zinc-200 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-zinc-100 flex-shrink-0">
+          <div>
+            <h3 className="text-base font-bold text-zinc-900">Status de participantes</h3>
+            <p className="text-[11.5px] text-zinc-500 mt-0.5">
+              {loggedInCount}/{rows.length} iniciaron sesión · {profileCount}/{rows.length} con perfil completo (foto + competencias)
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition"><I.Close className="w-4 h-4" /></button>
+        </div>
+
+        <div className="p-5 overflow-y-auto">
+          {rows.length === 0 ? (
+            <Empty msg="No hay participantes en este programa" icon={<I.Activity />} />
+          ) : (
+            <div className="divide-y divide-zinc-100">
+              {rows.map(p => {
+                const name = p.user.full_name || p.user.email;
+                const loggedIn = !!p.last_portal_access_at;
+                const profileOk = !!p.user.profile_complete;
+                return (
+                  <div key={p.id} className="flex items-center gap-3 py-2.5">
+                    <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center flex-shrink-0 overflow-hidden text-[11px] font-bold text-zinc-600">
+                      {p.user.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.user.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        name.charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12.5px] font-semibold text-zinc-900 truncate">{name}</div>
+                      <div className="text-[11px] text-zinc-400 truncate">{p.user.email} · {PARTICIPANT_ROLE_LABEL[p.role] || p.role}</div>
+                    </div>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10.5px] font-bold flex-shrink-0 ${loggedIn ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
+                      {loggedIn ? 'Inició sesión' : 'Sin sesión'}
+                    </span>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10.5px] font-bold flex-shrink-0 ${profileOk ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
+                      {profileOk ? 'Perfil OK' : 'Sin perfil'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2667,9 +2740,18 @@ function MatchDetail({ r }: { r: any }) {
   const bd: Record<string, any> = r.breakdown || {};
   const dims = Object.values(bd);
   const coverage = r.coverage_pct ?? 0;
+  const hasProfile = r.has_profile !== false;
   return (
     <div className="px-5 pb-4">
       <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 grid lg:grid-cols-2 gap-x-6 gap-y-4">
+        {!hasProfile && (
+          <div className="lg:col-span-2 rounded-lg px-3.5 py-2.5 bg-amber-50 border border-amber-200 flex items-start gap-2.5">
+            <svg className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <div className="text-[11px] text-amber-900 leading-relaxed">
+              <span className="font-semibold">Sin score real todavía.</span> El mentor y/o el mentee no completaron su perfil (foto + competencias), así que este número no es representativo — pídeles completarlo antes de usar este resultado para emparejar.
+            </div>
+          </div>
+        )}
         {/* Cómo se calcula */}
         <div className="lg:col-span-2 rounded-lg px-3.5 py-2.5 bg-blue-50/60 border border-blue-100 flex items-start gap-2.5">
           <svg className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
@@ -2747,7 +2829,8 @@ function MatchDetail({ r }: { r: any }) {
 // Modal moderno con el detalle completo del match (mismo contenido que el panel expandible)
 function MatchPreviewModal({ r, onClose }: { r: any; onClose: () => void }) {
   const s = r.score || 0;
-  const c = s >= 65 ? { color: '#16a34a', bg: '#dcfce7' } : s >= 45 ? { color: '#d97706', bg: '#fef3c7' } : { color: '#dc2626', bg: '#fee2e2' };
+  const hasProfile = r.has_profile !== false;
+  const c = !hasProfile ? { color: '#71717a', bg: '#f4f4f5' } : s >= 65 ? { color: '#16a34a', bg: '#dcfce7' } : s >= 45 ? { color: '#d97706', bg: '#fef3c7' } : { color: '#dc2626', bg: '#fee2e2' };
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -2758,7 +2841,7 @@ function MatchPreviewModal({ r, onClose }: { r: any; onClose: () => void }) {
       <div className="bg-white rounded-2xl border border-zinc-200 shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-zinc-100 flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold flex-shrink-0" style={{ background: c.bg, color: c.color }}>{s.toFixed(0)} pts</span>
+            <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold flex-shrink-0" style={{ background: c.bg, color: c.color }}>{hasProfile ? `${s.toFixed(0)} pts` : 'Sin perfil'}</span>
             <div className="min-w-0">
               <h3 className="text-base font-bold text-zinc-900 truncate">{r.mentor?.name || '—'} <span className="text-zinc-300 font-normal mx-0.5">↔</span> {r.mentee?.name || '—'}</h3>
               <p className="text-[11.5px] text-zinc-500 mt-0.5">Vista previa del match · análisis completo</p>
@@ -3348,7 +3431,8 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
               const key = `${r.mentor?.id}-${r.mentee?.id}`;
               const act = activations[key];
               const alreadyActive = vincs.some((v: any) => (v.mentor?.id === r.mentor?.id) && (v.mentee?.id === r.mentee?.id));
-              const c = sc(r.score || 0);
+              const hasProfile = r.has_profile !== false;
+              const c = hasProfile ? sc(r.score || 0) : { color: '#71717a', bg: '#f4f4f5' };
               const expanded = expandedAI[key];
               return (
                 <div key={key} className={`${idx > 0 ? 'border-t border-zinc-50' : ''}`}>
@@ -3363,7 +3447,9 @@ function TabDuplas({ programId, participants, showToast }: { programId: string; 
                       <p className="text-[13px] font-semibold text-zinc-900 truncate">{r.mentee?.name || '—'}</p>
                       <p className="text-[11px] text-zinc-400 truncate">{r.mentee?.headline || r.mentee?.email || ''}</p>
                     </div>
-                    <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold flex-shrink-0" style={{ background: c.bg, color: c.color }}>{(r.score || 0).toFixed(0)} pts</span>
+                    <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold flex-shrink-0" style={{ background: c.bg, color: c.color }} title={hasProfile ? undefined : 'Mentor y/o mentee aún no completaron su perfil — el score no es representativo todavía'}>
+                      {hasProfile ? `${(r.score || 0).toFixed(0)} pts` : 'Sin perfil'}
+                    </span>
                     <div className="flex-shrink-0">
                       {alreadyActive || act === 'done' ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10.5px] font-bold text-emerald-700 ring-1 ring-emerald-200 whitespace-nowrap"><I.Check className="w-3 h-3" />Activa</span>
