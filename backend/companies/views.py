@@ -1980,7 +1980,7 @@ def _generate_otp() -> str:
 INSPIRATORIA_LOGO_CID = "inspiratoria_logo"
 
 
-def send_branded_html_email(subject: str, plain_message: str, html_message: str, to_email: str) -> None:
+def send_branded_html_email(subject: str, plain_message: str, html_message: str, to_email: str, cc: list[str] | None = None) -> None:
     """Envía un email HTML con el logo de Inspiratoria incrustado como adjunto
     inline (CID) en vez de una <img> apuntando a una URL remota. La mayoría de
     clientes de correo bloquean imágenes remotas por defecto en el primer
@@ -1997,6 +1997,7 @@ def send_branded_html_email(subject: str, plain_message: str, html_message: str,
         body=plain_message,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[to_email],
+        cc=cc or [],
     )
     msg.attach_alternative(html_message, "text/html")
     msg.mixed_subtype = "related"

@@ -73,7 +73,7 @@ PARTICIPANT_ROLE_LABELS = {
 }
 
 
-def send_participant_access_email(user: User, otp_code: str, activation_token: str, program: "Program | None" = None, role: str = ""):
+def send_participant_access_email(user: User, otp_code: str, activation_token: str, program: "Program | None" = None, role: str = "", cc: list | None = None):
     """Envía el email de bienvenida al programa, con logo real e instrucciones de acceso."""
     frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
     activation_link = f"{frontend_url}/activate/{activation_token}"
@@ -173,13 +173,13 @@ def send_participant_access_email(user: User, otp_code: str, activation_token: s
     """
 
     try:
-        send_branded_html_email(subject, plain_message, html_message, user.email)
+        send_branded_html_email(subject, plain_message, html_message, user.email, cc=cc)
         print(f"[PARTICIPANT EMAIL] Enviado a {user.email}")
     except Exception as e:
         print(f"[PARTICIPANT EMAIL ERROR] No se pudo enviar a {user.email}: {e}")
 
 
-def prepare_user_secure_access(user: User, send_invitation: bool, program: "Program | None" = None, role: str = ""):
+def prepare_user_secure_access(user: User, send_invitation: bool, program: "Program | None" = None, role: str = "", cc: list | None = None):
     if not send_invitation:
         return
 
@@ -201,7 +201,7 @@ def prepare_user_secure_access(user: User, send_invitation: bool, program: "Prog
         "is_onboarded",
     ])
 
-    send_participant_access_email(user, otp_code, activation_token, program=program, role=role)
+    send_participant_access_email(user, otp_code, activation_token, program=program, role=role, cc=cc)
 
 
 def send_match_notification_email(
