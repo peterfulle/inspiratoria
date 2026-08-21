@@ -641,15 +641,14 @@ function Sidebar({ currentUser, onLogout, program, slug, activeTab, onTab, colla
     <aside className={`fixed left-0 top-0 bottom-0 bg-white border-r border-zinc-200/70 shadow-[1px_0_0_rgba(0,0,0,0.02)] z-40 flex flex-col transition-[width] duration-200 ${collapsed ? 'w-[76px]' : 'w-[268px]'}`}>
       {/* Marca */}
       <div className={`flex items-center h-[70px] flex-shrink-0 ${collapsed ? 'justify-center px-0' : 'justify-between px-4'}`}>
-        <Link href="/dashboard" className="flex items-center gap-2.5 group min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-zinc-950 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
-            <Image src="/images/logo.png" alt="Inspiratoria" width={36} height={36} className="object-cover" />
-          </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className="text-[14px] font-semibold text-zinc-900 leading-tight tracking-tight">Inspiratoria</p>
-              <p className="text-[10.5px] text-zinc-400 font-medium tracking-tight">Studio</p>
-            </div>
+        <Link href="/dashboard" className="flex items-center gap-2 group min-w-0">
+          {collapsed ? (
+            <Image src="/images/isologo-amarillo.png" alt="Inspiratoria" width={28} height={28} className="flex-shrink-0" />
+          ) : (
+            <>
+              <Image src="/images/logo.png" alt="Inspiratoria" width={132} height={43} className="h-6 w-auto object-contain flex-shrink-0" />
+              <p className="text-[10.5px] text-zinc-400 font-medium tracking-tight pt-0.5">Studio</p>
+            </>
           )}
         </Link>
         {!collapsed && (

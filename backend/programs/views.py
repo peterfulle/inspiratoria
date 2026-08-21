@@ -26,6 +26,19 @@ def _display_name(u) -> str:
     return getattr(u, "display_name", None) or "Participante"
 
 
+def _has_meaningful_profile_data(user, role: str) -> bool:
+    """¿Completó el cuestionario de perfil? El campo genérico "skills" casi
+    nunca se usa en este producto — el onboarding real de mentores llena
+    mentor_topics/mentor_objectives/mentor_style, y el de mentees llena
+    mentee_goals/mentee_interests/etc. Revisar solo "skills" marcaba como
+    "sin perfil" a gente que sí completó el cuestionario real."""
+    if role == "mentor":
+        fields = ["skills", "mentor_topics", "mentor_objectives", "mentor_style", "experience_area"]
+    else:
+        fields = ["mentee_goals", "mentee_interests", "mentee_challenges", "mentee_expectations", "preferred_mentor_style"]
+    return any(getattr(user, f, None) for f in fields)
+
+
 PROGRAM_PARTICIPANT_ROLES = [
     "facilitator",
     "mentor",
@@ -745,7 +758,7 @@ async def list_participants(
                     "company": p.user.company.name if p.user.company else None,
                     "is_onboarded": p.user.is_onboarded,
                     "avatar_url": getattr(p.user, 'avatar_url', '') or "",
-                    "profile_complete": bool(getattr(p.user, 'avatar_url', '')) and bool(getattr(p.user, 'skills', None)),
+                    "profile_complete": bool(getattr(p.user, 'avatar_url', '')) and _has_meaningful_profile_data(p.user, p.role),
                 },
                 "program_id": str(program.id),
                 "role": p.role,

@@ -11,6 +11,41 @@ import { EcosystemGraph, EcoIcons, ecoInitials, type EcoNodeDatum, type EcoEdgeD
 // ============================================================================
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 
+// Ciudades de Chile para el selector de "Ciudad de residencia" — evita que
+// cada persona escriba el nombre a mano ("Santiago", "Santiago, Chile",
+// "Las Condes, Santiago"...) de formas distintas que después no calzan al
+// comparar cercanía geográfica en el match inteligente.
+const CHILE_CITIES: string[] = [
+  'Arica', 'Putre',
+  'Iquique', 'Alto Hospicio', 'Pozo Almonte', 'Nueva Victoria', 'Pica', 'Huara',
+  'Antofagasta', 'Calama', 'Tocopilla', 'Mejillones', 'Taltal', 'María Elena', 'San Pedro de Atacama', 'Coya Sur', 'Sierra Gorda',
+  'Copiapó', 'Vallenar', 'Caldera', 'Chañaral', 'Diego de Almagro',
+  'La Serena', 'Coquimbo', 'Ovalle', 'Vicuña', 'Illapel',
+  'Valparaíso', 'Viña del Mar', 'San Antonio', 'Quillota', 'Los Andes', 'Casablanca', 'Quilpué', 'Villa Alemana', 'San Felipe', 'Isla de Pascua',
+  'Santiago', 'Las Condes', 'Providencia', 'Ñuñoa', 'Maipú', 'Puente Alto', 'La Florida', 'Peñaflor', 'San Bernardo', 'Vitacura', 'La Reina', 'Macul', 'Huechuraba', 'Colina', 'Melipilla', 'Talagante', 'Quilicura', 'Renca', 'Estación Central', 'Independencia', 'Recoleta', 'Conchalí', 'Cerrillos', 'Pudahuel', 'Lo Barnechea',
+  'Rancagua', 'San Fernando', 'Pichilemu', 'Rengo',
+  'Talca', 'Curicó', 'Linares', 'Constitución',
+  'Chillán',
+  'Concepción', 'Talcahuano', 'Los Ángeles', 'Chiguayante', 'Coronel', 'San Pedro de la Paz',
+  'Temuco', 'Villarrica', 'Angol', 'Pucón',
+  'Valdivia', 'La Unión',
+  'Puerto Montt', 'Osorno', 'Castro', 'Ancud', 'Puerto Varas',
+  'Coyhaique', 'Puerto Aysén',
+  'Punta Arenas', 'Puerto Natales',
+].sort((a, b) => a.localeCompare(b, 'es'));
+
+// Mapea valores de ciudad ya guardados en formatos libres previos ("Santiago,
+// Chile", "Las Condes, Santiago") a la opción canónica del selector, para que
+// quien ya tenía una ciudad asociada la vea pre-seleccionada correctamente.
+function normalizeCityForSelect(raw: string): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return '';
+  let s = trimmed.replace(/,?\s*chile\s*$/i, '').trim();
+  if (s.includes(',')) s = s.split(',').pop()!.trim();
+  const found = CHILE_CITIES.find(c => c.toLowerCase() === s.toLowerCase());
+  return found || trimmed;
+}
+
 const ROLE_LABELS: Record<string, string> = {
   facilitator: 'Facilitador', mentor: 'Mentor', mentee: 'Mentee',
   participant_cell: 'Participante célula', participant: 'Participante', facilitator_internal: 'Facilitador',
@@ -2688,7 +2723,17 @@ export default function ParticipantPortalPage() {
                           </div>
                           <div className="prof-field">
                             <label>Ciudad de residencia *</label>
-                            <input value={profileForm.residence_city} onChange={e => setProfileForm(f => ({ ...f, residence_city: e.target.value }))} placeholder="Ej: Santiago, Chile" />
+                            <select
+                              value={normalizeCityForSelect(profileForm.residence_city)}
+                              onChange={e => setProfileForm(f => ({ ...f, residence_city: e.target.value }))}
+                            >
+                              <option value="">Selecciona una ciudad…</option>
+                              {(() => {
+                                const norm = normalizeCityForSelect(profileForm.residence_city);
+                                return norm && !CHILE_CITIES.includes(norm) ? <option value={norm}>{norm} (actual)</option> : null;
+                              })()}
+                              {CHILE_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
                           </div>
                           <div className="prof-field">
                             <label>Localidad laboral *</label>
@@ -2720,7 +2765,17 @@ export default function ParticipantPortalPage() {
                           </div>
                           <div className="prof-field">
                             <label>Ciudad de residencia *</label>
-                            <input value={profileForm.residence_city} onChange={e => setProfileForm(f => ({ ...f, residence_city: e.target.value }))} placeholder="Ej: Santiago, Chile" />
+                            <select
+                              value={normalizeCityForSelect(profileForm.residence_city)}
+                              onChange={e => setProfileForm(f => ({ ...f, residence_city: e.target.value }))}
+                            >
+                              <option value="">Selecciona una ciudad…</option>
+                              {(() => {
+                                const norm = normalizeCityForSelect(profileForm.residence_city);
+                                return norm && !CHILE_CITIES.includes(norm) ? <option value={norm}>{norm} (actual)</option> : null;
+                              })()}
+                              {CHILE_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
                           </div>
                           <div className="prof-field">
                             <label>Perfil LinkedIn</label>

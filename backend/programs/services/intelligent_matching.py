@@ -5,12 +5,13 @@ Operates over `companies.User` profiles (rich onboarding data) and returns
 ranked suggestions with an explainable, weighted multi-dimensional score.
 
 Dimensions (sum to 100):
-    skills_x_goals      25  · mentor.skills ↔ mentee.mentee_goals + mentee_interests
-    topics_x_challenges 20  · mentor.mentor_topics ↔ mentee.mentee_challenges + interests
-    style_fit           15  · mentor.mentor_style ↔ mentee.preferred_mentor_style
-    experience_fit      15  · mentor.experience_level / experience_area vs mentee profile
-    objectives_fit      15  · mentor.mentor_objectives ↔ mentee.mentee_expectations + goals
-    domain_fit          10  · mentor.position/department/headline ↔ mentee.position/headline
+    city_proximity      25  · mentor.residence_city ↔ mentee.residence_city (misma ciudad > misma región > zona cercana)
+    skills_x_goals      18  · mentor.skills ↔ mentee.mentee_goals + mentee_interests
+    topics_x_challenges 15  · mentor.mentor_topics ↔ mentee.mentee_challenges + interests
+    style_fit           10  · mentor.mentor_style ↔ mentee.preferred_mentor_style
+    experience_fit      12  · mentor.experience_level / experience_area vs mentee profile
+    objectives_fit      12  · mentor.mentor_objectives ↔ mentee.mentee_expectations + goals
+    domain_fit           8  · mentor.position/department/headline ↔ mentee.position/headline
 
 If the mentee profile is empty, the score scales down proportionally.
 """
@@ -116,15 +117,118 @@ def _items_overlap(
     return (len(matches) / denom), sorted(set(matches))
 
 
+# ────────────────────────── ciudad / cercanía geográfica ──────────────────────────
+# Mapa comuna/ciudad -> región (claves normalizadas: sin tildes, minúsculas).
+# Cubre las 16 regiones de Chile, con énfasis en las zonas donde opera SQM
+# (Tarapacá / Antofagasta) ya que son la mayoría de los datos reales de hoy.
+CHILE_CITY_REGIONS: Dict[str, str] = {
+    # Arica y Parinacota
+    "arica": "arica y parinacota", "putre": "arica y parinacota",
+    # Tarapacá
+    "iquique": "tarapaca", "alto hospicio": "tarapaca", "pozo almonte": "tarapaca",
+    "nueva victoria": "tarapaca", "pica": "tarapaca", "huara": "tarapaca",
+    # Antofagasta
+    "antofagasta": "antofagasta", "calama": "antofagasta", "tocopilla": "antofagasta",
+    "mejillones": "antofagasta", "taltal": "antofagasta", "maria elena": "antofagasta",
+    "san pedro de atacama": "antofagasta", "coya sur": "antofagasta", "sierra gorda": "antofagasta",
+    # Atacama
+    "copiapo": "atacama", "vallenar": "atacama", "caldera": "atacama", "chanaral": "atacama",
+    "diego de almagro": "atacama",
+    # Coquimbo
+    "la serena": "coquimbo", "coquimbo": "coquimbo", "ovalle": "coquimbo", "vicuna": "coquimbo",
+    "illapel": "coquimbo",
+    # Valparaíso
+    "valparaiso": "valparaiso", "vina del mar": "valparaiso", "san antonio": "valparaiso",
+    "quillota": "valparaiso", "los andes": "valparaiso", "casablanca": "valparaiso",
+    "quilpue": "valparaiso", "villa alemana": "valparaiso", "san felipe": "valparaiso",
+    "isla de pascua": "valparaiso",
+    # Metropolitana de Santiago
+    "santiago": "metropolitana", "las condes": "metropolitana", "providencia": "metropolitana",
+    "nunoa": "metropolitana", "maipu": "metropolitana", "puente alto": "metropolitana",
+    "la florida": "metropolitana", "penaflor": "metropolitana", "san bernardo": "metropolitana",
+    "vitacura": "metropolitana", "la reina": "metropolitana", "macul": "metropolitana",
+    "huechuraba": "metropolitana", "colina": "metropolitana", "melipilla": "metropolitana",
+    "talagante": "metropolitana", "quilicura": "metropolitana", "renca": "metropolitana",
+    "estacion central": "metropolitana", "independencia": "metropolitana", "recoleta": "metropolitana",
+    "conchali": "metropolitana", "cerrillos": "metropolitana", "pudahuel": "metropolitana",
+    "lo barnechea": "metropolitana", "peniaflor": "metropolitana",
+    # O'Higgins
+    "rancagua": "ohiggins", "san fernando": "ohiggins", "pichilemu": "ohiggins", "rengo": "ohiggins",
+    # Maule
+    "talca": "maule", "curico": "maule", "linares": "maule", "constitucion": "maule",
+    # Ñuble
+    "chillan": "nuble",
+    # Biobío
+    "concepcion": "biobio", "talcahuano": "biobio", "los angeles": "biobio", "chiguayante": "biobio",
+    "coronel": "biobio", "san pedro de la paz": "biobio", "los alamos": "biobio",
+    # La Araucanía
+    "temuco": "araucania", "villarrica": "araucania", "angol": "araucania", "pucon": "araucania",
+    # Los Ríos
+    "valdivia": "los rios", "la union": "los rios",
+    # Los Lagos
+    "puerto montt": "los lagos", "osorno": "los lagos", "castro": "los lagos", "ancud": "los lagos",
+    "puerto varas": "los lagos",
+    # Aysén
+    "coyhaique": "aysen", "puerto aysen": "aysen",
+    # Magallanes
+    "punta arenas": "magallanes", "puerto natales": "magallanes",
+}
+
+# Macro-zonas — regiones geográficamente contiguas cuentan como "muy cercanas"
+# aunque no sean la misma región (ej. Antofagasta ↔ Tarapacá).
+REGION_MACRO_ZONE: Dict[str, str] = {
+    "arica y parinacota": "norte grande", "tarapaca": "norte grande", "antofagasta": "norte grande",
+    "atacama": "norte chico", "coquimbo": "norte chico",
+    "valparaiso": "centro", "metropolitana": "centro", "ohiggins": "centro", "maule": "centro", "nuble": "centro",
+    "biobio": "sur", "araucania": "sur", "los rios": "sur", "los lagos": "sur",
+    "aysen": "austral", "magallanes": "austral",
+}
+
+
+def _normalize_city_name(raw: str) -> str:
+    """'Las Condes, Santiago' -> 'santiago'; 'Santiago, Chile' -> 'santiago'."""
+    if not raw:
+        return ""
+    s = str(raw).strip()
+    s = re.sub(r",?\s*chile\s*$", "", s, flags=re.IGNORECASE).strip()
+    if "," in s:
+        s = s.split(",")[-1].strip()
+    return _norm(s)
+
+
+def _city_proximity(city_a: str, city_b: str) -> Tuple[float, bool, str]:
+    """(ratio 0-1, applicable, label). applicable=False si falta el dato en algún lado."""
+    a = _normalize_city_name(city_a)
+    b = _normalize_city_name(city_b)
+    if not a or not b:
+        return 0.0, False, ""
+    if a == b:
+        return 1.0, True, f"Misma ciudad ({city_a.strip()})"
+    region_a = CHILE_CITY_REGIONS.get(a)
+    region_b = CHILE_CITY_REGIONS.get(b)
+    if region_a and region_b:
+        if region_a == region_b:
+            return 0.7, True, f"Misma región ({city_a.strip()} / {city_b.strip()})"
+        zone_a = REGION_MACRO_ZONE.get(region_a)
+        zone_b = REGION_MACRO_ZONE.get(region_b)
+        if zone_a and zone_a == zone_b:
+            return 0.4, True, f"Ciudades cercanas ({city_a.strip()} / {city_b.strip()})"
+        return 0.05, True, f"Ciudades lejanas ({city_a.strip()} / {city_b.strip()})"
+    # Ciudad no reconocida en el mapa — no penalizar, pero tampoco premiar; se
+    # marca no-aplicable para que el peso se redistribuya a otras dimensiones.
+    return 0.0, False, ""
+
+
 # ────────────────────────────── scoring ──────────────────────────────
 
 WEIGHTS: Dict[str, int] = {
-    "skills_x_goals": 25,
-    "topics_x_challenges": 20,
-    "style_fit": 15,
-    "experience_fit": 15,
-    "objectives_fit": 15,
-    "domain_fit": 10,
+    "city_proximity": 25,
+    "skills_x_goals": 18,
+    "topics_x_challenges": 15,
+    "style_fit": 10,
+    "experience_fit": 12,
+    "objectives_fit": 12,
+    "domain_fit": 8,
 }
 
 EXPERIENCE_RANK: Dict[str, int] = {
@@ -184,6 +288,7 @@ def _profile(user: User, role: str) -> Dict[str, Any]:
         "bio": getattr(user, "bio", "") or "",
         "position": getattr(user, "position", "") or "",
         "department": getattr(user, "department", "") or "",
+        "residence_city": getattr(user, "residence_city", "") or "",
         "skills": _to_list(getattr(user, "skills", [])),
         "experience_level": getattr(user, "experience_level", "") or "",
         "experience_area": _to_list(getattr(user, "experience_area", [])),
@@ -226,6 +331,18 @@ def score_pair(mentor: User, mentee: User) -> Dict[str, Any]:
 
     breakdown: Dict[str, Dict[str, Any]] = {}
     matched_overall: List[str] = []
+
+    # 0) cercanía geográfica — mismo ciudad idealmente, o al menos misma región/zona.
+    city_ratio, city_applicable, city_label = _city_proximity(m["residence_city"], e["residence_city"])
+    breakdown["city_proximity"] = {
+        "weight": WEIGHTS["city_proximity"],
+        "ratio": round(city_ratio, 3),
+        "matches": [city_label] if city_label else [],
+        "applicable": city_applicable,
+        "mentor_city": m["residence_city"] or None,
+        "mentee_city": e["residence_city"] or None,
+        "label": "Cercanía geográfica (ciudad de residencia)",
+    }
 
     # 1) skills × (goals + interests)
     mentee_focus = e["mentee_goals"] + e["mentee_interests"]
