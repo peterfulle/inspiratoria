@@ -568,6 +568,7 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
     def fetch():
         close_old_connections()
         from django.db.models import Count
+        from django.db import connection
         from programs.models import Activity, Content
         try:
             user = User.objects.get(id=user_id)
@@ -585,6 +586,26 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
         template_slug_by_program = dict(
             Program.objects.filter(id__in=program_ids).values_list('id', 'template__slug')
         )
+
+        # Conteo real de módulos/hitos del currículo (design_snapshot), sin
+        # traer el JSON completo a Django — el Home mostraba "0 módulos"
+        # porque usaba un conteo de Content ligado a actividades tipo
+        # "training" (un modelo de datos distinto y casi siempre vacío en
+        # este programa), no el currículo real que sí se ve en Módulos.
+        template_module_counts: dict = {}
+        if program_ids:
+            with connection.cursor() as _cur:
+                _cur.execute(
+                    """
+                    SELECT id,
+                           jsonb_array_length(COALESCE(design_snapshot->'modules', '[]'::jsonb)),
+                           jsonb_array_length(COALESCE(design_snapshot->'milestones', '[]'::jsonb))
+                    FROM programs_program WHERE id = ANY(%s::uuid[])
+                    """,
+                    [[str(pid) for pid in program_ids]],
+                )
+                for _pid, _mods, _miles in _cur.fetchall():
+                    template_module_counts[str(_pid)] = (_mods, _miles)
 
         # Todo lo que sigue eran consultas por-programa (y por-actividad, en el
         # caso de módulos) dentro del for — un N+1 clásico. Se traen todas de
@@ -684,6 +705,8 @@ async def get_my_programs(user_id: str, authorization: Optional[str] = Header(No
                 "total_participants": counts_by_program.get(p.id, 0),
                 "activities": activities,
                 "modules": modules,
+                "template_modules_count": template_module_counts.get(str(p.id), (0, 0))[0],
+                "template_milestones_count": template_module_counts.get(str(p.id), (0, 0))[1],
                 "vinculation": vinculation_info,
             })
         return results

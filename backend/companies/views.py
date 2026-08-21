@@ -5922,9 +5922,15 @@ Genera en español:
 
 # ── Activity Completion ──────────────────────────────────────────────
 
+class CompleteActivityRequest(BaseModel):
+    notes: str = ""
+
+
 @router.post("/portal/{portal_code}/activities/{activity_id}/complete")
-async def complete_activity(portal_code: str, activity_id: str):
-    """Mark an activity as completed by this user."""
+async def complete_activity(portal_code: str, activity_id: str, payload: CompleteActivityRequest = CompleteActivityRequest()):
+    """Mark an activity as completed by this user, con un detalle opcional de
+    lo que se trabajó con el mentor/mentee (ej. "vimos el CV y ajustamos el
+    resumen profesional")."""
     def _resolve():
         user = _get_portal_user(portal_code)
         from programs.models import Activity, ActivityCompletion
@@ -5937,9 +5943,13 @@ async def complete_activity(portal_code: str, activity_id: str):
         completion, created = ActivityCompletion.objects.get_or_create(
             activity=activity, user=user,
         )
+        notes = (payload.notes or "").strip()[:500]
+        if notes and completion.notes != notes:
+            completion.notes = notes
+            completion.save(update_fields=["notes"])
         if not created:
-            return {"success": True, "already_completed": True}
-        return {"success": True, "already_completed": False, "completed_at": completion.completed_at.isoformat()}
+            return {"success": True, "already_completed": True, "notes": completion.notes}
+        return {"success": True, "already_completed": False, "completed_at": completion.completed_at.isoformat(), "notes": completion.notes}
 
     return await sync_to_async(_resolve)()
 
@@ -5959,9 +5969,17 @@ async def get_my_activities(portal_code: str):
             program_id__in=list(pps)
         ).select_related("program").order_by("start_date")
 
-        completed_ids = set(
-            ActivityCompletion.objects.filter(user=user).values_list("activity_id", flat=True)
+        notes_by_activity = dict(
+            ActivityCompletion.objects.filter(user=user, activity_id__in=[a.id for a in activities])
+            .values_list("activity_id", "notes")
         )
+
+        import re as _re
+        _session_re = _re.compile(r"sesi[oó]n\s*(\d+)", _re.IGNORECASE)
+
+        def _module_number(name: str):
+            m = _session_re.search(name or "")
+            return int(m.group(1)) if m else None
 
         return {"activities": [{
             "id": a.id, "name": a.name, "description": a.description,
@@ -5970,7 +5988,9 @@ async def get_my_activities(portal_code: str):
             "end_date": a.end_date.isoformat() if a.end_date else None,
             "modality": a.modality or "", "meeting_url": a.meeting_url or "",
             "program_name": a.program.name, "program_id": str(a.program.id),
-            "completed_by_me": a.id in completed_ids,
+            "completed_by_me": a.id in notes_by_activity,
+            "notes": notes_by_activity.get(a.id, ""),
+            "module_number": _module_number(a.name),
         } for a in activities]}
 
     return await sync_to_async(_resolve)()

@@ -880,7 +880,7 @@ const CSS = `
 .tag{padding:4px 14px;border-radius:20px;font-size:13px;font-weight:500;background:rgba(255,255,255,.15);color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.1)}
 
 /* pv-header — header nativo del portal (mismo lenguaje visual que Home/Ecosistema, sin banner) */
-.pv-header{padding:20px 24px 0}
+.pv-header{max-width:1000px;margin:0 auto;padding:20px 24px 0}
 .pv-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .pv-pill{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:#f4f5f6;color:#52525b;border:1px solid #ececec;white-space:nowrap}
 .pv-slug{font-size:13px;color:#9ca3af;font-family:monospace}

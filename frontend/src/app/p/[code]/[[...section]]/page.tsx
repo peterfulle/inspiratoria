@@ -928,7 +928,6 @@ export default function ParticipantPortalPage() {
   const SECTION_SLUGS: Record<string, string> = {
     '': 'dashboard',
     'modulos': 'my-modules',
-    'actividades': 'my-activities',
     'ecosistema': 'my-ecosystem',
     'perfil': 'my-profile',
     'insignias': 'my-badges',
@@ -936,7 +935,6 @@ export default function ParticipantPortalPage() {
     'mentees': 'my-mentees',
     'mi-mentor': 'my-mentor',
     'sesiones': 'my-sessions',
-    'mis-actividades': 'my-portal-activities',
   };
   const NAV_TO_SLUG: Record<string, string> = Object.fromEntries(Object.entries(SECTION_SLUGS).map(([k, v]) => [v, k]));
   const activeNav = SECTION_SLUGS[sectionParam] || 'dashboard';
@@ -1034,6 +1032,8 @@ export default function ParticipantPortalPage() {
   // Activities state
   const [portalActivities, setPortalActivities] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [activityNoteDrafts, setActivityNoteDrafts] = useState<Record<string, string>>({});
+  const [activityNoteOpenFor, setActivityNoteOpenFor] = useState<string | null>(null);
 
   // Network state
   const [networkPeople, setNetworkPeople] = useState<any[]>([]);
@@ -1153,26 +1153,25 @@ export default function ParticipantPortalPage() {
 
   // Derive detail tab from URL section
   const detailTab = (() => {
-    const map: Record<string, string> = { 'my-program': 'overview', 'my-progress': 'progress', 'my-modules': 'modules', 'my-activities': 'activities', 'my-ecosystem': 'ecosystem' };
+    const map: Record<string, string> = { 'my-program': 'overview', 'my-progress': 'progress', 'my-modules': 'modules', 'my-ecosystem': 'ecosystem' };
     return (map[activeNav] || 'overview') as 'overview' | 'modules' | 'activities' | 'ecosystem';
   })();
 
-  // Nav items — filtered by role
+  // Nav items — filtered por rol. "Actividades" se sacó del menú (se ve
+  // dentro de Módulos, por sesión) para reducir fricción — un solo lugar
+  // para revisar el contenido del programa, no dos.
   const mentoriaItems = isMentee ? [
     { id: 'my-mentor', label: 'Mi Mentor', icon: 'participants' },
     { id: 'my-sessions', label: 'Sesiones', icon: 'milestones' },
-    { id: 'my-portal-activities', label: 'Actividades', icon: 'activities' },
   ] : [
     { id: 'my-mentees', label: 'Mis Mentees', icon: 'participants' },
     { id: 'my-sessions', label: 'Sesiones', icon: 'milestones' },
-    { id: 'my-portal-activities', label: 'Actividades', icon: 'activities' },
   ];
   const navItems = [
     { section: 'Mi Espacio', items: [
-      { id: 'dashboard', label: 'Inicio', icon: 'home' },
-      { id: 'my-modules', label: 'Módulos', icon: 'modules', count: programTemplate?.modules?.length || 0 },
-      { id: 'my-activities', label: 'Actividades', icon: 'activities' },
       { id: 'my-ecosystem', label: 'Ecosistema', icon: 'ecosystem' },
+      { id: 'my-modules', label: 'Módulos', icon: 'modules', count: programTemplate?.modules?.length || 0 },
+      { id: 'dashboard', label: 'Resumen', icon: 'home' },
     ]},
     { section: 'Mentoría', items: mentoriaItems },
     { section: 'Personal', items: [
@@ -1351,9 +1350,10 @@ export default function ParticipantPortalPage() {
       .finally(() => setSessionsLoading(false));
   }, [activeNav, portalCode, isMentee]);
 
-  // Fetch activities when entering the activities tab (with completion status)
+  // Fetch activities when entering Módulos (el seguimiento de actividades
+  // vive ahí ahora, ya no como ítem propio del sidebar)
   useEffect(() => {
-    if (activeNav !== 'my-portal-activities' || !portalCode) return;
+    if (activeNav !== 'my-modules' || !portalCode) return;
     if (portalActivities.length > 0) return; // already loaded — usa el botón "Actualizar" para refrescar
     setActivitiesLoading(true);
     apiFetch(`${API_URL}/api/companies/portal/${portalCode}/activities`)
@@ -1616,7 +1616,7 @@ export default function ParticipantPortalPage() {
                     <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8, lineHeight: 1.3 }}>{mp.name}</div>
                     <div style={{ fontSize: '0.82rem', opacity: 0.8, marginBottom: 16, lineHeight: 1.5 }}>{mp.description?.slice(0, 120)}{(mp.description?.length || 0) > 120 ? '...' : ''}</div>
                     <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem', opacity: 0.75 }}>
-                      <span>{programTemplate?.modules?.length || mp.modules?.length || 0} módulos</span>
+                      <span>{programTemplate?.modules?.length || mp.template_modules_count || mp.modules?.length || 0} módulos</span>
                       <span>{programDetail?.activities?.length || mp.activities?.length || 0} actividades</span>
                       <span>{programParticipants.length || mp.total_participants || 0} participantes</span>
                     </div>
@@ -1638,7 +1638,7 @@ export default function ParticipantPortalPage() {
           <div className="stats-grid">
             {[
               { label: 'Programas activos', value: myPrograms.length, change: `Inscrito como ${roleLabel.toLowerCase()}`, stripe: '#0891b2' },
-              { label: 'Módulos', value: programTemplate?.modules?.length || myPrograms.reduce((a: number, p: any) => a + (p.modules?.length || 0), 0), change: 'Contenido del programa', stripe: '#0891b2' },
+              { label: 'Módulos', value: programTemplate?.modules?.length || myPrograms.reduce((a: number, p: any) => a + (p.template_modules_count || p.modules?.length || 0), 0), change: 'Contenido del programa', stripe: '#0891b2' },
               { label: 'Actividades', value: programDetail?.activities?.length || myPrograms.reduce((a: number, p: any) => a + (p.activities?.length || 0), 0), change: 'Ejercicios y entrenamientos', stripe: '#0891b2' },
               { label: 'Empresa', value: companyName || '—', change: roleLabel, stripe: '#0891b2' },
             ].map((s, i) => (
@@ -1999,13 +1999,18 @@ export default function ParticipantPortalPage() {
     if (!selectedProgram.template_slug) return <div className="empty-state">Este programa no tiene una plantilla de módulos configurada</div>;
     if (modulesTemplateLoading || !modulesTemplate || modulesTemplate.slug !== selectedProgram.template_slug) return <InlineSpinner minH={400} />;
     return (
-      <ProgramPreviewView
-        template={modulesTemplate}
-        showAssignedPrograms={false}
-        onBack={() => navigate('dashboard')}
-        backLabel="Inicio"
-        variant="portal"
-      />
+      <>
+        <ProgramPreviewView
+          template={modulesTemplate}
+          showAssignedPrograms={false}
+          onBack={() => navigate('dashboard')}
+          backLabel="Resumen"
+          variant="portal"
+        />
+        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 24px' }}>
+          {renderActivityTracker()}
+        </div>
+      </>
     );
   };
 
@@ -3588,11 +3593,14 @@ export default function ParticipantPortalPage() {
     setAckSaving(null);
   };
 
-  const handleCompleteActivity = async (actId: number) => {
+  const handleCompleteActivity = async (actId: number, notes: string = '') => {
     if (isAdminPreview) { blockInPreview(); return; }
     try {
-      await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/activities/${actId}/complete`, { method: 'POST' });
-      setPortalActivities(prev => prev.map(a => a.id === actId ? { ...a, completed_by_me: true } : a));
+      await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/activities/${actId}/complete`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes }),
+      });
+      setPortalActivities(prev => prev.map(a => a.id === actId ? { ...a, completed_by_me: true, notes } : a));
+      setActivityNoteOpenFor(null);
     } catch {}
   };
 
@@ -3809,9 +3817,11 @@ export default function ParticipantPortalPage() {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // RENDER: ACTIVIDADES CON COMPLETAR
+  // RENDER: SEGUIMIENTO DE ACTIVIDADES (con el mentor) — vive dentro de
+  // Módulos, ya no como ítem propio del sidebar, para no duplicar el lugar
+  // donde se revisa el contenido del programa.
   // ═══════════════════════════════════════════════════════════════
-  const renderPortalActivities = () => {
+  const renderActivityTracker = () => {
     if (activitiesLoading) return <InlineSpinner />;
     const total = portalActivities.length;
     const done = portalActivities.filter((a: any) => a.completed_by_me).length;
@@ -3825,11 +3835,11 @@ export default function ParticipantPortalPage() {
       return 0;
     });
     return (
-      <div>
-        <div className="dash-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <div style={{ marginTop: 28 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 }}>
           <div>
-            <h1 className="dash-title">Mis Actividades</h1>
-            <p className="dash-subtitle">{total} actividades en tus programas · {done} completadas · {scheduled} agendadas</p>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827', margin: '0 0 2px' }}>Seguimiento de actividades con tu mentor{isMentee ? '' : '/mentee'}</h2>
+            <p style={{ fontSize: '0.78rem', color: '#6b7280', margin: 0 }}>{total} actividades · {done} completadas · {scheduled} agendadas</p>
           </div>
           <button onClick={() => { setActivitiesLoading(true); apiFetch(`${API_URL}/api/companies/portal/${portalCode}/activities`).then(r => r.ok ? r.json() : { activities: [] }).then(d => setPortalActivities(d.activities || [])).finally(() => setActivitiesLoading(false)); }}
             style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontSize: '0.72rem', fontWeight: 600, color: '#0e7490', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -3859,49 +3869,76 @@ export default function ParticipantPortalPage() {
               const date = a.start_date ? new Date(a.start_date) : null;
               const isPast = date && date.getTime() < Date.now();
               const isToday = date && date.toDateString() === new Date().toDateString();
+              const noteOpen = activityNoteOpenFor === String(a.id);
               return (
-              <div key={a.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: a.completed_by_me ? '1px solid #d1fae5' : isToday ? '1px solid #fde68a' : '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                    <span style={{ fontWeight: 600, fontSize: '0.92rem', color: '#111827' }}>{a.name}</span>
-                    <span style={{ padding: '2px 8px', borderRadius: 8, background: '#f3f4f6', color: '#6b7280', fontSize: '0.68rem', fontWeight: 600 }}>
-                      {a.activity_type === 'training' ? 'Entrenamiento' : a.activity_type === 'event' ? 'Evento' : a.activity_type || 'Actividad'}
-                    </span>
-                    {isToday && <span style={{ padding: '2px 8px', borderRadius: 8, background: '#fef3c7', color: '#b45309', fontSize: '0.68rem', fontWeight: 700 }}>Hoy</span>}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 6, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                    <span style={{ fontWeight: 500 }}>{a.program_name}</span>
-                    {date ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: isPast && !a.completed_by_me ? '#dc2626' : '#0e7490', fontWeight: 600 }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                        {date.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              <div key={a.id} style={{ background: '#fff', borderRadius: 14, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: a.completed_by_me ? '1px solid #d1fae5' : isToday ? '1px solid #fde68a' : '1px solid #f3f4f6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                      {a.module_number && <span style={{ padding: '2px 8px', borderRadius: 8, background: '#ecfeff', color: '#0e7490', fontSize: '0.68rem', fontWeight: 700 }}>Módulo {a.module_number}</span>}
+                      <span style={{ fontWeight: 600, fontSize: '0.92rem', color: '#111827' }}>{a.name}</span>
+                      <span style={{ padding: '2px 8px', borderRadius: 8, background: '#f3f4f6', color: '#6b7280', fontSize: '0.68rem', fontWeight: 600 }}>
+                        {a.activity_type === 'training' ? 'Entrenamiento' : a.activity_type === 'event' ? 'Evento' : a.activity_type || 'Actividad'}
                       </span>
-                    ) : (
-                      <span style={{ color: '#d97706', fontStyle: 'italic' }}>Aún no agendada</span>
+                      {isToday && <span style={{ padding: '2px 8px', borderRadius: 8, background: '#fef3c7', color: '#b45309', fontSize: '0.68rem', fontWeight: 700 }}>Hoy</span>}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 6, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                      <span style={{ fontWeight: 500 }}>{a.program_name}</span>
+                      {date ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: isPast && !a.completed_by_me ? '#dc2626' : '#0e7490', fontWeight: 600 }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                          {date.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#d97706', fontStyle: 'italic' }}>Aún no agendada</span>
+                      )}
+                      {a.modality && <span style={{ color: '#9ca3af' }}>· {a.modality === 'online' ? 'Online' : a.modality === 'presencial' ? 'Presencial' : 'Híbrida'}</span>}
+                    </div>
+                    {a.description && <div style={{ fontSize: '0.78rem', color: '#4b5563', lineHeight: 1.5 }}>{a.description}</div>}
+                    {a.meeting_url && (
+                      <a href={a.meeting_url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.78rem', color: '#0891b2', fontWeight: 600 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        Unirse a la reunión
+                      </a>
                     )}
-                    {a.modality && <span style={{ color: '#9ca3af' }}>· {a.modality === 'online' ? 'Online' : a.modality === 'presencial' ? 'Presencial' : 'Híbrida'}</span>}
+                    {a.completed_by_me && a.notes && (
+                      <div style={{ marginTop: 10, padding: '8px 12px', background: '#f9fafb', borderRadius: 8, fontSize: '0.78rem', color: '#374151' }}>
+                        <span style={{ fontWeight: 600, color: '#6b7280' }}>Lo que hicimos: </span>{a.notes}
+                      </div>
+                    )}
                   </div>
-                  {a.description && <div style={{ fontSize: '0.78rem', color: '#4b5563', lineHeight: 1.5 }}>{a.description}</div>}
-                  {a.meeting_url && (
-                    <a href={a.meeting_url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.78rem', color: '#0891b2', fontWeight: 600 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                      Unirse a la reunión
-                    </a>
-                  )}
+                  <div style={{ flexShrink: 0 }}>
+                    {a.completed_by_me ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 14px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        Completada
+                      </span>
+                    ) : noteOpen ? null : (
+                      <button onClick={() => setActivityNoteOpenFor(String(a.id))} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0891b2, #06b6d4)', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, boxShadow: '0 1px 3px rgba(8,145,178,0.3)', whiteSpace: 'nowrap' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        Marcar completa
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div style={{ flexShrink: 0 }}>
-                  {a.completed_by_me ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 14px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 700 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      Completada
-                    </span>
-                  ) : (
-                    <button onClick={() => handleCompleteActivity(a.id)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0891b2, #06b6d4)', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, boxShadow: '0 1px 3px rgba(8,145,178,0.3)' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      Marcar completa
-                    </button>
-                  )}
-                </div>
+                {!a.completed_by_me && noteOpen && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f3f4f6' }}>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>
+                      ¿Qué hicieron en esta actividad con {isMentee ? 'tu mentor' : 'tu mentee'}? (opcional)
+                    </label>
+                    <textarea
+                      value={activityNoteDrafts[a.id] || ''}
+                      onChange={e => setActivityNoteDrafts(prev => ({ ...prev, [a.id]: e.target.value }))}
+                      placeholder="Ej: Revisamos mi CV y ajustamos el resumen profesional…"
+                      rows={2}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: '0.8rem', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
+                    />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+                      <button onClick={() => setActivityNoteOpenFor(null)} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontSize: '0.76rem', fontWeight: 600, color: '#6b7280', cursor: 'pointer' }}>Cancelar</button>
+                      <button onClick={() => handleCompleteActivity(a.id, activityNoteDrafts[a.id] || '')} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0891b2, #06b6d4)', color: '#fff', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}>Marcar completa</button>
+                    </div>
+                  </div>
+                )}
               </div>
               );
             })}
@@ -4417,7 +4454,7 @@ export default function ParticipantPortalPage() {
                       <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8, lineHeight: 1.3 }}>{mp.name}</div>
                       <div style={{ fontSize: '0.82rem', opacity: 0.8, marginBottom: 16, lineHeight: 1.5 }}>{mp.description?.slice(0, 120)}{(mp.description?.length || 0) > 120 ? '...' : ''}</div>
                       <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem', opacity: 0.75 }}>
-                        <span>{programTemplate?.modules?.length || mp.modules?.length || 0} módulos</span>
+                        <span>{programTemplate?.modules?.length || mp.template_modules_count || mp.modules?.length || 0} módulos</span>
                         <span>{programDetail?.activities?.length || mp.activities?.length || 0} actividades</span>
                       </div>
                       <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem', fontWeight: 600, opacity: 0.9 }}>
@@ -4784,7 +4821,6 @@ export default function ParticipantPortalPage() {
     switch (activeNav) {
       case 'dashboard': return isMentee ? renderMenteeDashboard() : renderDashboard();
       case 'my-modules': return renderModulesPreview();
-      case 'my-activities': return renderMyProgram();
       case 'my-ecosystem': return renderMyProgram();
       case 'my-profile': return renderProfile();
       case 'my-badges': return renderBadges();
@@ -4792,12 +4828,11 @@ export default function ParticipantPortalPage() {
       case 'my-mentees': return renderMentees();
       case 'my-mentor': return renderMyMentor();
       case 'my-sessions': return isMentee ? renderMenteeSessions() : renderSessions();
-      case 'my-portal-activities': return renderPortalActivities();
       default: return isMentee ? renderMenteeDashboard() : renderDashboard();
     }
   };
 
-  const currentNavLabel = navItems.flatMap(s => s.items).find(i => i.id === activeNav)?.label || 'Inicio';
+  const currentNavLabel = navItems.flatMap(s => s.items).find(i => i.id === activeNav)?.label || 'Resumen';
 
   // ══════════════════════════════════════════════════════════════════════════
   // RENDER
