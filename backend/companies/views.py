@@ -5139,7 +5139,7 @@ def _parse_scheduled_at(raw: str):
 
 @router.get("/portal/{portal_code}/my-mentor")
 async def get_my_mentor(portal_code: str):
-    """Get the mentor assigned to this mentee via Vinculation or same program."""
+    """Get the mentor assigned to this mentee via una Vinculation activa real. Sin match, devuelve None."""
     def _resolve():
         user = _get_portal_user(portal_code)
         from programs.models import ProgramParticipant, Vinculation
@@ -5195,29 +5195,11 @@ async def get_my_mentor(portal_code: str):
             if mentor:
                 break
 
-        # 2) Fallback: mentor from same programs
-        if not mentor:
-            for pp in my_pps:
-                mentor_pp = ProgramParticipant.objects.filter(
-                    program=pp.program, role="mentor", deleted_at__isnull=True,
-                ).exclude(user=user).select_related("user").first()
-                if mentor_pp:
-                    mu = mentor_pp.user
-                    mentor = {
-                        "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
-                        "position": mu.position or "", "department": mu.department or "",
-                        "avatar_url": getattr(mu, "avatar_url", "") or "",
-                        "linkedin_url": getattr(mu, "linkedin_url", "") or "",
-                        "bio": getattr(mu, "bio", "") or "",
-                        "headline": getattr(mu, "headline", "") or "",
-                        "skills": getattr(mu, "skills", []) or [],
-                        "mentor_topics": getattr(mu, "mentor_topics", []) or [],
-                        "mentor_style": getattr(mu, "mentor_style", "") or "",
-                        "program_name": pp.program.name, "program_id": str(pp.program.id),
-                        "source": "program",
-                    }
-                    break
-
+        # Nota: NO hay fallback a "cualquier mentor del mismo programa" —
+        # mostrar un mentor sin una Vinculation activa real es peor que no
+        # mostrar nada, porque el mentee cree que ya tiene alguien asignado.
+        # Sin match real, el frontend debe mostrar el estado "aún sin
+        # asignar" (ver renderMyMentor / dashboard mentor card).
         return {"mentor": mentor}
 
     return await sync_to_async(_resolve)()
@@ -5227,7 +5209,7 @@ async def get_my_mentor(portal_code: str):
 
 @router.get("/portal/{portal_code}/mentees")
 async def get_my_mentees(portal_code: str):
-    """Get mentees assigned to this mentor via Vinculation OR from same programs."""
+    """Get mentees assigned to this mentor via una Vinculation activa real. Sin matches, devuelve lista vacía."""
     def _resolve():
         user = _get_portal_user(portal_code)
         from programs.models import ProgramParticipant, Vinculation
@@ -5278,26 +5260,11 @@ async def get_my_mentees(portal_code: str):
                         "source": "vinculation",
                     })
 
-        # 2) Fallback: mentees from the same programs where user is mentor
-        for pp in my_pps:
-            program_mentees = ProgramParticipant.objects.filter(
-                program=pp.program, role="mentee", deleted_at__isnull=True,
-            ).exclude(user=user).select_related("user")
-            for pm in program_mentees:
-                mu = pm.user
-                if mu.id not in seen_ids:
-                    seen_ids.add(mu.id)
-                    mentees.append({
-                        "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
-                        "position": mu.position or "", "department": mu.department or "",
-                        "avatar_url": getattr(mu, "avatar_url", "") or "",
-                        "linkedin_url": getattr(mu, "linkedin_url", "") or "",
-                        "bio": getattr(mu, "bio", "") or "",
-                        "headline": getattr(mu, "headline", "") or "",
-                        "skills": getattr(mu, "skills", []) or [],
-                        "program_name": pp.program.name, "program_id": str(pp.program.id),
-                        "source": "program",
-                    })
+        # Nota: NO hay fallback a "todos los mentees del mismo programa" —
+        # mostrar mentees sin una Vinculation activa real hacía que un mentor
+        # viera como suyos a mentees con los que nunca fue emparejado. Sin
+        # match real, la lista debe salir vacía (el frontend ya maneja ese
+        # estado: "Aún no tienes mentees asignados").
 
         return {"mentees": mentees}
 

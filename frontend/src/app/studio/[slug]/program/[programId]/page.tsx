@@ -2804,19 +2804,24 @@ function parseParticipantsCSV(text: string): BulkRow[] {
   const iEmail = idxOf('email', 'correo', 'e-mail');
 
   // Si no reconocemos encabezados, asumimos nombre,apellido,email en ese orden.
+  // Si SÍ hay encabezados pero alguna columna no se identificó (ej. archivos de
+  // solo "nombre completo" + "correo", sin columna de apellido), no se debe
+  // adivinar una posición fija — eso hacía que "apellido" cayera en la misma
+  // columna que el email, guardando el correo como apellido de cada persona.
   const hasHeaderRow = iFirst >= 0 || iLast >= 0 || iEmail >= 0;
   const dataLines = hasHeaderRow ? lines.slice(1) : lines;
-  const fi = iFirst >= 0 ? iFirst : 0;
-  const li = iLast >= 0 ? iLast : 1;
-  const ei = iEmail >= 0 ? iEmail : 2;
+  const fi = iFirst >= 0 ? iFirst : (hasHeaderRow ? -1 : 0);
+  const li = iLast >= 0 ? iLast : (hasHeaderRow ? -1 : 1);
+  const ei = iEmail >= 0 ? iEmail : (hasHeaderRow ? -1 : 2);
 
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const seen = new Set<string>();
   const rows: BulkRow[] = dataLines.map(line => {
     const cells = splitLine(line);
-    const email = (cells[ei] || '').trim().toLowerCase();
-    const first_name = (cells[fi] || '').trim();
-    const last_name = (cells[li] || '').trim();
+    const email = (ei >= 0 ? cells[ei] || '' : '').trim().toLowerCase();
+    const first_name = (fi >= 0 ? cells[fi] || '' : '').trim();
+    let last_name = (li >= 0 ? cells[li] || '' : '').trim();
+    if (last_name.toLowerCase() === email) last_name = ''; // nunca guardar el email como apellido
     let issue: string | null = null;
     if (!email) issue = 'Falta email';
     else if (!emailRe.test(email)) issue = 'Email inválido';
