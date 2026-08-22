@@ -5224,6 +5224,42 @@ def _parse_scheduled_at(raw: str):
 
 # ── My Mentor (for mentees) ─────────────────────────────────────────
 
+def _serialize_full_profile(mu):
+    """Perfil completo de un usuario (mentor o mentee) para las vistas
+    'Mi Mentor' y 'Perfil de mentee' — incluye todos los campos del wizard
+    de perfil (no solo el subconjunto básico), a diferencia de los otros
+    serializadores livianos de este archivo (mentees list, matches, etc)."""
+    return {
+        "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
+        "phone": getattr(mu, "phone", "") or "",
+        "position": mu.position or "", "department": mu.department or "",
+        "avatar_url": getattr(mu, "avatar_url", "") or "",
+        "linkedin_url": getattr(mu, "linkedin_url", "") or "",
+        "bio": getattr(mu, "bio", "") or "",
+        "headline": getattr(mu, "headline", "") or "",
+        "skills": getattr(mu, "skills", []) or [],
+        "residence_city": getattr(mu, "residence_city", "") or "",
+        "work_location": getattr(mu, "work_location", "") or "",
+        "area_or_function": getattr(mu, "area_or_function", "") or "",
+        "career": getattr(mu, "career", "") or "",
+        "experience_area": getattr(mu, "experience_area", []) or [],
+        # Perfil de mentor
+        "mentor_topics": getattr(mu, "mentor_topics", []) or [],
+        "mentor_objectives": getattr(mu, "mentor_objectives", []) or [],
+        "mentor_style": getattr(mu, "mentor_style", []) or [],
+        "mentee_preference": getattr(mu, "mentee_preference", []) or [],
+        "mentee_outcomes": getattr(mu, "mentee_outcomes", []) or [],
+        "session_structure": getattr(mu, "session_structure", []) or [],
+        # Perfil de mentee
+        "mentee_goals": getattr(mu, "mentee_goals", []) or [],
+        "mentee_interests": getattr(mu, "mentee_interests", []) or [],
+        "mentee_challenges": getattr(mu, "mentee_challenges", []) or [],
+        "mentee_expectations": getattr(mu, "mentee_expectations", []) or [],
+        "preferred_mentor_style": getattr(mu, "preferred_mentor_style", []) or [],
+        "session_format_preference": getattr(mu, "session_format_preference", []) or [],
+    }
+
+
 @router.get("/portal/{portal_code}/my-mentor")
 async def get_my_mentor(portal_code: str):
     """Get the mentor assigned to this mentee via una Vinculation activa real. Sin match, devuelve None."""
@@ -5245,15 +5281,7 @@ async def get_my_mentor(portal_code: str):
             for v in vincs:
                 mu = v.participant1.user
                 mentor = {
-                    "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
-                    "position": mu.position or "", "department": mu.department or "",
-                    "avatar_url": getattr(mu, "avatar_url", "") or "",
-                    "linkedin_url": getattr(mu, "linkedin_url", "") or "",
-                    "bio": getattr(mu, "bio", "") or "",
-                    "headline": getattr(mu, "headline", "") or "",
-                    "skills": getattr(mu, "skills", []) or [],
-                    "mentor_topics": getattr(mu, "mentor_topics", []) or [],
-                    "mentor_style": getattr(mu, "mentor_style", "") or "",
+                    **_serialize_full_profile(mu),
                     "program_name": pp.program.name, "program_id": str(pp.program.id),
                     "source": "vinculation",
                 }
@@ -5266,15 +5294,7 @@ async def get_my_mentor(portal_code: str):
             for v in vincs2:
                 mu = v.participant2.user
                 mentor = {
-                    "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
-                    "position": mu.position or "", "department": mu.department or "",
-                    "avatar_url": getattr(mu, "avatar_url", "") or "",
-                    "linkedin_url": getattr(mu, "linkedin_url", "") or "",
-                    "bio": getattr(mu, "bio", "") or "",
-                    "headline": getattr(mu, "headline", "") or "",
-                    "skills": getattr(mu, "skills", []) or [],
-                    "mentor_topics": getattr(mu, "mentor_topics", []) or [],
-                    "mentor_style": getattr(mu, "mentor_style", "") or "",
+                    **_serialize_full_profile(mu),
                     "program_name": pp.program.name, "program_id": str(pp.program.id),
                     "source": "vinculation",
                 }
@@ -5318,13 +5338,7 @@ async def get_my_mentees(portal_code: str):
                 if mu.id not in seen_ids:
                     seen_ids.add(mu.id)
                     mentees.append({
-                        "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
-                        "position": mu.position or "", "department": mu.department or "",
-                        "avatar_url": getattr(mu, "avatar_url", "") or "",
-                        "linkedin_url": getattr(mu, "linkedin_url", "") or "",
-                        "bio": getattr(mu, "bio", "") or "",
-                        "headline": getattr(mu, "headline", "") or "",
-                        "skills": getattr(mu, "skills", []) or [],
+                        **_serialize_full_profile(mu),
                         "program_name": pp.program.name, "program_id": str(pp.program.id),
                         "source": "vinculation",
                     })
@@ -5336,13 +5350,7 @@ async def get_my_mentees(portal_code: str):
                 if mu.id not in seen_ids:
                     seen_ids.add(mu.id)
                     mentees.append({
-                        "id": str(mu.id), "username": mu.username, "full_name": mu.display_name, "email": mu.email,
-                        "position": mu.position or "", "department": mu.department or "",
-                        "avatar_url": getattr(mu, "avatar_url", "") or "",
-                        "linkedin_url": getattr(mu, "linkedin_url", "") or "",
-                        "bio": getattr(mu, "bio", "") or "",
-                        "headline": getattr(mu, "headline", "") or "",
-                        "skills": getattr(mu, "skills", []) or [],
+                        **_serialize_full_profile(mu),
                         "program_name": pp.program.name, "program_id": str(pp.program.id),
                         "source": "vinculation",
                     })

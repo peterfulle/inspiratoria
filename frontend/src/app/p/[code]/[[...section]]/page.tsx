@@ -3344,6 +3344,173 @@ export default function ParticipantPortalPage() {
     trophy: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.318 2.916.52A6.003 6.003 0 0116.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.023 6.023 0 01-2.77.852m0 0a6.023 6.023 0 01-2.77-.852" /></svg>,
   };
 
+  // ── Perfil completo de la contraparte (mentor visto por mentee, o
+  // mentee visto por mentor) — helpers compartidos por "Mi Mentor" y por
+  // el detalle de "Mis Mentees", para que ambas vistas muestren toda la
+  // info del wizard de perfil con el mismo lenguaje visual. ──
+  const PARTNER_CHIP_STYLES: Record<string, { bg: string; fg: string }> = {
+    mentor_topics: { bg: '#ecfeff', fg: '#0e7490' },
+    mentor_objectives: { bg: '#f0fdf4', fg: '#166534' },
+    mentor_style: { bg: '#fef3c7', fg: '#92400e' },
+    experience_area: { bg: '#ede9fe', fg: '#5b21b6' },
+    mentee_preference: { bg: '#fce7f3', fg: '#9d174d' },
+    mentee_outcomes: { bg: '#fff7ed', fg: '#c2410c' },
+    session_structure: { bg: '#f0f9ff', fg: '#0369a1' },
+    mentee_goals: { bg: '#ecfeff', fg: '#0e7490' },
+    mentee_interests: { bg: '#f0fdf4', fg: '#166534' },
+    mentee_challenges: { bg: '#fef3c7', fg: '#92400e' },
+    mentee_expectations: { bg: '#fff7ed', fg: '#c2410c' },
+    preferred_mentor_style: { bg: '#fce7f3', fg: '#9d174d' },
+    session_format_preference: { bg: '#f0f9ff', fg: '#0369a1' },
+    skills: { bg: '#ecfeff', fg: '#0e7490' },
+  };
+
+  const partnerChipRow = (field: string, label: string, items?: string[]) => {
+    if (!items?.length) return null;
+    const st = PARTNER_CHIP_STYLES[field] || { bg: '#f3f4f6', fg: '#4b5563' };
+    return (
+      <div key={field}>
+        <div style={{ fontSize: '0.72rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const, marginBottom: 6 }}>{label}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {items.map(t => <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: st.bg, color: st.fg, fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>)}
+        </div>
+      </div>
+    );
+  };
+
+  const partnerCard = (title: string, rows: (JSX.Element | null)[]) => {
+    const content = rows.filter(Boolean);
+    if (!content.length) return null;
+    return (
+      <div className="prof-form-card" key={title}>
+        <div className="prof-form-head"><span className="prof-form-title">{title}</span></div>
+        <div className="prof-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{content}</div>
+      </div>
+    );
+  };
+
+  // p = perfil de la contraparte (ya viene "completo" desde my-mentor / mentees).
+  // role = rol de la contraparte ('mentor' o 'mentee').
+  const renderPartnerHero = (p: any, role: 'mentor' | 'mentee') => (
+    <div style={{ borderRadius: 20, overflow: 'hidden', marginBottom: 20, boxShadow: '0 4px 20px rgba(0,0,0,0.07)' }}>
+      <div style={{ height: 84, background: role === 'mentor' ? 'linear-gradient(135deg,#0e7490,#0891b2 55%,#06b6d4)' : 'linear-gradient(135deg,#4338ca,#6366f1 55%,#818cf8)' }} />
+      <div style={{ background: '#fff', padding: '0 28px 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 18, marginTop: -40 }}>
+          <div style={{ width: 88, height: 88, borderRadius: '50%', background: role === 'mentor' ? 'linear-gradient(135deg,#0891b2,#06b6d4)' : 'linear-gradient(135deg,#6366f1,#818cf8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.9rem', fontWeight: 800, color: '#fff', flexShrink: 0, overflow: 'hidden', border: '4px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
+            {p.avatar_url ? <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : bestName(p, role === 'mentor' ? 'M' : 'M').charAt(0).toUpperCase()}
+          </div>
+          <div style={{ flex: 1, paddingTop: 40 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 800, fontSize: '1.25rem', color: '#111827' }}>{bestName(p)}</span>
+              <span style={{ padding: '3px 10px', borderRadius: 8, background: role === 'mentor' ? '#ecfdf5' : '#eef2ff', color: role === 'mentor' ? '#047857' : '#4338ca', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.03em' }}>{role === 'mentor' ? 'Mentor' : 'Mentee'}</span>
+            </div>
+            {(p.headline || p.position) && <div style={{ fontSize: '0.9rem', color: '#6b7280', marginTop: 2 }}>{p.headline || p.position}</div>}
+          </div>
+        </div>
+
+        {p.bio && <p style={{ fontSize: '0.88rem', color: '#4b5563', lineHeight: 1.7, marginTop: 18 }}>{p.bio}</p>}
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 16 }}>
+          {p.email && (
+            <a href={`mailto:${p.email}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 20, background: '#f9fafb', border: '1px solid #f3f4f6', color: '#374151', fontSize: '0.78rem', textDecoration: 'none' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z" opacity="0"/><path d="M22 6l-10 7L2 6"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg> {p.email}
+            </a>
+          )}
+          {p.phone && (
+            <a href={`tel:${p.phone}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 20, background: '#f9fafb', border: '1px solid #f3f4f6', color: '#374151', fontSize: '0.78rem', textDecoration: 'none' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> {p.phone}
+            </a>
+          )}
+          {p.linkedin_url && (
+            <a href={p.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 20, background: '#eff6ff', border: '1px solid #dbeafe', color: '#1d4ed8', fontSize: '0.78rem', fontWeight: 600, textDecoration: 'none' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Ver perfil LinkedIn
+            </a>
+          )}
+        </div>
+
+        {/* Info tiles */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginTop: 18 }}>
+          {p.position && (
+            <div style={{ background: '#f9fafb', borderRadius: 10, padding: '10px 12px' }}>
+              <div style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const }}>Cargo</div>
+              <div style={{ fontSize: '0.82rem', color: '#111827', fontWeight: 600, marginTop: 2 }}>{p.position}</div>
+            </div>
+          )}
+          {p.department && (
+            <div style={{ background: '#f9fafb', borderRadius: 10, padding: '10px 12px' }}>
+              <div style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const }}>{role === 'mentor' ? 'Empresa / Área' : 'Empresa / Institución'}</div>
+              <div style={{ fontSize: '0.82rem', color: '#111827', fontWeight: 600, marginTop: 2 }}>{p.department}</div>
+            </div>
+          )}
+          {p.residence_city && (
+            <div style={{ background: '#f9fafb', borderRadius: 10, padding: '10px 12px' }}>
+              <div style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const }}>Ciudad de residencia</div>
+              <div style={{ fontSize: '0.82rem', color: '#111827', fontWeight: 600, marginTop: 2 }}>{p.residence_city}</div>
+            </div>
+          )}
+          {role === 'mentor' && p.work_location && (
+            <div style={{ background: '#f9fafb', borderRadius: 10, padding: '10px 12px' }}>
+              <div style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const }}>Localidad laboral</div>
+              <div style={{ fontSize: '0.82rem', color: '#111827', fontWeight: 600, marginTop: 2 }}>{p.work_location}</div>
+            </div>
+          )}
+          {role === 'mentee' && p.area_or_function && (
+            <div style={{ background: '#f9fafb', borderRadius: 10, padding: '10px 12px' }}>
+              <div style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const }}>Área o función</div>
+              <div style={{ fontSize: '0.82rem', color: '#111827', fontWeight: 600, marginTop: 2 }}>{p.area_or_function}</div>
+            </div>
+          )}
+          {role === 'mentee' && p.career && (
+            <div style={{ background: '#f9fafb', borderRadius: 10, padding: '10px 12px' }}>
+              <div style={{ fontSize: '0.68rem', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' as const }}>Carrera</div>
+              <div style={{ fontSize: '0.82rem', color: '#111827', fontWeight: 600, marginTop: 2 }}>{p.career}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderPartnerDetailCards = (p: any, role: 'mentor' | 'mentee') => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginBottom: 20 }}>
+      {role === 'mentor' ? (
+        <>
+          {partnerCard('Expertise de Mentoría', [
+            partnerChipRow('mentor_topics', 'Temas de valor', p.mentor_topics),
+            partnerChipRow('mentor_objectives', 'Objetivos que acompaña', p.mentor_objectives),
+            partnerChipRow('mentor_style', 'Estilo de acompañamiento', p.mentor_style),
+          ])}
+          {partnerCard('Experiencia y Preferencias', [
+            partnerChipRow('experience_area', 'Áreas de experiencia', p.experience_area),
+            partnerChipRow('mentee_preference', 'Perfil de mentee preferido', p.mentee_preference),
+          ])}
+          {partnerCard('Expectativas', [
+            partnerChipRow('mentee_outcomes', 'Lo que espera del mentee', p.mentee_outcomes),
+            partnerChipRow('session_structure', 'Estructura de sesiones', p.session_structure),
+          ])}
+          {partnerCard('Habilidades', [partnerChipRow('skills', 'Habilidades', p.skills)])}
+        </>
+      ) : (
+        <>
+          {partnerCard('Objetivos de Desarrollo', [
+            partnerChipRow('mentee_goals', 'Lo que quiere lograr', p.mentee_goals),
+            partnerChipRow('mentee_interests', 'Áreas de interés', p.mentee_interests),
+          ])}
+          {partnerCard('Experiencia y Contexto', [
+            partnerChipRow('experience_area', 'Área de desempeño', p.experience_area),
+            partnerChipRow('mentee_challenges', 'Desafíos actuales', p.mentee_challenges),
+          ])}
+          {partnerCard('Expectativas del Proceso', [
+            partnerChipRow('mentee_expectations', 'Lo que espera de su mentor/a', p.mentee_expectations),
+            partnerChipRow('preferred_mentor_style', 'Estilo de mentor preferido', p.preferred_mentor_style),
+            partnerChipRow('session_format_preference', 'Formato de sesiones preferido', p.session_format_preference),
+          ])}
+          {partnerCard('Habilidades', [partnerChipRow('skills', 'Habilidades', p.skills)])}
+        </>
+      )}
+    </div>
+  );
+
   // ═══════════════════════════════════════════════════════════════
   // RENDER: MIS MENTEES
   // ═══════════════════════════════════════════════════════════════
@@ -3364,31 +3531,14 @@ export default function ParticipantPortalPage() {
             <button onClick={() => setSelectedMentee(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }}>← </button>
             <div><h1 className="dash-title">Perfil de {bestName(m)}</h1><p className="dash-subtitle">{m.program_name}</p></div>
           </div>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-            <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', fontWeight: 700, color: '#0891b2', overflow: 'hidden', flexShrink: 0 }}>
-                {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : bestName(m, 'M').charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#111827' }}>{bestName(m)}</div>
-                <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>{m.headline || m.position || ''}</div>
-                <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{m.department || ''}</div>
-              </div>
-            </div>
-            {m.bio && <div style={{ marginBottom: 16 }}><div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 4 }}>Bio</div><p style={{ fontSize: '0.85rem', color: '#4b5563', lineHeight: 1.6 }}>{m.bio}</p></div>}
-            {m.linkedin_url && <div style={{ marginBottom: 16 }}><a href={m.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Ver perfil LinkedIn</a></div>}
-            {m.skills?.length > 0 && (
-              <div><div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 8 }}>Habilidades</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{m.skills.map((s: string) => <span key={s} style={{ padding: '4px 12px', borderRadius: 16, background: '#ecfeff', color: '#0e7490', fontSize: '0.75rem', fontWeight: 500 }}>{s}</span>)}</div>
-              </div>
-            )}
-            <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
-              <button onClick={() => { setSessionForm(f => ({ ...f, mentee_id: m.id, program_id: m.program_id })); setShowSessionForm(true); navigate('my-sessions'); }} style={{ padding: '10px 20px', borderRadius: 10, background: '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Agendar sesión</button>
-            </div>
+          {renderPartnerHero(m, 'mentee')}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+            <button onClick={() => { setSessionForm(f => ({ ...f, mentee_id: m.id, program_id: m.program_id })); setShowSessionForm(true); }} style={{ padding: '10px 20px', borderRadius: 10, background: '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Agendar sesión</button>
           </div>
+          {renderPartnerDetailCards(m, 'mentee')}
 
           {/* Ficha 360 — avance, sesiones, compromisos, tendencia emocional */}
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, marginTop: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 28, marginTop: 4, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
             <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#111827', marginBottom: 16 }}>Seguimiento de mentoría</div>
             {menteeStatsLoading ? (
               <InlineSpinner />
@@ -4802,55 +4952,8 @@ export default function ParticipantPortalPage() {
       <div>
         <div className="dash-header"><h1 className="dash-title">Mi Mentor</h1><p className="dash-subtitle">{m.program_name}</p></div>
 
-        {/* Mentor profile card */}
-        <div style={{ background: '#fff', borderRadius: 18, padding: 28, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #f3f4f6', marginBottom: 24 }}>
-          <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', marginBottom: 20 }}>
-            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #0891b2, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', fontWeight: 800, color: '#fff', flexShrink: 0, overflow: 'hidden' }}>
-              {m.avatar_url ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : bestName(m, 'M').charAt(0).toUpperCase()}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: '1.2rem', color: '#111827', marginBottom: 4 }}>{bestName(m)}</div>
-              <div style={{ fontSize: '0.88rem', color: '#6b7280', marginBottom: 4 }}>{m.headline || m.position || ''}</div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ padding: '3px 10px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.72rem', fontWeight: 600 }}>Mentor</span>
-                {m.department && <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>{m.department}</span>}
-              </div>
-            </div>
-          </div>
-
-          {m.bio && <p style={{ fontSize: '0.88rem', color: '#4b5563', lineHeight: 1.7, marginBottom: 16 }}>{m.bio}</p>}
-
-          {m.mentor_style && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 6 }}>Estilo de mentoría</div>
-              <div style={{ fontSize: '0.85rem', color: '#4b5563', padding: '10px 14px', background: '#f0fdfa', borderRadius: 10, border: '1px solid #ccfbf1' }}>{m.mentor_style}</div>
-            </div>
-          )}
-
-          {m.mentor_topics?.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 6 }}>Temas de mentoría</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {m.mentor_topics.map((t: string) => <span key={t} style={{ padding: '4px 12px', borderRadius: 16, background: '#e0f2fe', color: '#0e7490', fontSize: '0.75rem', fontWeight: 500 }}>{t}</span>)}
-              </div>
-            </div>
-          )}
-
-          {m.skills?.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151', marginBottom: 6 }}>Habilidades</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {m.skills.map((s: string) => <span key={s} style={{ padding: '4px 12px', borderRadius: 16, background: '#ecfeff', color: '#0e7490', fontSize: '0.75rem', fontWeight: 500 }}>{s}</span>)}
-              </div>
-            </div>
-          )}
-
-          {m.linkedin_url && (
-            <a href={m.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0891b2', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Ver perfil LinkedIn
-            </a>
-          )}
-        </div>
+        {renderPartnerHero(m, 'mentor')}
+        {renderPartnerDetailCards(m, 'mentor')}
 
         {/* Quick stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
