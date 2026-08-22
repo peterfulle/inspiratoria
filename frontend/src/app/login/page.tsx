@@ -10,6 +10,11 @@ const VIDEOS = [
   "/videos/veo-studio-creation (2).mp4",
 ];
 
+// Roles de participante del portal de mentoría — deben ir directo a
+// /p/{portal_code}, nunca a /studio o /dashboard (evita el flash de
+// StudioOS morado que se pintaba antes del redirect en /studio/[slug]).
+const PARTICIPANT_ROLES = ["facilitator", "mentor", "mentee", "participant_cell", "participant", "facilitator_internal"];
+
 export default function LoginPage() {
   const [step, setStep] = useState<'email' | 'otp' | 'totp'>('email');
   const [email, setEmail] = useState("");
@@ -63,10 +68,9 @@ export default function LoginPage() {
       const pp = ppRaw ? JSON.parse(ppRaw) : null;
       const role = user?.role;
       const portalCode = user?.portal_code;
-      const participantRoles = ['facilitator', 'mentor', 'mentee', 'participant_cell', 'participant', 'facilitator_internal'];
-      if (participantRoles.includes(role) && portalCode) {
+      if (PARTICIPANT_ROLES.includes(role) && portalCode) {
         router.replace(`/p/${portalCode}`);
-      } else if (pp && pp.company_slug && portalCode && participantRoles.includes(role)) {
+      } else if (pp && pp.company_slug && portalCode && PARTICIPANT_ROLES.includes(role)) {
         router.replace(`/p/${portalCode}`);
       } else if (role === "admin_root" || role === "inspiratoria_admin" || role === "superadmin") {
         router.replace("/dashboard");
@@ -89,7 +93,11 @@ export default function LoginPage() {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
-  const getDashboardRoute = (role: string, hasCompany: boolean): string => {
+  const getDashboardRoute = (user: any, hasCompany: boolean): string => {
+    const role = user?.role;
+    if (PARTICIPANT_ROLES.includes(role) && user?.portal_code) {
+      return `/p/${user.portal_code}`;
+    }
     if (role === "admin_root" || role === "inspiratoria_admin" || role === "superadmin") {
       return "/dashboard";
     }
@@ -186,8 +194,8 @@ export default function LoginPage() {
         if (data.expires_at) {
           localStorage.setItem("session_expires_at", data.expires_at);
         }
-        const route = getDashboardRoute(data.user.role, !!data.company);
-        router.push(route);
+        const route = getDashboardRoute(data.user, !!data.company);
+        router.replace(route);
       } else {
         const data = await res.json();
         setError(data.detail || "Código incorrecto");
@@ -307,8 +315,8 @@ export default function LoginPage() {
         if (data.expires_at) {
           localStorage.setItem("session_expires_at", data.expires_at);
         }
-        const route = getDashboardRoute(data.user.role, !!data.company);
-        router.push(route);
+        const route = getDashboardRoute(data.user, !!data.company);
+        router.replace(route);
       } else {
         const data = await res.json();
         setError(data.detail || "Código incorrecto");
