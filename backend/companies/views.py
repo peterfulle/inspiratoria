@@ -1980,16 +1980,29 @@ def _generate_otp() -> str:
 INSPIRATORIA_LOGO_CID = "inspiratoria_logo"
 
 
-def send_branded_html_email(subject: str, plain_message: str, html_message: str, to_email: str, cc: list[str] | None = None) -> None:
+def send_branded_html_email(
+    subject: str,
+    plain_message: str,
+    html_message: str,
+    to_email: str,
+    cc: list[str] | None = None,
+    ics_content: str | None = None,
+) -> None:
     """Envía un email HTML con el logo de Inspiratoria incrustado como adjunto
     inline (CID) en vez de una <img> apuntando a una URL remota. La mayoría de
     clientes de correo bloquean imágenes remotas por defecto en el primer
     envío ("mostrar imágenes"), lo que hacía que el logo apareciera roto o
     invisible — un adjunto inline no depende de esa carga externa.
     El html_message debe referenciar el logo como src="cid:{INSPIRATORIA_LOGO_CID}".
+
+    Si se pasa `ics_content`, se adjunta como invitación de calendario real
+    (.ics) — funciona en Gmail/Outlook/Apple Mail sin depender de que Google
+    Calendar haya creado el evento (a diferencia del Meet autogenerado, que
+    solo invita bien a quienes usan Gmail).
     """
     from django.core.mail import EmailMultiAlternatives
     from email.mime.image import MIMEImage
+    from email.mime.text import MIMEText
     from pathlib import Path
 
     msg = EmailMultiAlternatives(
@@ -2010,7 +2023,53 @@ def send_branded_html_email(subject: str, plain_message: str, html_message: str,
         logo_image.add_header("Content-Disposition", "inline", filename="logo.png")
         msg.attach(logo_image)
 
+    if ics_content:
+        ics_part = MIMEText(ics_content, "calendar", "utf-8")
+        ics_part.set_param("method", "REQUEST")
+        ics_part.add_header("Content-Disposition", "attachment", filename="sesion.ics")
+        msg.attach(ics_part)
+
     msg.send(fail_silently=False)
+
+
+def build_session_ics(session, mentor, mentee, program) -> str:
+    """Invitación de calendario mínima (RFC 5545) para una MentoringSession —
+    funciona igual sea el link un Google Meet autogenerado o un Zoom/Teams
+    que el mentor escribió a mano, porque no depende de la API de Google
+    Calendar para crear el evento."""
+    from datetime import timezone as _dt_timezone
+
+    def _fmt(dt) -> str:
+        return dt.astimezone(_dt_timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+    now = timezone.now()
+    dtstart = session.scheduled_at
+    dtend = dtstart + timedelta(minutes=session.duration_minutes)
+    location = session.meeting_url or session.location or ""
+    description = (session.description or "").replace("\n", "\\n")
+
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Inspiratoria//Mentoring//ES",
+        "CALSCALE:GREGORIAN",
+        "METHOD:REQUEST",
+        "BEGIN:VEVENT",
+        f"UID:{session.id}@inspiratoria.org",
+        f"DTSTAMP:{_fmt(now)}",
+        f"DTSTART:{_fmt(dtstart)}",
+        f"DTEND:{_fmt(dtend)}",
+        f"SUMMARY:{session.title}",
+        f"DESCRIPTION:{description}",
+        f"LOCATION:{location}",
+        f"ORGANIZER;CN={mentor.full_name or mentor.email}:mailto:{mentor.email}",
+        f"ATTENDEE;CN={mentee.full_name or mentee.email};RSVP=TRUE:mailto:{mentee.email}",
+        "STATUS:CONFIRMED",
+        "SEQUENCE:0",
+        "END:VEVENT",
+        "END:VCALENDAR",
+    ]
+    return "\r\n".join(lines)
 
 
 def _send_otp_email(user_email: str, user_name: str, otp_code: str, is_login: bool = False, activation_token: str = ""):
@@ -5318,6 +5377,7 @@ class SessionNotesRequest(BaseModel):
     topics_covered: list = []
     mentee_mood: Optional[int] = None
     next_steps: str = ""
+    resources: list = []
 
 
 @router.get("/portal/{portal_code}/sessions")
@@ -5348,6 +5408,7 @@ async def get_my_sessions(portal_code: str):
             "mentee_reflection_at": s.mentee_reflection_at.isoformat() if s.mentee_reflection_at else None,
             "mentor_acknowledged_at": s.mentor_acknowledged_at.isoformat() if s.mentor_acknowledged_at else None,
             "mentor_acknowledgment_note": s.mentor_acknowledgment_note or "",
+            "resources": s.resources or [],
         } for s in sessions]}
 
     return await sync_to_async(_resolve)()
@@ -5547,7 +5608,7 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
         <div style="background-color:#f9fafb;padding:40px 16px;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
           <div style="max-width:520px;margin:0 auto;">
             <div style="text-align:center;padding-bottom:32px;">
-              <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#0a0a0a;">Inspiratoria</span>
+              <img src="cid:{INSPIRATORIA_LOGO_CID}" alt="Inspiratoria" style="height:36px;width:auto;" />
             </div>
             <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:40px 36px;">
               <p style="margin:0 0 8px 0;color:#111827;font-size:17px;font-weight:600;">
@@ -5602,7 +5663,7 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
         <div style="background-color:#f9fafb;padding:40px 16px;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
           <div style="max-width:520px;margin:0 auto;">
             <div style="text-align:center;padding-bottom:32px;">
-              <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#0a0a0a;">Inspiratoria</span>
+              <img src="cid:{INSPIRATORIA_LOGO_CID}" alt="Inspiratoria" style="height:36px;width:auto;" />
             </div>
             <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:40px 36px;">
               <p style="margin:0 0 8px 0;color:#111827;font-size:17px;font-weight:600;">
@@ -5650,26 +5711,33 @@ async def create_session(portal_code: str, payload: SessionCreateRequest):
           </div>
         </div>"""
 
-        # Send emails (fail_silently so session creation still succeeds)
+        # Invitación de calendario real (.ics) — funciona con cualquier link
+        # (Meet/Zoom/Teams) y en cualquier cliente de correo, a diferencia
+        # del invite automático de Google Calendar que solo llega bien vía
+        # Gmail y solo cuando el Meet se autogeneró.
         try:
-            send_mail(
+            ics = build_session_ics(session, mentor=user, mentee=mentee, program=program)
+        except Exception:
+            ics = None
+
+        # Send emails (fail_silently — que no envíe no bloquea la creación)
+        try:
+            send_branded_html_email(
                 subject=f"📅 Nueva sesión de mentoría: {session.title}",
-                message=f"Tu mentor {user.full_name or user.email} agendó una sesión \"{session.title}\" para el {formatted_date}. Programa: {program.name}.",
-                from_email=django_settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[mentee.email],
+                plain_message=f"Tu mentor {user.full_name or user.email} agendó una sesión \"{session.title}\" para el {formatted_date}. Programa: {program.name}.",
                 html_message=mentee_html,
-                fail_silently=True,
+                to_email=mentee.email,
+                ics_content=ics,
             )
         except Exception:
             pass
         try:
-            send_mail(
+            send_branded_html_email(
                 subject=f"✅ Sesión confirmada: {session.title}",
-                message=f"Creaste la sesión \"{session.title}\" con {mentee.full_name or mentee.email} para el {formatted_date}. Programa: {program.name}.",
-                from_email=django_settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
+                plain_message=f"Creaste la sesión \"{session.title}\" con {mentee.full_name or mentee.email} para el {formatted_date}. Programa: {program.name}.",
                 html_message=mentor_html,
-                fail_silently=True,
+                to_email=user.email,
+                ics_content=ics,
             )
         except Exception:
             pass
@@ -5762,6 +5830,8 @@ async def save_session_notes(portal_code: str, session_id: str, payload: Session
         session.topics_covered = payload.topics_covered
         session.mentee_mood = payload.mentee_mood
         session.next_steps = payload.next_steps
+        if payload.resources:
+            session.resources = payload.resources
         session.save()
         return {"success": True}
 

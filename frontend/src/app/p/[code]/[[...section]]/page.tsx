@@ -1019,6 +1019,7 @@ export default function ParticipantPortalPage() {
   const [showSessionForm, setShowSessionForm] = useState(false);
   const [editingSession, setEditingSession] = useState<any>(null);
   const [sessionNotesForm, setSessionNotesForm] = useState({ session_notes: '', topics_covered: [] as string[], mentee_mood: 0, next_steps: '' });
+  const [sessionNotesResources, setSessionNotesResources] = useState<any[]>([]);
   const [showNotesModal, setShowNotesModal] = useState<any>(null);
   const [aiSuggestion, setAiSuggestion] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -1311,10 +1312,10 @@ export default function ParticipantPortalPage() {
       .finally(() => setBadgesLoading(false));
   }, [activeNav, portalCode]);
 
-  // Fetch mentees when entering mentees OR sessions tab (mentor only)
+  // Fetch mentees when entering mentees, sessions OR módulos tab (mentor only)
   useEffect(() => {
-    if ((activeNav !== 'my-mentees' && activeNav !== 'my-sessions') || !portalCode || isMentee) return;
-    if (myMentees.length > 0 && activeNav === 'my-sessions') return; // already loaded
+    if ((activeNav !== 'my-mentees' && activeNav !== 'my-sessions' && activeNav !== 'my-modules') || !portalCode || isMentee) return;
+    if (myMentees.length > 0 && activeNav !== 'my-mentees') return; // already loaded
     setMenteesLoading(true);
     apiFetch(`${API_URL}/api/companies/portal/${portalCode}/mentees`)
       .then(r => r.ok ? r.json() : { mentees: [] })
@@ -1336,12 +1337,12 @@ export default function ParticipantPortalPage() {
       .finally(() => setMentorLoading(false));
   }, [activeNav, portalCode, isMentee]);
 
-  // Fetch sessions when entering the sessions tab or mentee dashboard/mentor view
+  // Fetch sessions when entering sessions/módulos tab or mentee dashboard/mentor view
   useEffect(() => {
     if (!portalCode) return;
-    const needsSessions = activeNav === 'my-sessions' || (isMentee && (activeNav === 'dashboard' || activeNav === 'my-mentor'));
+    const needsSessions = activeNav === 'my-sessions' || activeNav === 'my-modules' || (isMentee && (activeNav === 'dashboard' || activeNav === 'my-mentor'));
     if (!needsSessions) return;
-    if (mySessions.length > 0 && activeNav !== 'my-sessions') return; // already loaded from sessions tab
+    if (mySessions.length > 0 && activeNav !== 'my-sessions' && activeNav !== 'my-modules') return; // already loaded
     setSessionsLoading(true);
     apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`)
       .then(r => r.ok ? r.json() : { sessions: [] })
@@ -2006,6 +2007,9 @@ export default function ParticipantPortalPage() {
           onBack={() => navigate('dashboard')}
           backLabel="Resumen"
           variant="portal"
+          portalSessions={mySessions}
+          onScheduleSession={openScheduleSessionModal}
+          canScheduleSessions={!isMentee}
         />
         <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 24px' }}>
           {renderActivityTracker()}
@@ -3517,14 +3521,29 @@ export default function ParticipantPortalPage() {
     setSessionCreating(false);
   };
 
+  // Agendar desde un módulo: pre-llena el formulario con "Sesión N | {módulo}"
+  // y el mentee vinculado a este programa, y abre el mismo modal de siempre.
+  const openScheduleSessionModal = (moduleIndex: number, moduleName: string) => {
+    if (isAdminPreview) { blockInPreview(); return; }
+    const mentee = myMentees.find((m: any) => m.program_id === selectedProgram?.id);
+    setSessionFormError('');
+    setSessionForm({
+      mentee_id: mentee?.id || '', program_id: mentee?.program_id || selectedProgram?.id || '',
+      title: `Sesión ${moduleIndex + 1} | ${moduleName}`, description: '', scheduled_at: '',
+      duration_minutes: 60, modality: 'online', meeting_url: '', location: '', location_instructions: '',
+    });
+    setShowSessionForm(true);
+  };
+
   const handleSaveNotes = async (sessionId: string) => {
     if (isAdminPreview) { blockInPreview(); return; }
     try {
       await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions/${sessionId}/notes`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sessionNotesForm),
+        body: JSON.stringify({ ...sessionNotesForm, resources: sessionNotesResources }),
       });
       setShowNotesModal(null);
+      setSessionNotesResources([]);
       // Refresh
       const res = await apiFetch(`${API_URL}/api/companies/portal/${portalCode}/sessions`);
       if (res.ok) { const d = await res.json(); setMySessions(d.sessions || []); }
@@ -3549,6 +3568,24 @@ export default function ParticipantPortalPage() {
       setAiError('Error de conexión. Revisa tu internet e intenta de nuevo.');
     }
     setAiLoading(false);
+  };
+
+  // Subida de contenido a la sesión — mismo patrón base64 que Studio usa
+  // para recursos de módulo (Content.resources), aplicado a MentoringSession.
+  const handleSessionResourceUpload = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    Promise.all(
+      Array.from(files).map(file => new Promise<any>(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({
+          id: `sres-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          name: file.name.replace(/\.[^/.]+$/, ''), type: file.type || 'document',
+          url: '', dataUrl: reader.result as string, fileName: file.name,
+          size: file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        });
+        reader.readAsDataURL(file);
+      }))
+    ).then(newResources => setSessionNotesResources(prev => [...prev, ...newResources]));
   };
 
   const handleCompleteSession = async (sessionId: string) => {
@@ -3604,6 +3641,77 @@ export default function ParticipantPortalPage() {
     } catch {}
   };
 
+  // Modal de agendar sesión — vive a nivel superior porque ahora se dispara
+  // tanto desde Módulos (por módulo) como, si se abre igual, desde el propio
+  // registro de Sesiones, y debe montarse sin importar el tab activo.
+  const renderSessionFormModal = () => {
+    if (!showSessionForm) return null;
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 500, maxHeight: '90vh', overflow: 'auto' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 16 }}>Nueva Sesión de Mentoría</h3>
+          {sessionFormError && <div style={{ background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14 }}>{sessionFormError}</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="prof-field">
+              <label>Mentee *</label>
+              {menteesLoading ? (
+                <div style={{ fontSize: '0.82rem', color: '#6b7280', padding: 8 }}>Cargando participantes...</div>
+              ) : myMentees.length > 0 ? (
+                <select value={sessionForm.mentee_id} onChange={e => { const mt = myMentees.find((m: any) => m.id === e.target.value); setSessionForm(f => ({ ...f, mentee_id: e.target.value, program_id: mt?.program_id || f.program_id })); }} style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: '0.85rem' }}>
+                  <option value="">Seleccionar mentee...</option>
+                  {myMentees.map((m: any) => <option key={m.id} value={m.id}>{bestName(m)} — {m.program_name}</option>)}
+                </select>
+              ) : (
+                <div style={{ fontSize: '0.82rem', color: '#9ca3af', padding: 8, background: '#f9fafb', borderRadius: 10 }}>No hay mentees asignados en tus programas</div>
+              )}
+            </div>
+            <div className="prof-field"><label>Título *</label><input value={sessionForm.title} onChange={e => setSessionForm(f => ({ ...f, title: e.target.value }))} placeholder="Ej: Sesión de alineación de objetivos" /></div>
+            <div className="prof-field"><label>Fecha y hora *</label><input type="datetime-local" value={sessionForm.scheduled_at} onChange={e => setSessionForm(f => ({ ...f, scheduled_at: e.target.value }))} /></div>
+            <div className="prof-field"><label>Duración (min)</label><input type="number" value={sessionForm.duration_minutes} onChange={e => setSessionForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 60 }))} /></div>
+            <div className="prof-field">
+              <label>Modalidad *</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {([
+                  { v: 'online', l: 'Online' },
+                  { v: 'in_person', l: 'Presencial' },
+                  { v: 'hybrid', l: 'Híbrida' },
+                ] as const).map(opt => (
+                  <button key={opt.v} type="button" onClick={() => setSessionForm(f => ({ ...f, modality: opt.v }))}
+                    style={{ flex: 1, padding: '9px 10px', borderRadius: 10, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: sessionForm.modality === opt.v ? '1.5px solid #0891b2' : '1.5px solid #d1d5db', background: sessionForm.modality === opt.v ? '#ecfeff' : '#fff', color: sessionForm.modality === opt.v ? '#0e7490' : '#374151' }}>
+                    {opt.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {sessionForm.modality !== 'in_person' && (
+              <div className="prof-field">
+                <label>Enlace de reunión (opcional)</label>
+                <input value={sessionForm.meeting_url} onChange={e => setSessionForm(f => ({ ...f, meeting_url: e.target.value }))} placeholder="Se genera automáticamente un Google Meet si lo dejas vacío" />
+              </div>
+            )}
+            {sessionForm.modality !== 'online' && (
+              <>
+                <div className="prof-field">
+                  <label>Ubicación *</label>
+                  <input value={sessionForm.location} onChange={e => setSessionForm(f => ({ ...f, location: e.target.value }))} placeholder="Ej: Oficinas SQM Antofagasta, Av. Grecia 1234" />
+                </div>
+                <div className="prof-field">
+                  <label>Instrucciones de llegada (opcional)</label>
+                  <textarea value={sessionForm.location_instructions} onChange={e => setSessionForm(f => ({ ...f, location_instructions: e.target.value }))} rows={2} placeholder="Ej: Preguntar en recepción por..." />
+                </div>
+              </>
+            )}
+            <div className="prof-field"><label>Descripción</label><textarea value={sessionForm.description} onChange={e => setSessionForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Temas a tratar..." /></div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
+            <button onClick={() => { setShowSessionForm(false); setSessionFormError(''); }} style={{ padding: '10px 20px', borderRadius: 10, background: '#f3f4f6', border: 'none', fontSize: '0.82rem', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={handleCreateSession} disabled={sessionCreating} style={{ padding: '10px 20px', borderRadius: 10, background: sessionCreating ? '#9ca3af' : '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: sessionCreating ? 'not-allowed' : 'pointer' }}>{sessionCreating ? 'Creando...' : 'Crear sesión'}</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderSessions = () => {
     if (sessionsLoading) return <InlineSpinner />;
 
@@ -3613,75 +3721,8 @@ export default function ParticipantPortalPage() {
     return (
       <div>
         <div className="dash-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div><h1 className="dash-title">Sesiones de Mentoría</h1><p className="dash-subtitle">{mySessions.length} sesiones total</p></div>
-          <button onClick={() => setShowSessionForm(true)} style={{ padding: '10px 20px', borderRadius: 10, background: '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>+ Nueva sesión</button>
+          <div><h1 className="dash-title">Sesiones de Mentoría</h1><p className="dash-subtitle">{mySessions.length} sesiones total • agenda desde Módulos</p></div>
         </div>
-
-        {/* New session form modal */}
-        {showSessionForm && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 500, maxHeight: '90vh', overflow: 'auto' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 16 }}>Nueva Sesión de Mentoría</h3>
-              {sessionFormError && <div style={{ background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14 }}>{sessionFormError}</div>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div className="prof-field">
-                  <label>Mentee *</label>
-                  {menteesLoading ? (
-                    <div style={{ fontSize: '0.82rem', color: '#6b7280', padding: 8 }}>Cargando participantes...</div>
-                  ) : myMentees.length > 0 ? (
-                    <select value={sessionForm.mentee_id} onChange={e => { const mt = myMentees.find((m: any) => m.id === e.target.value); setSessionForm(f => ({ ...f, mentee_id: e.target.value, program_id: mt?.program_id || f.program_id })); }} style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid #d1d5db', fontSize: '0.85rem' }}>
-                      <option value="">Seleccionar mentee...</option>
-                      {myMentees.map((m: any) => <option key={m.id} value={m.id}>{bestName(m)} — {m.program_name}</option>)}
-                    </select>
-                  ) : (
-                    <div style={{ fontSize: '0.82rem', color: '#9ca3af', padding: 8, background: '#f9fafb', borderRadius: 10 }}>No hay mentees asignados en tus programas</div>
-                  )}
-                </div>
-                <div className="prof-field"><label>Título *</label><input value={sessionForm.title} onChange={e => setSessionForm(f => ({ ...f, title: e.target.value }))} placeholder="Ej: Sesión de alineación de objetivos" /></div>
-                <div className="prof-field"><label>Fecha y hora *</label><input type="datetime-local" value={sessionForm.scheduled_at} onChange={e => setSessionForm(f => ({ ...f, scheduled_at: e.target.value }))} /></div>
-                <div className="prof-field"><label>Duración (min)</label><input type="number" value={sessionForm.duration_minutes} onChange={e => setSessionForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 60 }))} /></div>
-                <div className="prof-field">
-                  <label>Modalidad *</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {([
-                      { v: 'online', l: 'Online' },
-                      { v: 'in_person', l: 'Presencial' },
-                      { v: 'hybrid', l: 'Híbrida' },
-                    ] as const).map(opt => (
-                      <button key={opt.v} type="button" onClick={() => setSessionForm(f => ({ ...f, modality: opt.v }))}
-                        style={{ flex: 1, padding: '9px 10px', borderRadius: 10, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: sessionForm.modality === opt.v ? '1.5px solid #0891b2' : '1.5px solid #d1d5db', background: sessionForm.modality === opt.v ? '#ecfeff' : '#fff', color: sessionForm.modality === opt.v ? '#0e7490' : '#374151' }}>
-                        {opt.l}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {sessionForm.modality !== 'in_person' && (
-                  <div className="prof-field">
-                    <label>Enlace de reunión (opcional)</label>
-                    <input value={sessionForm.meeting_url} onChange={e => setSessionForm(f => ({ ...f, meeting_url: e.target.value }))} placeholder="Se genera automáticamente un Google Meet si lo dejas vacío" />
-                  </div>
-                )}
-                {sessionForm.modality !== 'online' && (
-                  <>
-                    <div className="prof-field">
-                      <label>Ubicación *</label>
-                      <input value={sessionForm.location} onChange={e => setSessionForm(f => ({ ...f, location: e.target.value }))} placeholder="Ej: Oficinas SQM Antofagasta, Av. Grecia 1234" />
-                    </div>
-                    <div className="prof-field">
-                      <label>Instrucciones de llegada (opcional)</label>
-                      <textarea value={sessionForm.location_instructions} onChange={e => setSessionForm(f => ({ ...f, location_instructions: e.target.value }))} rows={2} placeholder="Ej: Preguntar en recepción por..." />
-                    </div>
-                  </>
-                )}
-                <div className="prof-field"><label>Descripción</label><textarea value={sessionForm.description} onChange={e => setSessionForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Temas a tratar..." /></div>
-              </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
-                <button onClick={() => { setShowSessionForm(false); setSessionFormError(''); }} style={{ padding: '10px 20px', borderRadius: 10, background: '#f3f4f6', border: 'none', fontSize: '0.82rem', cursor: 'pointer' }}>Cancelar</button>
-                <button onClick={handleCreateSession} disabled={sessionCreating} style={{ padding: '10px 20px', borderRadius: 10, background: sessionCreating ? '#9ca3af' : '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: sessionCreating ? 'not-allowed' : 'pointer' }}>{sessionCreating ? 'Creando...' : 'Crear sesión'}</button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Notes modal */}
         {showNotesModal && (
@@ -3695,9 +3736,27 @@ export default function ParticipantPortalPage() {
                   <div style={{ display: 'flex', gap: 8 }}>{[1,2,3,4,5].map(n => <button key={n} type="button" onClick={() => setSessionNotesForm(f => ({ ...f, mentee_mood: n }))} style={{ width: 40, height: 40, borderRadius: '50%', border: sessionNotesForm.mentee_mood === n ? '2px solid #0891b2' : '1.5px solid #d1d5db', background: sessionNotesForm.mentee_mood === n ? '#ecfeff' : '#fff', fontWeight: 600, cursor: 'pointer' }}>{n}</button>)}</div>
                 </div>
                 <div className="prof-field"><label>Próximos pasos</label><textarea value={sessionNotesForm.next_steps} onChange={e => setSessionNotesForm(f => ({ ...f, next_steps: e.target.value }))} rows={3} placeholder="Acciones acordadas para la siguiente sesión..." /></div>
+                <div className="prof-field">
+                  <label>Contenido de la sesión (opcional)</label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: '1.5px dashed #d1d5db', fontSize: '0.8rem', color: '#4b5563', cursor: 'pointer', width: 'fit-content' }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Subir archivo
+                    <input type="file" multiple style={{ display: 'none' }} onChange={e => { handleSessionResourceUpload(e.target.files); e.target.value = ''; }} />
+                  </label>
+                  {sessionNotesResources.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                      {sessionNotesResources.map((r: any) => (
+                        <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: '#f9fafb', fontSize: '0.78rem', color: '#374151' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.fileName || r.name} <span style={{ color: '#9ca3af' }}>· {r.size}</span></span>
+                          <button type="button" onClick={() => setSessionNotesResources(prev => prev.filter((x: any) => x.id !== r.id))} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>Quitar</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
-                <button onClick={() => setShowNotesModal(null)} style={{ padding: '10px 20px', borderRadius: 10, background: '#f3f4f6', border: 'none', fontSize: '0.82rem', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={() => { setShowNotesModal(null); setSessionNotesResources([]); }} style={{ padding: '10px 20px', borderRadius: 10, background: '#f3f4f6', border: 'none', fontSize: '0.82rem', cursor: 'pointer' }}>Cancelar</button>
                 <button onClick={() => handleSaveNotes(showNotesModal.id)} style={{ padding: '10px 20px', borderRadius: 10, background: '#0891b2', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Guardar notas</button>
               </div>
 
@@ -3760,7 +3819,7 @@ export default function ParticipantPortalPage() {
                   )}
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                     <button onClick={() => handleCompleteSession(s.id)} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #10b981', background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Completar</button>
-                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setAiError(''); setAiManualTemplate(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Notas</button>
+                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setAiError(''); setAiManualTemplate(''); setSessionNotesResources(s.resources || []); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Notas</button>
                   </div>
                 </div>
               ))}
@@ -3780,6 +3839,16 @@ export default function ParticipantPortalPage() {
                     <span style={{ padding: '4px 10px', borderRadius: 8, background: '#ecfdf5', color: '#047857', fontSize: '0.72rem', fontWeight: 600 }}>Completada</span>
                   </div>
                   {s.session_notes && <div style={{ fontSize: '0.8rem', color: '#4b5563', marginTop: 6, lineHeight: 1.5, borderLeft: '3px solid #e5e7eb', paddingLeft: 12 }}>{s.session_notes.slice(0, 200)}{s.session_notes.length > 200 ? '...' : ''}</div>}
+                  {s.resources?.length > 0 && (
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {s.resources.map((r: any) => (
+                        <a key={r.id} href={r.dataUrl || r.url} download={r.fileName || r.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: '#f9fafb', fontSize: '0.78rem', color: '#0891b2', textDecoration: 'none' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#374151' }}>{r.fileName || r.name} <span style={{ color: '#9ca3af' }}>· {r.size}</span></span>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        </a>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Reflexión de la mentee — bitácora propia, no depende de las notas del mentor */}
                   {s.mentee_reflection && (
@@ -3800,8 +3869,8 @@ export default function ParticipantPortalPage() {
                   )}
 
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setAiError(''); setAiManualTemplate(''); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> {s.session_notes ? 'Ver notas' : 'Agregar notas'}</span></button>
-                    <button onClick={() => { setAiSuggestion(''); setAiError(''); setAiManualTemplate(''); setShowNotesModal(s); setTimeout(() => handleAiSuggest(s.id), 200); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #8b5cf6', background: '#f5f3ff', color: '#6d28d9', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6d28d9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> IA: Próxima sesión</button>
+                    <button onClick={() => { setSessionNotesForm({ session_notes: s.session_notes || '', topics_covered: s.topics_covered || [], mentee_mood: s.mentee_mood || 0, next_steps: s.next_steps || '' }); setAiSuggestion(''); setAiError(''); setAiManualTemplate(''); setSessionNotesResources(s.resources || []); setShowNotesModal(s); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #6366f1', background: '#eef2ff', color: '#4338ca', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> {s.session_notes ? 'Ver notas' : 'Agregar notas'}</span></button>
+                    <button onClick={() => { setAiSuggestion(''); setAiError(''); setAiManualTemplate(''); setSessionNotesResources(s.resources || []); setShowNotesModal(s); setTimeout(() => handleAiSuggest(s.id), 200); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1.5px solid #8b5cf6', background: '#f5f3ff', color: '#6d28d9', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6d28d9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> IA: Próxima sesión</button>
                   </div>
                 </div>
               ))}
@@ -4626,6 +4695,18 @@ export default function ParticipantPortalPage() {
                     </div>
                   )}
 
+                  {/* Contenido subido por el mentor — solo lectura */}
+                  {s.resources?.length > 0 && (
+                    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {s.resources.map((r: any) => (
+                        <a key={r.id} href={r.dataUrl || r.url} download={r.fileName || r.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: '#f9fafb', fontSize: '0.78rem', color: '#0891b2', textDecoration: 'none' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#374151' }}>{r.fileName || r.name} <span style={{ color: '#9ca3af' }}>· {r.size}</span></span>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Bitácora de la mentee — reflexión propia, independiente de las notas del mentor */}
                   {s.mentee_reflection ? (
                     <div style={{ marginTop: 10, padding: '10px 14px', background: '#fdf4ff', borderRadius: 10, border: '1px solid #f3e8ff' }}>
@@ -5001,6 +5082,9 @@ export default function ParticipantPortalPage() {
           {renderContent()}
         </main>
       </div>
+
+      {/* Modal de agendar sesión — global, se dispara desde Módulos y desde Sesiones */}
+      {renderSessionFormModal()}
 
       {/* Mensaje privado (DM) — overlay global, se puede abrir desde ecosistema o chat */}
       {dmTarget && (

@@ -825,6 +825,11 @@ class MentoringSession(models.Model):
     topics_covered = models.JSONField(default=list, blank=True)
     mentee_mood = models.PositiveSmallIntegerField(null=True, blank=True, help_text="1-5")
     next_steps = models.TextField(blank=True)
+    # Archivos que el mentor sube junto a las notas de la sesión — mismo
+    # shape que Content.resources ({id, name, type, url, dataUrl, fileName,
+    # size}), guardados como base64 dentro del JSON en vez de FileField para
+    # seguir el mismo patrón ya usado por los recursos de módulo en Studio.
+    resources = models.JSONField(default=list, blank=True)
 
     # AI-generated content suggestion for next session
     ai_suggestion = models.TextField(blank=True)

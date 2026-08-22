@@ -84,6 +84,20 @@ function hasData(r: Resource) { return !!(r.dataUrl || r.url); }
 // MAIN
 // ═══════════════════════════════════════════════════════════════════
 
+// Resumen liviano de una MentoringSession real, usado solo por variant="portal"
+// para mostrar/agendar sesiones directamente desde cada módulo del currículo.
+export interface PortalSessionSummary {
+  id: string;
+  title: string;
+  status: "scheduled" | "completed" | "cancelled" | "no_show";
+  scheduled_at: string;
+  meeting_url?: string;
+  location?: string;
+  session_notes?: string;
+}
+
+const _SESSION_NUM_RE = /sesi[oó]n\s*(\d+)/i;
+
 export default function ProgramPreviewView({
   template,
   assignedPrograms = [],
@@ -91,6 +105,9 @@ export default function ProgramPreviewView({
   onBack,
   backLabel = "Programas",
   variant = "studio",
+  portalSessions = [],
+  onScheduleSession,
+  canScheduleSessions = false,
 }: {
   template: ProgramTemplate;
   assignedPrograms?: Array<{ id: string; name: string; status: string; company?: { name: string; slug?: string } | null }>;
@@ -98,6 +115,9 @@ export default function ProgramPreviewView({
   onBack: () => void;
   backLabel?: string;
   variant?: "studio" | "portal";
+  portalSessions?: PortalSessionSummary[];
+  onScheduleSession?: (moduleIndex: number, moduleName: string) => void;
+  canScheduleSessions?: boolean;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<"overview" | "modules" | "milestones" | "config">("overview");
@@ -152,6 +172,41 @@ export default function ProgramPreviewView({
   const toggle = (id: string) => setExpanded(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const openAll = () => setExpanded(new Set(template.modules.map(m => m.id)));
   const closeAll = () => setExpanded(new Set());
+
+  // Módulo N ↔ "Sesión N | ..." — mismo criterio que usa el backend en
+  // link_session_to_activity para conectar sesiones reales con el roadmap.
+  const sessionForModule = (moduleIndex: number): PortalSessionSummary | undefined =>
+    portalSessions.find(s => {
+      const m = _SESSION_NUM_RE.exec(s.title || "");
+      return m ? parseInt(m[1], 10) === moduleIndex + 1 : false;
+    });
+
+  // Badge de estado o botón de agendar, mostrado en cada módulo — solo en
+  // el portal (mentor/mentee), nunca en Studio (variant sigue "studio" ahí
+  // y esta función retorna null de inmediato).
+  const renderModuleSessionBlock = (moduleIndex: number, moduleName: string) => {
+    if (variant !== "portal") return null;
+    const s = sessionForModule(moduleIndex);
+    if (!s) {
+      if (!canScheduleSessions) return null;
+      return (
+        <button
+          className="mod-session-btn"
+          onClick={e => { e.stopPropagation(); onScheduleSession?.(moduleIndex, moduleName); }}
+        >
+          {I.calendar}<span>Agendar sesión</span>
+        </button>
+      );
+    }
+    const dateLabel = new Date(s.scheduled_at).toLocaleDateString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    if (s.status === "completed") {
+      return <span className="mod-session-badge mod-session-badge-done" onClick={e => e.stopPropagation()}>{I.check}<span>Completada</span></span>;
+    }
+    if (s.status === "cancelled" || s.status === "no_show") {
+      return <span className="mod-session-badge mod-session-badge-muted" onClick={e => e.stopPropagation()}>{s.status === "cancelled" ? "Cancelada" : "No asistió"}</span>;
+    }
+    return <span className="mod-session-badge mod-session-badge-scheduled" onClick={e => e.stopPropagation()}>{I.calendar}<span>Programada · {dateLabel}</span></span>;
+  };
 
   const stats = [
     { icon: I.calendar, label: "Duración", val: template.duration || "—" },
@@ -353,6 +408,7 @@ export default function ProgramPreviewView({
                     </div>
                     <p className="mod-desc">{m.description}</p>
                     <div className="mod-meta"><span>{I.paperclip} {m.resources.length} recursos</span><span>{I.zap} {m.activities.length} actividades</span></div>
+                    {renderModuleSessionBlock(i, m.name) && <div className="mod-session-row">{renderModuleSessionBlock(i, m.name)}</div>}
                   </div>
                 ))}
               </div>
@@ -414,6 +470,7 @@ export default function ProgramPreviewView({
                           <span>{I.paperclip} {m.resources.length} recursos</span><span>{I.zap} {m.activities.length} act.</span>
                         </div>
                       </div>
+                      {renderModuleSessionBlock(i, m.name)}
                       <div className={`chev ${open ? "rot" : ""}`}>{I.chevDown}</div>
                     </div>
                     {open && (
@@ -928,6 +985,15 @@ const CSS = `
 .mod-num{width:36px;height:36px;border-radius:10px;background:#f1f5f9;color:#64748b;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0}
 .mod-desc{font-size:13px;color:#64748b;line-height:1.6;margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .mod-meta{display:flex;gap:16px;font-size:12px;color:#94a3b8}.mod-meta span{display:flex;align-items:center;gap:4px}
+
+/* sesión por módulo (portal) */
+.mod-session-row{margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9}
+.mod-session-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;border:none;background:linear-gradient(135deg,#0891b2,#06b6d4);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0}
+.mod-session-btn:hover{filter:brightness(1.05)}
+.mod-session-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9px;font-size:12px;font-weight:700;flex-shrink:0;white-space:nowrap}
+.mod-session-badge-scheduled{background:#ecfeff;color:#0e7490}
+.mod-session-badge-done{background:#ecfdf5;color:#047857}
+.mod-session-badge-muted{background:#f4f4f5;color:#71717a}
 
 /* resources */
 .res-list{display:grid;gap:8px}
