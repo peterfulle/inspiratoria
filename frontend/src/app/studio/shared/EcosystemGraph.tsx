@@ -81,23 +81,42 @@ export function EcosystemGraph({
   useEffect(() => {
     const w0 = containerRef.current?.clientWidth || width;
     const h0 = containerRef.current?.clientHeight || height;
+
+    // Redes con muchos participantes no caben en el contenedor visible sin
+    // amontonarse (el radio de colisión ya reserva espacio para el nombre
+    // debajo del avatar, no solo para el círculo). En vez de comprimir a
+    // todos dentro del tamaño visible, la simulación corre en un "mundo"
+    // que crece con la cantidad de nodos — y la cámara se autoajusta más
+    // abajo para que ese mundo completo quede visible por defecto (zoom out
+    // automático), sin superposición. Con pocos nodos, spread=1 y el
+    // comportamiento es idéntico al de antes.
+    const nodeCount = rawNodes.length;
+    const BASELINE_NODES = 15; // cantidad que ya cabía bien en el contenedor original
+    const spread = Math.max(1, Math.sqrt(nodeCount / BASELINE_NODES));
+    const worldW = w0 * spread;
+    const worldH = h0 * spread;
+
     const simNodes: EcoNodeDatum[] = rawNodes.map(n => {
       const rand = seededRand(n.id);
-      return { ...n, x: w0 / 2 + (rand() - 0.5) * w0 * 0.6, y: h0 / 2 + (rand() - 0.5) * h0 * 0.6 };
+      return { ...n, x: worldW / 2 + (rand() - 0.5) * worldW * 0.7, y: worldH / 2 + (rand() - 0.5) * worldH * 0.7 };
     });
     const nodeById = new Map(simNodes.map(n => [n.id, n]));
     const validEdges = rawEdges.filter(e => nodeById.has(e.source) && nodeById.has(e.target));
     const simLinks = validEdges.map(e => ({ ...e, source: nodeById.get(e.source)!, target: nodeById.get(e.target)! }));
     nodesRef.current = simNodes;
 
+    // Radio de colisión con buffer para la etiqueta (nombre + rol) debajo del
+    // avatar — antes casi no dejaba margen y los nombres se pisaban entre sí.
+    const collideRadius = (d: any) => (d.is_viewer ? 74 : d.is_my_dupla ? 64 : 58);
+
     const sim = forceSimulation(simNodes)
       .force('link', forceLink(simLinks as any).id((d: any) => d.id)
         .distance((l: any) => l.type === 'MENTORSHIP' ? 190 : Math.max(190, 320 - (l.strength || 30) * 1.4))
         .strength((l: any) => l.type === 'MENTORSHIP' ? 0.95 : 0.15))
       .force('charge', forceManyBody().strength(-480).distanceMax(650))
-      .force('collide', forceCollide().radius((d: any) => (d.is_viewer ? 68 : d.is_my_dupla ? 58 : 50)).strength(0.9))
-      .force('x', forceX(w0 / 2).strength(0.035))
-      .force('y', forceY(h0 / 2).strength(0.035))
+      .force('collide', forceCollide().radius(collideRadius).strength(0.9))
+      .force('x', forceX(worldW / 2).strength(0.035))
+      .force('y', forceY(worldH / 2).strength(0.035))
       .alpha(1).alphaDecay(0.02);
 
     // Afinidad por ciudad: agrupa sin dibujar línea (sección 24 del instructivo)
@@ -119,16 +138,21 @@ export function EcosystemGraph({
     });
 
     sim.on('tick', () => {
-      const w = containerRef.current?.clientWidth || width;
-      const h = containerRef.current?.clientHeight || height;
       for (const n of simNodes) {
-        const r = n.is_viewer ? 68 : n.is_my_dupla ? 58 : 50;
-        n.x = Math.max(r, Math.min(w - r, n.x!));
-        n.y = Math.max(r, Math.min(h - r, n.y!));
+        const r = collideRadius(n);
+        n.x = Math.max(r, Math.min(worldW - r, n.x!));
+        n.y = Math.max(r, Math.min(worldH - r, n.y!));
       }
       setTick(t => t + 1);
     });
     simRef.current = sim;
+
+    // Auto-fit: centra y escala la cámara para que quepa el mundo completo
+    // en el contenedor visible al construir el grafo (una red de 50+
+    // personas se ve completa y espaciada, en vez de recortada o amontonada).
+    const fitK = Math.min(1, w0 / worldW, h0 / worldH);
+    setTransform({ x: (w0 - worldW * fitK) / 2, y: (h0 - worldH * fitK) / 2, k: fitK });
+
     return () => { sim.stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawNodes, rawEdges, width, height]);
@@ -159,7 +183,7 @@ export function EcosystemGraph({
     const rect = containerRef.current!.getBoundingClientRect();
     const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
     setTransform(t => {
-      const newK = Math.min(2.5, Math.max(0.4, t.k * (1 - e.deltaY * 0.001)));
+      const newK = Math.min(2.5, Math.max(0.15, t.k * (1 - e.deltaY * 0.001)));
       const newX = cx - ((cx - t.x) / t.k) * newK;
       const newY = cy - ((cy - t.y) / t.k) * newK;
       return { x: newX, y: newY, k: newK };
@@ -170,7 +194,7 @@ export function EcosystemGraph({
     const rect = containerRef.current?.getBoundingClientRect();
     const cx = rect ? rect.width / 2 : width / 2, cy = rect ? rect.height / 2 : height / 2;
     setTransform(t => {
-      const newK = Math.min(2.5, Math.max(0.4, t.k * factor));
+      const newK = Math.min(2.5, Math.max(0.15, t.k * factor));
       const newX = cx - ((cx - t.x) / t.k) * newK;
       const newY = cy - ((cy - t.y) / t.k) * newK;
       return { x: newX, y: newY, k: newK };
