@@ -305,8 +305,10 @@ export default function ProgramPreviewView({
             <div className="pv-stats-row">
               {stats.map(s => (
                 <div key={s.label} className="pv-stat">
-                  <div className="pv-stat-icon">{s.icon}</div>
-                  <div className="pv-stat-label">{s.label}</div>
+                  <div className="pv-stat-head">
+                    <span className="pv-stat-label">{s.label}</span>
+                    <span className="pv-stat-icon">{s.icon}</span>
+                  </div>
                   <div className="pv-stat-value">{s.val}</div>
                 </div>
               ))}
@@ -945,9 +947,10 @@ const CSS = `
 .pv-desc{font-size:14px;color:#6b7280;line-height:1.6;max-width:640px}
 .pv-tag{padding:4px 14px;border-radius:20px;font-size:12px;font-weight:500;background:#f4f5f6;color:#52525b;border:1px solid #ececec}
 .pv-stats-row{display:grid;grid-template-columns:repeat(6,minmax(112px,1fr));gap:10px;flex-shrink:0}
-.pv-stat{background:#fff;border:1px solid #eef0f2;border-radius:14px;padding:10px 16px;position:relative;box-shadow:0 1px 2px rgba(15,23,42,.03)}
-.pv-stat-icon{position:absolute;right:14px;top:12px;color:#c3ccd6}
-.pv-stat-label{font-size:10.5px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px;padding-right:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-stat{background:#fff;border:1px solid #eef0f2;border-radius:14px;padding:10px 16px;box-shadow:0 1px 2px rgba(15,23,42,.03)}
+.pv-stat-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px}
+.pv-stat-icon{color:#c3ccd6;flex-shrink:0;display:flex}
+.pv-stat-label{font-size:10.5px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .pv-stat-value{font-size:18px;font-weight:800;color:#111827}
 @media(max-width:900px){.pv-stats-row{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:520px){.pv-stats-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
